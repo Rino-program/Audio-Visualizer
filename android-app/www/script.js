@@ -141,6 +141,22 @@ const els = {
     persistSettingsCheckbox: $('persistSettingsCheckbox')
 };
 
+// Capacitor helpers (Android)
+function isNativeCapacitor() {
+    return typeof window.Capacitor !== 'undefined' && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform();
+}
+
+function toCapacitorFileUrl(uri) {
+    try {
+        if (typeof window.Capacitor !== 'undefined' && typeof window.Capacitor.convertFileSrc === 'function') {
+            return window.Capacitor.convertFileSrc(uri);
+        }
+    } catch {
+        // ignore
+    }
+    return uri;
+}
+
 let W, H;
 let topBarH = 0;
 let bottomBarH = 0;
@@ -260,6 +276,15 @@ async function init() {
             showOverlay('✅ プレイリストをクリアしました');
         }
     };
+    // Native環境では「パス/URI保存」で容量を抑えるため、FilePickerを優先
+    const nativeFileBtn = document.getElementById('nativeFileBtn');
+    if (nativeFileBtn && isNativeCapacitor()) {
+        nativeFileBtn.addEventListener('click', async e => {
+            e.preventDefault();
+            await openNativeFilePicker();
+        });
+    }
+
     els.fileInput.onchange = handleLocalFiles;
     els.gDriveBtn.onclick = openGDrivePicker;
     els.closeVideoBtn.onclick = () => { state.settings.showVideo = false; updateVideoVisibility(); applySettingsToUI(); };
@@ -531,6 +556,69 @@ function saveSettingsToStorage() {
     localStorage.setItem('audioVisualizerPlaylist', JSON.stringify(playlistData));
 }
 
+async function openNativeFilePicker() {
+    // Requires: capacitor.js loaded + FilePicker plugin installed
+    if (!isNativeCapacitor()) {
+        els.fileInput?.click();
+        return;
+    }
+
+    const plugins = window.Capacitor?.Plugins;
+    const filePicker = plugins?.FilePicker;
+
+    if (!filePicker || typeof filePicker.pickFiles !== 'function') {
+        alert('FilePickerプラグインが見つかりません。android-appで依存追加後に `npx cap sync` してください。');
+        return;
+    }
+
+    try {
+        const result = await filePicker.pickFiles({ multiple: true, readData: false });
+        const files = Array.isArray(result?.files) ? result.files : [];
+        if (files.length === 0) return;
+
+        const accepted = [];
+        const allowedExt = new Set(['mp3', 'wav', 'm4a', 'aac', 'mp4', 'webm', 'mkv', 'mov', 'ogg', 'flac', 'opus']);
+        const videoExt = new Set(['mp4', 'webm', 'mkv', 'mov']);
+
+        for (const f of files) {
+            const name = (f?.name || '').toLowerCase();
+            const ext = name.includes('.') ? name.split('.').pop() : '';
+            const isVideo = videoExt.has(ext);
+            if (!name) continue;
+            if (allowedExt.has(ext)) {
+                const uri = f?.path || f?.uri || '';
+                if (!uri) continue;
+                accepted.push({ name: f.name, uri, isVideo });
+            }
+        }
+
+        if (accepted.length === 0) {
+            showOverlay('対応するファイルを選択してください');
+            return;
+        }
+
+        showOverlay(`📥 ${accepted.length}個のファイルを取り込み中...`);
+
+        for (const item of accepted) {
+            state.playlist.push({
+                name: item.name,
+                url: toCapacitorFileUrl(item.uri),
+                source: 'local',
+                isVideo: item.isVideo,
+                localRef: `uri:${item.uri}`
+            });
+        }
+
+        renderPlaylist();
+        if (state.currentIndex === -1) playTrack(state.playlist.length - accepted.length);
+        saveSettingsToStorage();
+        setTimeout(() => showOverlay(`✅ ${accepted.length}個のファイルを追加しました`), 500);
+    } catch (error) {
+        console.error('FilePicker failed:', error);
+        showOverlay('❌ ファイル選択に失敗しました');
+    }
+}
+
 // ============== PLAYLIST PERSISTENCE (LocalStorage + IndexedDB) ==============
 const PLAYLIST_STORAGE_KEY = 'audioVisualizerPlaylistV7';
 const LOCAL_FILE_DB_NAME = 'audioVisualizerLocalFiles';
@@ -642,6 +730,13 @@ async function loadPlaylistFromStorage() {
         if (source === 'local') {
             const localRef = typeof item.localRef === 'string' ? item.localRef : null;
             const legacyPath = typeof item.path === 'string' ? item.path : null;
+
+            if (localRef && localRef.startsWith('uri:')) {
+                const uri = localRef.slice('uri:'.length);
+                if (!uri) continue;
+                restored.push({ name, url: toCapacitorFileUrl(uri), source: 'local', isVideo, localRef });
+                continue;
+            }
 
             if (localRef && localRef.startsWith('path:')) {
                 const p = localRef.slice('path:'.length);

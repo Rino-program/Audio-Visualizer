@@ -97,7 +97,7 @@
                 <h3>プレイリスト</h3>
                 <div class="playlist-actions">
                     <button id="clearPlaylistBtn" class="icon-btn sm" title="すべて削除" aria-label="プレイリストをすべて削除">🗑️</button>
-                    <label class="file-btn">
+                    <label class="file-btn" id="nativeFileBtn">
                         📁 追加
                         <input type="file" id="fileInput" multiple hidden>
                     </label>
@@ -383,6 +383,7 @@
         </div>
     </div>
 
+    <script src="capacitor.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
