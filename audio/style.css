@@ -1,0 +1,1212 @@
+:root {
+    --primary: #6366f1; /* Indigo */
+    --primary-hover: #818cf8;
+    --accent: #06b6d4; /* Cyan */
+    --bg-color: #0f172a;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    
+    --glass-bg: rgba(15, 23, 42, 0.6);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-highlight: rgba(255, 255, 255, 0.05);
+    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.36);
+    
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-full: 9999px;
+    
+    --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Layout helpers */
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+
+    --ui-pad: 20px;
+    --ui-pad-mobile: 12px;
+}
+
+* {
+    box-sizing: border-box;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    outline: none;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg-color);
+    color: var(--text-main);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+button, input, select {
+    font-family: inherit;
+}
+
+/* Better default focus (keyboard / accessibility) */
+:focus-visible {
+    outline: 2px solid rgba(99, 102, 241, 0.65);
+    outline-offset: 2px;
+}
+
+/* Canvas Layer */
+#cv {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;    pointer-events: none;}
+
+/* Video Layer */
+.video-container {
+    position: absolute;
+    top: 100px; /* UIと被らないように初期位置を下に */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 320px;
+    aspect-ratio: 16 / 9;
+    z-index: 5;
+    background: #000;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    box-shadow: var(--glass-shadow);
+    border: 1px solid var(--glass-border);
+    resize: both;
+    min-width: 160px;
+    min-height: 90px;
+    will-change: transform, top, left;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+    transition: top 0.3s, left 0.3s, width 0.3s, height 0.3s, border-radius 0.3s, transform 0.3s, opacity 0.3s;
+    contain: strict;
+}
+
+.video-container.dragging {
+    transition: none !important;
+}
+
+.video-container.background-mode {
+    top: 0 !important;
+    left: 0 !important;
+    transform: none !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: -1;
+    border-radius: 0;
+    border: none;
+    resize: none;
+}
+
+.video-container.background-mode .video-controls {
+    display: none;
+}
+
+.video-container.hidden {
+    display: none;
+}
+
+#bgVideo {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+    image-rendering: auto;
+}
+
+.video-container.background-mode #bgVideo {
+    object-fit: cover;
+}
+
+/* Drag & Drop Feedback */
+body.drag-over::after {
+    content: 'ファイルをドロップして追加';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(99, 102, 241, 0.2);
+    border: 4px dashed var(--primary);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: bold;
+    color: #fff;
+    pointer-events: none;
+}
+
+.video-controls {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 30px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.5), transparent);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 10px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.video-container:hover .video-controls {
+    opacity: 1;
+}
+
+.video-handle {
+    cursor: move;
+    color: #fff;
+    font-size: 18px;
+}
+
+.mini-btn {
+    background: none;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px;
+}
+
+.action-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--glass-border);
+    color: #fff;
+    padding: 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.2s;
+    white-space: nowrap;
+}
+.action-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Help Tab Styles */
+.shortcut-list {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+}
+
+.shortcut-list li {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 8px 12px;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+}
+
+.shortcut-list li span {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-weight: bold;
+    color: var(--accent);
+}
+
+.help-section h3 {
+    margin-bottom: 15px;
+    color: var(--accent);
+    border-bottom: 1px solid var(--glass-border);
+    padding-bottom: 5px;
+}
+
+.color-preset-btn {
+    height: 30px;
+    border-radius: 4px;
+    border: 1px solid var(--glass-border);
+    cursor: pointer;
+    transition: transform 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    color: #fff;
+    text-shadow: 0 0 2px #000;
+}
+.color-preset-btn:hover {
+    transform: scale(1.05);
+}
+
+/* UI Layer */
+#uiLayer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    pointer-events: none;
+    transition: opacity 0.4s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: calc(var(--ui-pad) + var(--safe-top)) calc(var(--ui-pad) + var(--safe-right)) calc(var(--ui-pad) + var(--safe-bottom)) calc(var(--ui-pad) + var(--safe-left));
+}
+
+#uiLayer.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+/* When UI is hidden, nothing inside it should ever receive pointer events. */
+#uiLayer.hidden, #uiLayer.hidden * {
+    pointer-events: none !important;
+}
+
+#uiLayer > * {
+    pointer-events: auto;
+}
+
+/* Persistent Controls */
+#persistentControls {
+    position: fixed;
+    top: calc(20px + var(--safe-top));
+    right: calc(20px + var(--safe-right));
+    display: flex;
+    gap: 12px;
+    z-index: 1001;
+    transition: var(--transition);
+    pointer-events: auto;
+}
+
+#uiLayer.hidden ~ #persistentControls {
+    opacity: 0.5;
+}
+
+#uiLayer.hidden ~ #persistentControls:hover {
+    opacity: 1;
+}
+
+/* Adjust Top Bar to make space for persistent controls */
+.top-bar {
+    padding-right: 140px; /* Space for fixed buttons (desktop) */
+}
+
+/* Glassmorphism Utility */
+.glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    background-image: linear-gradient(to bottom right, var(--glass-highlight), transparent);
+}
+
+/* Top Bar */
+.top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+    border-radius: var(--radius-lg);
+    margin-bottom: auto; /* Push to top */
+    width: 100%;
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.status-display {
+    display: flex;
+    flex-direction: column;
+    min-width: 0; /* For text truncation */
+}
+
+#statusText {
+    font-size: 1rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-main);
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+#timeDisplay {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-family: 'Roboto Mono', monospace;
+    margin-top: 2px;
+}
+
+.top-controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+/* Input Toggle Group */
+.input-toggle-group {
+    display: flex;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 4px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--glass-border);
+}
+
+.toggle-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    padding: 6px 16px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: var(--transition);
+}
+
+.toggle-btn:hover {
+    color: var(--text-main);
+}
+
+.toggle-btn.active {
+    background: var(--primary);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+}
+
+/* Icon Buttons */
+.icon-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    color: var(--text-main);
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    transition: var(--transition);
+}
+
+.icon-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-1px);
+}
+
+.icon-btn.active {
+    color: var(--accent);
+    background: rgba(6, 182, 212, 0.15);
+    border-color: var(--accent);
+}
+
+.icon-btn:active {
+    transform: translateY(1px);
+}
+
+/* Bottom Controls (Floating) */
+.controls-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 20px;
+    border-radius: var(--radius-lg);
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto; /* Center horizontally */
+}
+
+/* Prevent accidental text selection when dragging ranges on mobile */
+input[type="range"] {
+    touch-action: pan-y;
+}
+
+/* Progress Bar */
+.progress-container {
+    width: 100%;
+    height: 6px;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.progress-container.hidden { display: none; }
+
+input[type=range] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100%;
+    background: transparent;
+    cursor: pointer;
+    height: 20px; /* Hit area */
+    margin: 0;
+}
+
+input[type=range]:focus {
+    outline: none;
+}
+
+/* Custom Range Track & Thumb */
+input[type=range]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    transition: var(--transition);
+}
+
+input[type=range]:hover::-webkit-slider-runnable-track {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    height: 14px;
+    width: 14px;
+    border-radius: 50%;
+    background: var(--text-main);
+    margin-top: -5px; /* Center thumb */
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+    transition: var(--transition);
+}
+
+input[type=range]:hover::-webkit-slider-thumb {
+    box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.1);
+    transform: scale(1.1);
+}
+
+/* Main Controls Row */
+.main-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.control-group {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex: 1;
+}
+
+.control-group.center {
+    justify-content: center;
+    gap: 24px;
+}
+
+.control-group.right {
+    justify-content: flex-end;
+}
+
+.control-group.hidden {
+    visibility: hidden;
+    pointer-events: none;
+}
+
+/* Playback Buttons */
+.ctrl-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+    border-radius: 50%;
+}
+
+.ctrl-btn.sm {
+    width: 40px;
+    height: 40px;
+    font-size: 1.2rem;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.ctrl-btn.sm:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.ctrl-btn.play-btn {
+    width: 64px;
+    height: 64px;
+    font-size: 1.8rem;
+    background: var(--primary);
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+}
+
+.ctrl-btn.play-btn:hover {
+    background: var(--primary-hover);
+    transform: scale(1.05);
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+}
+
+.ctrl-btn.play-btn:active {
+    transform: scale(0.95);
+}
+
+/* Volume */
+.volume-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 120px;
+}
+
+#volIcon {
+    font-size: 1.2rem;
+    width: 24px;
+    text-align: center;
+}
+
+/* Select Dropdown */
+select {
+    appearance: none;
+    background-color: rgba(0, 0, 0, 0.3);
+    color: var(--text-main);
+    border: 1px solid var(--glass-border);
+    padding: 8px 32px 8px 16px;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23fff' d='M6 8.825L1.175 4 2.238 2.938 6 6.7l3.763-3.762L10.825 4z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    transition: var(--transition);
+}
+
+select:hover {
+    background-color: rgba(0, 0, 0, 0.5);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+select option {
+    background-color: var(--bg-color);
+    color: var(--text-main);
+}
+
+/* Playlist Panel */
+.playlist-panel {
+    position: absolute;
+    top: 80px;
+    left: 20px;
+    width: 400px;
+    max-width: calc(100vw - 40px);
+    max-height: calc(100vh - 240px);
+    border-radius: var(--radius-lg);
+    display: flex;
+    flex-direction: column;
+    transition: var(--transition);
+    z-index: 1005;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+}
+
+.playlist-panel.collapsed {
+    display: none;
+}
+
+/* Improve tap targets inside playlist header on touch devices */
+.playlist-actions .icon-btn.sm {
+    width: 36px;
+    height: 36px;
+}
+
+.playlist-header {
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid var(--glass-border);
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.playlist-header h3 {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.playlist-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    flex: 1;
+    min-width: 160px; /* これを下回ると折り返す */
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.playlist-actions::-webkit-scrollbar { display: none; }
+
+.playlist-header #closePlaylistBtn {
+    flex-shrink: 0;
+}
+
+.file-btn, .drive-btn {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    cursor: pointer;
+    border: none;
+    color: var(--text-main);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: var(--transition);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.file-btn:hover, .drive-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.playlist-items {
+    overflow-y: auto;
+    flex: 1;
+    padding: 6px;
+}
+
+.playlist-search {
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.playlist-search input {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    color: var(--text-main);
+    font-size: 0.9rem;
+    outline: none;
+    transition: var(--transition);
+}
+
+.playlist-search input:focus {
+    border-color: var(--primary);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.playlist-items::-webkit-scrollbar {
+    width: 6px;
+}
+.playlist-items::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+}
+
+.playlist-item {
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    cursor: default;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: var(--transition);
+    margin-bottom: 2px;
+    background: rgba(255, 255, 255, 0.02);
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+}
+
+.playlist-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.playlist-item.active {
+    background: rgba(99, 102, 241, 0.15);
+    color: var(--primary);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    font-weight: 600;
+}
+
+.playlist-item.dragging {
+    opacity: 0.5;
+    background: rgba(99, 102, 241, 0.3);
+}
+
+/* タッチ操作時のみ pointer-events を無効化して背後の要素を判定可能にする */
+.playlist-item.touch-dragging {
+    pointer-events: none;
+}
+
+.playlist-item.drag-over {
+    background: rgba(99, 102, 241, 0.4);
+    border: 1px dashed var(--primary);
+}
+
+.drag-handle {
+    color: var(--text-main);
+    cursor: grab;
+    margin-right: 8px;
+    font-size: 1.2rem;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    touch-action: none;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.playlist-item:hover .drag-handle {
+    opacity: 1;
+}
+
+/* タッチデバイスでハンドルを常に見やすく表示 */
+@media (hover: none) {
+    .drag-handle {
+        opacity: 0.9;
+    }
+}
+
+.track-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    cursor: pointer;
+}
+
+.playlist-item .name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.9rem;
+}
+
+.item-actions {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+    opacity: 0;
+    transition: var(--transition);
+}
+
+.playlist-item:hover .item-actions {
+    opacity: 1;
+}
+
+.move-btn, .remove-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 6px;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+    border-radius: var(--radius-sm);
+}
+
+.move-btn:hover {
+    color: var(--primary);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.remove-btn:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+}
+
+/* タッチデバイスではアクションを常に表示 */
+@media (hover: none) {
+    .item-actions {
+        opacity: 1;
+    }
+}
+
+.playlist-empty {
+    padding: 20px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+/* Overlay Message */
+.overlay-msg {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.7);
+    color: #fff;
+    padding: 16px 32px;
+    border-radius: var(--radius-full);
+    font-size: 1.2rem;
+    pointer-events: none;
+    transition: opacity 0.3s;
+    backdrop-filter: blur(4px);
+    z-index: 100;
+}
+.overlay-msg.hidden { opacity: 0; }
+
+/* Settings Modal */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85); /* Darker background, removed backdrop-filter for performance */
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+}
+
+.modal.open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.modal-content {
+    width: 90%;
+    max-width: 550px;
+    height: 650px; /* Fixed height for stability */
+    max-height: 90vh;
+    border-radius: var(--radius-lg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    background: #1a1a20; /* Solid background to prevent transparency lag */
+}
+
+@media (prefers-reduced-motion: reduce) {
+    * {
+        transition: none !important;
+        scroll-behavior: auto !important;
+    }
+
+    .icon-btn:hover {
+        transform: none;
+    }
+}
+
+.modal-header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--glass-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h2 { margin: 0; font-size: 1.2rem; }
+
+.close-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: var(--transition);
+}
+.close-btn:hover { color: var(--text-main); }
+
+.tabs {
+    display: flex;
+    padding: 0 4px;
+    border-bottom: 1px solid var(--glass-border);
+    background: rgba(0,0,0,0.3);
+    overflow-x: auto;
+    scrollbar-width: none;
+    width: 100%;
+    flex-shrink: 0; /* Prevent squashing */
+    min-height: 48px; /* Ensure minimum height */
+    align-items: center;
+}
+.tabs::-webkit-scrollbar { display: none; }
+
+.tab-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    padding: 0 16px; /* Horizontal padding only */
+    height: 100%; /* Fill the container height */
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.85rem;
+    border-bottom: 2px solid transparent;
+    transition: var(--transition);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.tab-btn.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+.tab-content {
+    display: none;
+    padding: 20px 24px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0; /* Flexbox scroll fix */
+    width: 100%;
+    box-sizing: border-box;
+}
+.tab-content.active { display: block; }
+
+.setting-item {
+    margin-bottom: 20px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.setting-item .range-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+}
+
+.setting-item .range-wrapper input {
+    flex: 1;
+    min-width: 0;
+}
+
+.setting-item .range-wrapper span {
+    min-width: 45px;
+    text-align: right;
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: var(--primary);
+    flex-shrink: 0;
+}
+
+.setting-item label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.setting-item select, 
+.setting-item input[type="text"],
+.setting-item input[type="password"],
+.setting-item input[type="color"] {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid var(--glass-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.1);
+}
+
+#saveSettingsBtn {
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    padding: 8px 24px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-weight: 600;
+    transition: var(--transition);
+}
+#saveSettingsBtn:hover { background: var(--primary-hover); }
+
+#resetAllSettingsBtn {
+    background: rgba(239, 68, 68, 0.1) !important;
+    border: 1px solid rgba(239, 68, 68, 0.3) !important;
+    color: #ef4444 !important;
+    padding: 8px 16px !important;
+    border-radius: var(--radius-sm) !important;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: var(--transition);
+}
+#resetAllSettingsBtn:hover {
+    background: rgba(239, 68, 68, 0.2) !important;
+    border-color: #ef4444 !important;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    /* Keep the fixed buttons from overlapping the title/status on small screens */
+    #persistentControls {
+        top: calc(12px + var(--safe-top));
+        right: calc(12px + var(--safe-right));
+        gap: 8px;
+    }
+
+    .icon-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 1rem;
+    }
+
+    .top-bar {
+        flex-direction: column;
+        gap: 12px;
+        align-items: stretch;
+        padding: calc(56px + var(--safe-top)) 12px 12px; /* top padding leaves room for fixed buttons */
+        padding-right: 12px; /* Cancel desktop fixed-button padding */
+    }
+    
+    .status-display {
+        text-align: center;
+        margin-bottom: 4px;
+    }
+    
+    .top-controls {
+        justify-content: space-between;
+    }
+    
+    .controls-bar {
+        padding: 16px;
+        gap: 12px;
+    }
+    
+    .main-controls {
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    
+    .control-group {
+        min-width: auto;
+    }
+    
+    .control-group.left { order: 2; justify-content: flex-start; }
+    .control-group.center { order: 1; width: 100%; margin-bottom: 8px; }
+    .control-group.right { order: 3; justify-content: flex-end; }
+
+    /* Playlist becomes a bottom sheet on mobile */
+    .playlist-panel {
+        position: fixed;
+        left: 12px;
+        right: 12px;
+        top: auto;
+        bottom: calc(160px + var(--safe-bottom));
+        width: auto;
+        max-height: min(70vh, calc(100vh - 200px));
+        border-radius: var(--radius-lg);
+        z-index: 1005;
+    }
+
+    .playlist-items {
+        padding: 4px;
+    }
+
+    .playlist-item {
+        padding: 6px 10px;
+        margin-bottom: 2px;
+    }
+
+    .playlist-header {
+        gap: 10px;
+        align-items: flex-start;
+    }
+
+    .playlist-actions {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    .volume-controls {
+        width: min(220px, 45vw);
+    }
+    
+
+@media (max-width: 520px) {
+    #uiLayer {
+        padding: calc(var(--ui-pad-mobile) + var(--safe-top)) calc(var(--ui-pad-mobile) + var(--safe-right)) calc(var(--ui-pad-mobile) + var(--safe-bottom)) calc(var(--ui-pad-mobile) + var(--safe-left));
+    }
+
+    .ctrl-btn.play-btn {
+        width: 60px;
+        height: 60px;
+        font-size: 1.7rem;
+    }
+
+    .control-group.center {
+        gap: 14px;
+    }
+
+    .control-group.right {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .mode-select {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .volume-controls {
+        width: min(240px, 60vw);
+    }
+
+    /* Settings modal should feel native on phones */
+    .modal-content {
+        width: 100%;
+        height: 100%;
+        max-width: none;
+        max-height: none;
+        border-radius: 0;
+    }
+}
+    .modal-content {
+        width: 95%;
+        max-height: 90vh;
+    }
+
+    .modal-header, .modal-footer {
+        padding: 12px 16px;
+    }
+
+    .tab-content {
+        padding: 16px;
+    }
+
+    .setting-item {
+        margin-bottom: 16px;
+    }
+}

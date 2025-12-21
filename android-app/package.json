@@ -1,0 +1,22 @@
+{
+  "name": "audio-visualizer-android",
+  "version": "1.0.0",
+  "description": "Audio Visualizer Pro - Android APK版",
+  "main": "index.js",
+  "scripts": {
+    "dev": "npx cap open android",
+    "sync": "npx cap sync",
+    "build": "npx cap sync && cd android && gradlew.bat assembleDebug",
+    "build-release": "npx cap sync && cd android && gradlew.bat assembleRelease"
+  },
+  "keywords": ["audio", "visualizer", "android", "capacitor"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.0"
+  },
+  "dependencies": {
+    "@capacitor/core": "^6.1.0",
+    "@capacitor/android": "^6.1.0"
+  }
+}

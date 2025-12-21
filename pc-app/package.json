@@ -1,0 +1,39 @@
+{
+  "name": "audio-visualizer-desktop",
+  "version": "1.0.0",
+  "description": "Desktop app for the Audio Visualizer (Electron).",
+  "main": "main.js",
+  "author": "",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "build": "electron-builder --win --publish=never"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^25.1.0"
+  },
+  "build": {
+    "appId": "com.example.audiovisualizer",
+    "files": [
+      "main.js",
+      "preload.js",
+      "public/**/*"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": ["nsis"],
+      "certificateFile": null,
+      "sign": null
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}
