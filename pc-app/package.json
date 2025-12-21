@@ -8,11 +8,12 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
-    "build": "node build-simple.js",
+    "build": "node scripts/build-portable-win.js",
     "build:installer": "electron-builder --win --publish=never"
   },
   "devDependencies": {
     "electron": "^28.0.0",
+    "electron-packager": "^17.1.2",
     "electron-builder": "^25.1.0"
   },
   "build": {

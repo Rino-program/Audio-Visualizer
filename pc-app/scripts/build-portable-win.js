@@ -1,0 +1,104 @@
+#!/usr/bin/env node
+
+const fs = require("fs");
+const path = require("path");
+const { execSync } = require("child_process");
+
+const appDir = path.join(__dirname, "..");
+const releaseDir = path.join(appDir, "release");
+const outDir = path.join(releaseDir, "Audio-Visualizer-Portable");
+const outputZip = path.join(releaseDir, "Audio-Visualizer-Portable.zip");
+
+function sleep(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function rmForce(targetPath) {
+  try {
+    fs.rmSync(targetPath, { recursive: true, force: true });
+  } catch {
+    // ignore
+  }
+}
+
+function ensureDir(targetPath) {
+  fs.mkdirSync(targetPath, { recursive: true });
+}
+
+function run(command) {
+  execSync(command, { stdio: "inherit", cwd: appDir });
+}
+
+if (process.platform !== "win32") {
+  console.error("This build script is intended for Windows.");
+  process.exit(1);
+}
+
+ensureDir(releaseDir);
+rmForce(outDir);
+rmForce(outputZip);
+
+console.log("📦 Packaging app (electron-packager)...");
+
+// electron-packager outputs: <out>/<name>-win32-x64/
+const packName = "audio-visualizer-desktop";
+// Use unique temp directory to avoid touching any previously generated (possibly locked) output.
+const tempOutDir = path.join(releaseDir, ".tmp", `pack-${Date.now()}`);
+ensureDir(tempOutDir);
+const packOutBase = path.join(tempOutDir, `${packName}-win32-x64`);
+
+// Using npx ensures the local devDependency is used.
+// --asar makes distribution simpler (fewer files).
+run(
+  [
+    "npx electron-packager .",
+    packName,
+    "--platform=win32",
+    "--arch=x64",
+    `--out=\"${tempOutDir}\"`,
+    "--asar",
+  ].join(" ")
+);
+
+// Rename to stable folder name for end-users
+if (!fs.existsSync(packOutBase)) {
+  console.error(`Expected output folder not found: ${packOutBase}`);
+  process.exit(1);
+}
+ensureDir(outDir);
+
+// Windows環境ではAV/Indexer等でrenameがEPERMになりやすいので、copy→removeで安定化
+for (let attempt = 1; attempt <= 5; attempt += 1) {
+  try {
+    fs.cpSync(packOutBase, outDir, { recursive: true, force: true });
+    break;
+  } catch (error) {
+    if (attempt === 5) {
+      console.error(`Failed to copy to ${outDir}`);
+      console.error(error && error.message ? error.message : error);
+      process.exit(1);
+    }
+    sleep(400);
+  }
+}
+
+rmForce(tempOutDir);
+
+console.log("🗜️  Creating zip...");
+// Avoid embedding double-quotes inside the -Command string.
+const psCmd = [
+  `$src = '${outDir}\\*'`,
+  `$dst = '${outputZip}'`,
+  `if (Test-Path $dst) { Remove-Item $dst -Force }`,
+  `Compress-Archive -Path $src -DestinationPath $dst -CompressionLevel Optimal`,
+  `$size = (Get-Item $dst).Length / 1MB`,
+  `Write-Host ('✓ Portable package created: ' + $dst)`,
+  `Write-Host ('  Size: ' + [Math]::Round($size, 2) + ' MB')`,
+].join("; ");
+
+execSync(
+  `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "${psCmd}"`,
+  { stdio: "inherit" }
+);
+
+console.log("✅ Build complete!");
