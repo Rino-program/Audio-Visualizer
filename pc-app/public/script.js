@@ -146,8 +146,9 @@ let topBarH = 0;
 let bottomBarH = 0;
 
 // ============== INITIALIZATION ==============
-function init() {
+async function init() {
 	loadSettings();
+	await loadPlaylistFromStorage();
 	resize();
 	window.addEventListener('resize', resize);
 	// Calculate UI heights after initial render
@@ -243,9 +244,10 @@ function init() {
 	els.playlistToggle.onclick = togglePlaylist;
 	els.closePlaylistBtn.onclick = togglePlaylist;
 	els.playlistSearchInput.oninput = renderPlaylist;
-	els.clearPlaylistBtn.onclick = () => {
+	els.clearPlaylistBtn.onclick = async () => {
 		if (confirm('プレイリストをすべてクリアしますか？')) {
-			state.playlist.forEach(t => { if (t.source === 'local') URL.revokeObjectURL(t.url); });
+			await deleteAllLocalTrackStorage(state.playlist);
+			state.playlist.forEach(t => { if (t.source === 'local' && isBlobUrl(t.url)) URL.revokeObjectURL(t.url); });
 			state.playlist = [];
 			state.currentIndex = -1;
 			audio.pause();
@@ -298,12 +300,12 @@ function init() {
 		e.preventDefault();
 		document.body.classList.remove('drag-over');
 	});
-	document.body.addEventListener('drop', e => {
+	document.body.addEventListener('drop', async e => {
 		e.preventDefault();
 		document.body.classList.remove('drag-over');
 		const files = Array.from(e.dataTransfer.files);
 		if (files.length > 0) {
-			handleFiles(files);
+			await handleFiles(files);
 		}
 	});
 
@@ -516,14 +518,171 @@ function saveSettingsToStorage() {
 	if (state.settings.persistSettings) {
 		localStorage.setItem('audioVisualizerSettingsV7', JSON.stringify(state.settings));
 	}
-	// プレイリストの位置情報（Google Drive/ローカルのみ保存）
+	// プレイリスト情報（ローカルは参照キー(localRef)を保存）
 	const playlistData = state.playlist.map(track => ({
 		name: track.name,
 		source: track.source,
 		isVideo: track.isVideo,
+		localRef: track.localRef || null,
 		...(track.source === 'drive' && { fileId: track.fileId })
 	}));
+	localStorage.setItem('audioVisualizerPlaylistV7', JSON.stringify(playlistData));
+	// 後方互換
 	localStorage.setItem('audioVisualizerPlaylist', JSON.stringify(playlistData));
+}
+
+// ============== PLAYLIST PERSISTENCE (LocalStorage + IndexedDB) ==============
+const PLAYLIST_STORAGE_KEY = 'audioVisualizerPlaylistV7';
+const LOCAL_FILE_DB_NAME = 'audioVisualizerLocalFiles';
+const LOCAL_FILE_STORE = 'files';
+
+function isBlobUrl(url) {
+	return typeof url === 'string' && url.startsWith('blob:');
+}
+
+function generateLocalId() {
+	if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+	return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function fileUrlFromPath(filePath) {
+	if (!filePath || typeof filePath !== 'string') return '';
+	// Windows path: C:\a\b.mp3 -> file:///C:/a/b.mp3
+	let normalized = filePath.replace(/\\/g, '/');
+	if (!normalized.startsWith('/')) normalized = '/' + normalized;
+	return encodeURI('file://' + normalized);
+}
+
+function openLocalFileDb() {
+	return new Promise((resolve, reject) => {
+		if (typeof indexedDB === 'undefined') {
+			reject(new Error('indexedDB is not available'));
+			return;
+		}
+		const req = indexedDB.open(LOCAL_FILE_DB_NAME, 1);
+		req.onupgradeneeded = () => {
+			const db = req.result;
+			if (!db.objectStoreNames.contains(LOCAL_FILE_STORE)) {
+				db.createObjectStore(LOCAL_FILE_STORE, { keyPath: 'id' });
+			}
+		};
+		req.onsuccess = () => resolve(req.result);
+		req.onerror = () => reject(req.error);
+	});
+}
+
+async function idbPutLocalFile(file) {
+	const db = await openLocalFileDb();
+	const id = generateLocalId();
+	await new Promise((resolve, reject) => {
+		const tx = db.transaction(LOCAL_FILE_STORE, 'readwrite');
+		tx.oncomplete = () => resolve();
+		tx.onerror = () => reject(tx.error);
+		tx.objectStore(LOCAL_FILE_STORE).put({ id, file });
+	});
+	db.close();
+	return id;
+}
+
+async function idbGetLocalFile(id) {
+	const db = await openLocalFileDb();
+	const record = await new Promise((resolve, reject) => {
+		const tx = db.transaction(LOCAL_FILE_STORE, 'readonly');
+		tx.onerror = () => reject(tx.error);
+		const req = tx.objectStore(LOCAL_FILE_STORE).get(id);
+		req.onsuccess = () => resolve(req.result || null);
+		req.onerror = () => reject(req.error);
+	});
+	db.close();
+	return record ? record.file : null;
+}
+
+async function idbDeleteLocalFile(id) {
+	const db = await openLocalFileDb();
+	await new Promise((resolve, reject) => {
+		const tx = db.transaction(LOCAL_FILE_STORE, 'readwrite');
+		tx.oncomplete = () => resolve();
+		tx.onerror = () => reject(tx.error);
+		tx.objectStore(LOCAL_FILE_STORE).delete(id);
+	});
+	db.close();
+}
+
+async function deleteAllLocalTrackStorage(tracks) {
+	const deletions = tracks
+		.filter(t => t && t.source === 'local' && typeof t.localRef === 'string' && t.localRef.startsWith('idb:'))
+		.map(t => t.localRef.slice('idb:'.length));
+	for (const id of deletions) {
+		try {
+			await idbDeleteLocalFile(id);
+		} catch {
+			// ignore
+		}
+	}
+}
+
+async function loadPlaylistFromStorage() {
+	const saved = localStorage.getItem(PLAYLIST_STORAGE_KEY) || localStorage.getItem('audioVisualizerPlaylist');
+	if (!saved) return;
+
+	let playlistData;
+	try {
+		playlistData = JSON.parse(saved);
+	} catch {
+		return;
+	}
+	if (!Array.isArray(playlistData)) return;
+
+	const restored = [];
+	for (const item of playlistData) {
+		if (!item || typeof item !== 'object') continue;
+		const name = typeof item.name === 'string' ? item.name : 'Unknown';
+		const source = item.source;
+		const isVideo = !!item.isVideo;
+
+		if (source === 'local') {
+			const localRef = typeof item.localRef === 'string' ? item.localRef : null;
+			// Backward compat: ElectronのFile.pathが保存されていた場合
+			const legacyPath = typeof item.path === 'string' ? item.path : null;
+
+			if (localRef && localRef.startsWith('path:')) {
+				const p = localRef.slice('path:'.length);
+				const url = fileUrlFromPath(p);
+				if (!url) continue;
+				restored.push({ name, url, source: 'local', isVideo, localRef });
+				continue;
+			}
+			if (legacyPath) {
+				const url = fileUrlFromPath(legacyPath);
+				if (!url) continue;
+				restored.push({ name, url, source: 'local', isVideo, localRef: `path:${legacyPath}` });
+				continue;
+			}
+			if (localRef && localRef.startsWith('idb:')) {
+				try {
+					const id = localRef.slice('idb:'.length);
+					const file = await idbGetLocalFile(id);
+					if (!file) continue;
+					restored.push({ name, url: URL.createObjectURL(file), source: 'local', isVideo, localRef });
+				} catch {
+					// ignore
+				}
+			}
+			continue;
+		}
+
+		// 既存仕様: Driveはメタだけ復元（再ダウンロードはユーザー操作で）
+		if (source === 'drive') {
+			restored.push({ name, url: '', source: 'drive', isVideo, fileId: item.fileId });
+		}
+	}
+
+	state.playlist = restored;
+	if (state.currentIndex >= state.playlist.length) state.currentIndex = -1;
+	renderPlaylist();
+	if (state.playlist.length > 0) {
+		els.statusText.textContent = '📂 プレイリストを復元しました';
+	}
 }
 
 function setupSettingsInputs() {
@@ -972,7 +1131,7 @@ function handleAudioError(e) {
 }
 function formatTime(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60); const sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
 
-function handleFiles(files) {
+async function handleFiles(files) {
 	const allowedExt = new Set(['mp3', 'wav', 'm4a', 'aac', 'mp4', 'webm', 'mkv', 'mov', 'ogg', 'flac', 'opus']);
 	const videoExt = new Set(['mp4', 'webm', 'mkv', 'mov']);
     
@@ -995,19 +1154,40 @@ function handleFiles(files) {
 
 	showOverlay(`📥 ${accepted.length}個のファイルを取り込み中...`);
 
-	accepted.forEach(item => {
-		state.playlist.push({ name: item.file.name, url: URL.createObjectURL(item.file), source: 'local', isVideo: item.isVideo });
-	});
+	for (const item of accepted) {
+		const file = item.file;
+		const filePath = typeof file.path === 'string' ? file.path : '';
+		let localRef = null;
+		if (filePath) {
+			localRef = `path:${filePath}`;
+		} else {
+			try {
+				const id = await idbPutLocalFile(file);
+				localRef = `idb:${id}`;
+			} catch {
+				localRef = null;
+			}
+		}
+
+		state.playlist.push({
+			name: file.name,
+			url: URL.createObjectURL(file),
+			source: 'local',
+			isVideo: item.isVideo,
+			localRef
+		});
+	}
 	renderPlaylist();
 	if (state.currentIndex === -1) playTrack(state.playlist.length - accepted.length);
+	saveSettingsToStorage();
     
 	setTimeout(() => {
 		showOverlay(`✅ ${accepted.length}個のファイルを追加しました`);
 	}, 500);
 }
 
-function handleLocalFiles(e) {
-	handleFiles(Array.from(e.target.files));
+async function handleLocalFiles(e) {
+	await handleFiles(Array.from(e.target.files));
 	e.target.value = '';
 }
 
@@ -1211,10 +1391,19 @@ function performPlaylistReorder(draggedIdx, targetIdx) {
 	showOverlay('プレイリストの順序を変更しました');
 }
 
-function removeFromPlaylist(index) {
+async function removeFromPlaylist(index) {
 	if (index < 0 || index >= state.playlist.length) return;
 	const track = state.playlist[index];
-	if (track.source === 'local') URL.revokeObjectURL(track.url);
+	if (track.source === 'local') {
+		if (isBlobUrl(track.url)) URL.revokeObjectURL(track.url);
+		if (typeof track.localRef === 'string' && track.localRef.startsWith('idb:')) {
+			try {
+				await idbDeleteLocalFile(track.localRef.slice('idb:'.length));
+			} catch {
+				// ignore
+			}
+		}
+	}
 	state.playlist.splice(index, 1);
     
 	// 現在再生中の曲を削除した場合の処理
@@ -1592,5 +1781,9 @@ function drawMirrorBars(fd, maxH, drawH, drawStartY) {
 	}
 }
 
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', () => {
+	init().catch(err => {
+		console.error('Init failed:', err);
+	});
+});
 
