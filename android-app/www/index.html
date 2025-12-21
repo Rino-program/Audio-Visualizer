@@ -67,9 +67,11 @@
                 <!-- Center: Playback -->
                 <div class="control-group center" id="playbackControls">
                     <button id="shuffleBtn" class="icon-btn sm" title="シャッフル" aria-label="シャッフル">🔀</button>
+                    <button id="seekBackBtn" class="icon-btn sm" title="10秒戻す" aria-label="10秒戻す">⏪10</button>
                     <button id="prevBtn" class="ctrl-btn sm" aria-label="前の曲">⏮</button>
                     <button id="playBtn" class="ctrl-btn play-btn" aria-label="再生/一時停止">▶</button>
                     <button id="nextBtn" class="ctrl-btn sm" aria-label="次の曲">⏭</button>
+                    <button id="seekForwardBtn" class="icon-btn sm" title="10秒進む" aria-label="10秒進む">10⏩</button>
                     <button id="repeatBtn" class="icon-btn sm" title="リピート" aria-label="リピート">🔁</button>
                 </div>
 
@@ -316,6 +318,12 @@
                 <div class="setting-item">
                     <label>
                         <input type="checkbox" id="persistSettingsCheckbox" checked> 設定をブラウザに保存する
+                    </label>
+                </div>
+
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="storeLocalFilesCheckbox"> ローカルファイルをアプリ内に保存する (容量が増えます)
                     </label>
                 </div>
             </div>

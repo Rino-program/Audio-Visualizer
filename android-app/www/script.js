@@ -68,7 +68,8 @@ const state = {
         playbackRate: 1.0,
         sleepTimer: 0,
         autoPlayNext: true,
-        stopOnVideoEnd: false
+        stopOnVideoEnd: false,
+        storeLocalFiles: false
     }
 };
 
@@ -97,6 +98,8 @@ const els = {
     playBtn: $('playBtn'),
     prevBtn: $('prevBtn'),
     nextBtn: $('nextBtn'),
+    seekBackBtn: $('seekBackBtn'),
+    seekForwardBtn: $('seekForwardBtn'),
     shuffleBtn: $('shuffleBtn'),
     repeatBtn: $('repeatBtn'),
     seekBar: $('seekBar'),
@@ -141,6 +144,58 @@ const els = {
     persistSettingsCheckbox: $('persistSettingsCheckbox')
 };
 
+let playlistRenderQueued = false;
+function scheduleRenderPlaylist() {
+    if (playlistRenderQueued) return;
+    playlistRenderQueued = true;
+    requestAnimationFrame(() => {
+        playlistRenderQueued = false;
+        renderPlaylist();
+    });
+}
+
+function seekBySeconds(deltaSeconds) {
+    if (state.inputSource !== 'file') return;
+    if (!Number.isFinite(audio.duration) || audio.duration <= 0) return;
+    const next = Math.max(0, Math.min(audio.duration, (audio.currentTime || 0) + deltaSeconds));
+    audio.currentTime = next;
+    if (bgVideo.src) {
+        try { bgVideo.currentTime = next; } catch {}
+    }
+    showOverlay(deltaSeconds < 0 ? '⏪ -10秒' : '⏩ +10秒');
+}
+
+function setupPlaylistEventDelegation() {
+    const root = els.playlistItems;
+    if (!root) return;
+    root.addEventListener('click', e => {
+        const removeBtn = e.target.closest('.remove-btn');
+        if (removeBtn) {
+            e.stopPropagation();
+            removeFromPlaylist(+removeBtn.dataset.index);
+            return;
+        }
+
+        const moveBtn = e.target.closest('.move-btn');
+        if (moveBtn) {
+            e.stopPropagation();
+            const idx = +moveBtn.dataset.index;
+            const direction = moveBtn.classList.contains('up') ? -1 : 1;
+            const targetIdx = idx + direction;
+            if (targetIdx >= 0 && targetIdx < state.playlist.length) {
+                performPlaylistReorder(idx, targetIdx);
+            }
+            return;
+        }
+
+        if (e.target.closest('.drag-handle')) return;
+        const item = e.target.closest('.playlist-item');
+        if (item && item.dataset && item.dataset.index != null) {
+            playTrack(+item.dataset.index);
+        }
+    });
+}
+
 // Capacitor helpers (Android)
 function isNativeCapacitor() {
     return typeof window.Capacitor !== 'undefined' && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform();
@@ -165,6 +220,10 @@ let bottomBarH = 0;
 async function init() {
     loadSettings();
     await loadPlaylistFromStorage();
+
+    // Playlist click handlers (reduce per-render work)
+    setupPlaylistEventDelegation();
+
     resize();
     window.addEventListener('resize', resize);
     // Calculate UI heights after initial render
@@ -234,6 +293,8 @@ async function init() {
     els.playBtn.onclick = togglePlay;
     els.prevBtn.onclick = prevTrack;
     els.nextBtn.onclick = nextTrack;
+    if (els.seekBackBtn) els.seekBackBtn.onclick = () => seekBySeconds(-10);
+    if (els.seekForwardBtn) els.seekForwardBtn.onclick = () => seekBySeconds(10);
     els.shuffleBtn.onclick = toggleShuffle;
     els.repeatBtn.onclick = toggleRepeat;
     els.seekBar.oninput = seek;
@@ -259,7 +320,7 @@ async function init() {
     els.exportBtn.onclick = startExport;
     els.playlistToggle.onclick = togglePlaylist;
     els.closePlaylistBtn.onclick = togglePlaylist;
-    els.playlistSearchInput.oninput = renderPlaylist;
+    els.playlistSearchInput.oninput = scheduleRenderPlaylist;
     els.clearPlaylistBtn.onclick = async () => {
         if (confirm('プレイリストをすべてクリアしますか？')) {
             await deleteAllLocalTrackStorage(state.playlist);
@@ -276,10 +337,16 @@ async function init() {
             showOverlay('✅ プレイリストをクリアしました');
         }
     };
-    // Native環境では「パス/URI保存」で容量を抑えるため、FilePickerを優先
+    // Native環境では設定に応じて
+    // - storeLocalFiles=false: URI保存(FilePicker)
+    // - storeLocalFiles=true : アプリ内保存(file input -> IndexedDB)
     const nativeFileBtn = document.getElementById('nativeFileBtn');
     if (nativeFileBtn && isNativeCapacitor()) {
         nativeFileBtn.addEventListener('click', async e => {
+            if (state.settings.storeLocalFiles) {
+                // allow default label -> input click
+                return;
+            }
             e.preventDefault();
             await openNativeFilePicker();
         });
@@ -474,6 +541,11 @@ function updateVideoVisibility() {
     
     container.classList.toggle('hidden', !state.settings.showVideo || !isVideo);
     container.classList.toggle('background-mode', state.settings.videoMode === 'background');
+	
+    // モード切替時に残りやすいスタイルを整理
+    if (state.settings.videoMode !== 'window') {
+        container.style.bottom = '';
+    }
     
     // ウィンドウモードで位置が未設定なら中央下に配置
     if (state.settings.videoMode === 'window' && !localStorage.getItem('videoWindowPos')) {
@@ -777,6 +849,49 @@ async function loadPlaylistFromStorage() {
     }
 }
 
+function hasIdbLocalTracksInPlaylist() {
+    return state.playlist.some(t => t && t.source === 'local' && typeof t.localRef === 'string' && t.localRef.startsWith('idb:'));
+}
+
+async function purgeIdbLocalTracksFromPlaylist() {
+    const targets = state.playlist
+        .map((t, idx) => ({ t, idx }))
+        .filter(({ t }) => t && t.source === 'local' && typeof t.localRef === 'string' && t.localRef.startsWith('idb:'));
+    if (targets.length === 0) return;
+
+    try {
+        await deleteAllLocalTrackStorage(targets.map(x => x.t));
+    } catch {
+        // ignore
+    }
+
+    for (const { t } of targets) {
+        if (t && isBlobUrl(t.url)) {
+            try { URL.revokeObjectURL(t.url); } catch {}
+        }
+    }
+
+    const removedIndices = new Set(targets.map(x => x.idx));
+    const removedBeforeCurrent = [...removedIndices].filter(i => i < state.currentIndex).length;
+    const wasPlayingRemoved = removedIndices.has(state.currentIndex);
+
+    state.playlist = state.playlist.filter((_, idx) => !removedIndices.has(idx));
+
+    if (wasPlayingRemoved) {
+        audio.pause();
+        state.isPlaying = false;
+        updatePlayBtn();
+        state.currentIndex = -1;
+        els.statusText.textContent = '待機中...';
+    } else if (state.currentIndex >= 0) {
+        state.currentIndex = Math.max(-1, state.currentIndex - removedBeforeCurrent);
+    }
+
+    renderPlaylist();
+    updateVideoVisibility();
+    saveSettingsToStorage();
+}
+
 function setupSettingsInputs() {
     $('smoothingSlider').oninput = e => {
         state.settings.smoothing = +e.target.value;
@@ -834,6 +949,29 @@ function setupSettingsInputs() {
     $('clientIdInput').onchange = e => { state.settings.gDriveClientId = e.target.value.trim(); };
     $('apiKeyInput').onchange = e => { state.settings.gDriveApiKey = e.target.value.trim(); };
     $('persistSettingsCheckbox').onchange = e => { state.settings.persistSettings = e.target.checked; };
+    const storeLocalFilesCheckbox = $('storeLocalFilesCheckbox');
+    if (storeLocalFilesCheckbox) {
+        storeLocalFilesCheckbox.onchange = async e => {
+            const nextValue = !!e.target.checked;
+            const prevValue = !!state.settings.storeLocalFiles;
+            state.settings.storeLocalFiles = nextValue;
+
+            if (prevValue && !nextValue && hasIdbLocalTracksInPlaylist()) {
+                const ok = confirm('「URIのみ」に切り替えるため、アプリ内に保存済みのローカルファイルをプレイリストから削除しますか？\n\n削除すると、再起動後にそれらの曲は復元できなくなります。');
+                if (ok) {
+                    await purgeIdbLocalTracksFromPlaylist();
+                } else {
+                    // 取り消し: 設定を元に戻す
+                    state.settings.storeLocalFiles = true;
+                    e.target.checked = true;
+                    showOverlay('💾 ローカル保存: ON');
+                    return;
+                }
+            }
+
+            showOverlay(state.settings.storeLocalFiles ? '💾 ローカル保存: ON' : '🔗 ローカル保存: OFF (URIのみ)');
+        };
+    }
 
     $('sleepTimerSelect').onchange = e => {
         state.settings.sleepTimer = +e.target.value;
@@ -958,6 +1096,8 @@ function applySettingsToUI() {
     $('clientIdInput').value = state.settings.gDriveClientId;
     $('apiKeyInput').value = state.settings.gDriveApiKey;
     $('persistSettingsCheckbox').checked = state.settings.persistSettings;
+    const storeLocalFilesCheckbox = $('storeLocalFilesCheckbox');
+    if (storeLocalFilesCheckbox) storeLocalFilesCheckbox.checked = !!state.settings.storeLocalFiles;
     
     $('sleepTimerSelect').value = state.settings.sleepTimer;
     $('autoPlayNextCheckbox').checked = state.settings.autoPlayNext;
@@ -1311,36 +1451,6 @@ function renderPlaylist() {
             </div>
         </div>
     `).join('');
-
-    // プレイリストアイテムのクリック処理
-    els.playlistItems.querySelectorAll('.playlist-item').forEach(item => { 
-        item.onclick = e => { 
-            if (!e.target.closest('.remove-btn') && !e.target.closest('.drag-handle') && !e.target.closest('.move-btn')) {
-                playTrack(+item.dataset.index); 
-            }
-        }; 
-    });
-    
-    // 移動ボタン処理
-    els.playlistItems.querySelectorAll('.move-btn').forEach(btn => {
-        btn.onclick = e => {
-            e.stopPropagation();
-            const idx = +btn.dataset.index;
-            const direction = btn.classList.contains('up') ? -1 : 1;
-            const targetIdx = idx + direction;
-            if (targetIdx >= 0 && targetIdx < state.playlist.length) {
-                performPlaylistReorder(idx, targetIdx);
-            }
-        };
-    });
-    
-    // 削除ボタン処理
-    els.playlistItems.querySelectorAll('.remove-btn').forEach(btn => { 
-        btn.onclick = e => { 
-            e.stopPropagation(); 
-            removeFromPlaylist(+btn.dataset.index); 
-        }; 
-    });
     
     // ドラッグ&ドロップ処理
     setupPlaylistDragDrop();
@@ -1618,9 +1728,16 @@ function toggleFullscreen() {
     const cancelFullScreen = doc.exitFullscreen || doc.mozCancelFullScreen || doc.webkitExitFullscreen || doc.msExitFullscreen;
 
     try {
-        if (!doc.fullscreenElement && !doc.mozFullScreenElement && !doc.webkitFullscreenElement && !doc.msFullscreenElement) {
+        const isFs = !!(doc.fullscreenElement || doc.mozFullScreenElement || doc.webkitFullscreenElement || doc.msFullscreenElement);
+        if (!isFs) {
             if (requestFullScreen) {
-                requestFullScreen.call(docEl);
+                const p = requestFullScreen.call(docEl);
+                if (p && typeof p.catch === 'function') {
+                    p.catch(err => {
+                        console.warn('Fullscreen request rejected:', err);
+                        showOverlay('⚠️ フルスクリーン切替に失敗しました');
+                    });
+                }
             } else if (typeof window.ActiveXObject !== "undefined") { // for Internet Explorer
                 const wscript = new ActiveXObject("WScript.Shell");
                 if (wscript !== null) {
@@ -1629,7 +1746,13 @@ function toggleFullscreen() {
             }
         } else {
             if (cancelFullScreen) {
-                cancelFullScreen.call(doc);
+                const p = cancelFullScreen.call(doc);
+                if (p && typeof p.catch === 'function') {
+                    p.catch(err => {
+                        console.warn('Fullscreen exit rejected:', err);
+                        showOverlay('⚠️ フルスクリーン解除に失敗しました');
+                    });
+                }
             }
         }
     } catch (e) {
@@ -1701,32 +1824,29 @@ function getColor(i, v = 1, total = state.settings.barCount) {
     return state.settings.fixedColor;
 }
 
-function draw() {
-    // バックグラウンドから復帰時に同期を取る
-    if (document.hidden) {
-        // バックグラウンド中は動画を再生し続けるが、描画は行わない
-        // 復帰時に同期するため何もしない
-        requestAnimationFrame(draw);
-        return;
-    }
-    
-    // フォアグラウンドに復帰したとき、動画と音声の同期を確認
-    if (bgVideo.src && state.isPlaying && state.settings.showVideo) {
-        const timeDiff = Math.abs(bgVideo.currentTime - audio.currentTime);
-        // 遅延が1秒以上ある場合のみ同期（小さなズレは無視）
-        if (timeDiff > 1.0) {
-            console.log(`Syncing video: audio=${audio.currentTime.toFixed(2)}s, video=${bgVideo.currentTime.toFixed(2)}s`);
-            bgVideo.currentTime = audio.currentTime;
-        }
-    }
+let lastDrawTs = 0;
+let lastVideoSyncCheckTs = 0;
+function draw(ts = 0) {
+    requestAnimationFrame(draw);
 
-    if (state.settings.lowPowerMode) {
-        // 軽量化モード: 30FPSに制限
-        setTimeout(() => {
-            requestAnimationFrame(draw);
-        }, 1000 / 30);
-    } else {
-        requestAnimationFrame(draw);
+    // バックグラウンド中は描画を行わない（復帰時に同期チェックで追従）
+    if (document.hidden) return;
+
+    const targetFps = state.settings.lowPowerMode ? 30 : 60;
+    const minInterval = 1000 / targetFps;
+    if (lastDrawTs && ts - lastDrawTs < minInterval) return;
+    lastDrawTs = ts;
+
+    // 動画と音声の同期チェックは間引く（毎フレームやると重い）
+    if (bgVideo.src && state.isPlaying && state.settings.showVideo) {
+        if (!lastVideoSyncCheckTs || ts - lastVideoSyncCheckTs >= 250) {
+            lastVideoSyncCheckTs = ts;
+            const timeDiff = Math.abs(bgVideo.currentTime - audio.currentTime);
+            // 遅延が1秒以上ある場合のみ同期（小さなズレは無視）
+            if (timeDiff > 1.0) {
+                bgVideo.currentTime = audio.currentTime;
+            }
+        }
     }
 
     if (state.settings.videoMode === 'background' && state.playlist[state.currentIndex]?.isVideo && state.settings.showVideo) {
