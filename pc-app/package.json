@@ -8,7 +8,7 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
-    "build": "node build-portable.js",
+    "build": "node build-simple.js",
     "build:installer": "electron-builder --win --publish=never"
   },
   "devDependencies": {

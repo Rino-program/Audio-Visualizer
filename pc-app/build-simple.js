@@ -30,20 +30,18 @@ try {
     }
 
     // Compress-Archive コマンドで Zip を作成
-    const psCmd = `
-        $src = @('${electronPath}', '${path.join(appDir, 'main.js')}', '${path.join(appDir, 'preload.js')}', '${path.join(appDir, 'public')}')
-        $dst = '${outputZip}'
-        
-        if (Test-Path $dst) { Remove-Item $dst -Force }
-        
-        Compress-Archive -Path $src -DestinationPath $dst -CompressionLevel Optimal
-        
-        $size = (Get-Item $dst).Length / 1MB
-        Write-Host "✓ Portable package created: $dst"
-        Write-Host "  Size: $([Math]::Round($size, 2)) MB"
-    `;
+    // NOTE: -Command を "..." で囲うため、内部にダブルクォートを含めない（クォート崩れ防止）
+    const psCmd = [
+        `$src = @('${path.join(electronPath, '*')}', '${path.join(appDir, 'main.js')}', '${path.join(appDir, 'preload.js')}', '${path.join(appDir, 'public')}')`,
+        `$dst = '${outputZip}'`,
+        `if (Test-Path $dst) { Remove-Item $dst -Force }`,
+        `Compress-Archive -Path $src -DestinationPath $dst -CompressionLevel Optimal`,
+        `$size = (Get-Item $dst).Length / 1MB`,
+        `Write-Host ('✓ Portable package created: ' + $dst)`,
+        `Write-Host ('  Size: ' + [Math]::Round($size, 2) + ' MB')`,
+    ].join('; ');
 
-    execSync(`powershell -Command "${psCmd}"`, { stdio: 'inherit' });
+    execSync(`powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "${psCmd}"`, { stdio: 'inherit' });
     console.log('✅ Build complete!');
 
 } catch (err) {
