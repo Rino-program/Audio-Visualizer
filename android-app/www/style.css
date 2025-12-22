@@ -327,7 +327,6 @@ body.drag-over::after {
     margin-left: auto;
     margin-right: auto;
 }
-
 .status-display {
     display: flex;
     flex-direction: column;
@@ -1090,30 +1089,30 @@ select option {
         padding: calc(56px + var(--safe-top)) 12px 12px; /* top padding leaves room for fixed buttons */
         padding-right: 12px; /* Cancel desktop fixed-button padding */
     }
-    
+
     .status-display {
         text-align: center;
         margin-bottom: 4px;
     }
-    
+
     .top-controls {
         justify-content: space-between;
     }
-    
+
     .controls-bar {
         padding: 16px;
         gap: 12px;
     }
-    
+
     .main-controls {
         flex-wrap: wrap;
         gap: 12px;
     }
-    
+
     .control-group {
         min-width: auto;
     }
-    
+
     .control-group.left { order: 2; justify-content: flex-start; }
     .control-group.center { order: 1; width: 100%; margin-bottom: 8px; }
     .control-group.right { order: 3; justify-content: flex-end; }
@@ -1153,7 +1152,25 @@ select option {
     .volume-controls {
         width: min(220px, 45vw);
     }
-    
+
+    /* Settings modal sizing on phones (non-fullscreen) */
+    .modal-content {
+        width: 95%;
+        max-height: 90vh;
+    }
+
+    .modal-header, .modal-footer {
+        padding: 12px 16px;
+    }
+
+    .tab-content {
+        padding: 16px;
+    }
+
+    .setting-item {
+        margin-bottom: 16px;
+    }
+}
 
 @media (max-width: 520px) {
     #uiLayer {
@@ -1193,20 +1210,40 @@ select option {
         border-radius: 0;
     }
 }
-    .modal-content {
-        width: 95%;
-        max-height: 90vh;
+
+/* Phone landscape: keep controls reachable and playlist unobtrusive */
+@media (max-width: 768px) and (orientation: landscape) and (max-height: 520px) {
+    .top-bar {
+        padding: calc(44px + var(--safe-top)) 12px 10px;
+        gap: 8px;
     }
 
-    .modal-header, .modal-footer {
-        padding: 12px 16px;
+    .controls-bar {
+        padding: 12px;
+        gap: 10px;
     }
 
-    .tab-content {
-        padding: 16px;
+    .main-controls {
+        flex-wrap: nowrap;
+        gap: 10px;
     }
 
-    .setting-item {
-        margin-bottom: 16px;
+    .control-group.center {
+        width: auto;
+        margin-bottom: 0;
+        gap: 16px;
+        order: 2;
+    }
+
+    .control-group.left { order: 1; }
+    .control-group.right { order: 3; }
+
+    .playlist-panel {
+        left: auto;
+        right: 12px;
+        top: calc(12px + var(--safe-top));
+        bottom: calc(120px + var(--safe-bottom));
+        width: min(420px, 46vw);
+        max-height: none;
     }
 }

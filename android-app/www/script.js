@@ -348,7 +348,12 @@ async function init() {
                 return;
             }
             e.preventDefault();
-            await openNativeFilePicker();
+            const useFolder = confirm('フォルダから一括追加しますか？\n\nOK: フォルダ\nキャンセル: ファイル');
+            if (useFolder) {
+                await openNativeFolderImport();
+            } else {
+                await openNativeFilePicker();
+            }
         });
     }
 
@@ -691,6 +696,57 @@ async function openNativeFilePicker() {
     }
 }
 
+async function openNativeFolderImport() {
+    if (!isNativeCapacitor()) {
+        showOverlay('この機能はAndroidアプリ版で利用できます');
+        return;
+    }
+
+    const plugins = window.Capacitor?.Plugins;
+    const folderImport = plugins?.LocalFolderImport;
+    if (!folderImport || typeof folderImport.pickAudioFolder !== 'function') {
+        alert('フォルダ一括追加プラグインが見つかりません。android-appで `npx cap sync` してください。');
+        return;
+    }
+
+    try {
+        showOverlay('📂 フォルダを選択してください');
+        const result = await folderImport.pickAudioFolder({});
+        const files = Array.isArray(result?.files) ? result.files : [];
+        if (files.length === 0) {
+            showOverlay('フォルダ内に対応ファイルが見つかりませんでした');
+            return;
+        }
+
+        showOverlay(`📥 ${files.length}個のファイルを追加中...`);
+
+        for (const f of files) {
+            const name = typeof f?.name === 'string' ? f.name : '';
+            const path = typeof f?.path === 'string' ? f.path : '';
+            if (!name || !path) continue;
+            const isVideo = !!f?.isVideo;
+            state.playlist.push({
+                name,
+                url: toCapacitorFileUrl(path),
+                source: 'local',
+                isVideo,
+                localRef: `app:${path}`
+            });
+        }
+
+        renderPlaylist();
+        if (state.currentIndex === -1) {
+            const firstAddedIndex = Math.max(0, state.playlist.length - files.length);
+            playTrack(firstAddedIndex);
+        }
+        saveSettingsToStorage();
+        setTimeout(() => showOverlay(`✅ ${files.length}個のファイルを追加しました`), 500);
+    } catch (error) {
+        console.error('Folder import failed:', error);
+        showOverlay('❌ フォルダの一括追加に失敗しました');
+    }
+}
+
 // ============== PLAYLIST PERSISTENCE (LocalStorage + IndexedDB) ==============
 const PLAYLIST_STORAGE_KEY = 'audioVisualizerPlaylistV7';
 const LOCAL_FILE_DB_NAME = 'audioVisualizerLocalFiles';
@@ -778,6 +834,22 @@ async function deleteAllLocalTrackStorage(tracks) {
             // ignore
         }
     }
+
+    const appPaths = tracks
+        .filter(t => t && t.source === 'local' && typeof t.localRef === 'string' && t.localRef.startsWith('app:'))
+        .map(t => t.localRef.slice('app:'.length))
+        .filter(Boolean);
+
+    if (appPaths.length > 0 && isNativeCapacitor()) {
+        try {
+            const folderImport = window.Capacitor?.Plugins?.LocalFolderImport;
+            if (folderImport && typeof folderImport.deleteImportedFiles === 'function') {
+                await folderImport.deleteImportedFiles({ paths: appPaths });
+            }
+        } catch {
+            // ignore
+        }
+    }
 }
 
 async function loadPlaylistFromStorage() {
@@ -807,6 +879,13 @@ async function loadPlaylistFromStorage() {
                 const uri = localRef.slice('uri:'.length);
                 if (!uri) continue;
                 restored.push({ name, url: toCapacitorFileUrl(uri), source: 'local', isVideo, localRef });
+                continue;
+            }
+
+            if (localRef && localRef.startsWith('app:')) {
+                const p = localRef.slice('app:'.length);
+                if (!p) continue;
+                restored.push({ name, url: toCapacitorFileUrl(p), source: 'local', isVideo, localRef });
                 continue;
             }
 
@@ -1601,6 +1680,16 @@ async function removeFromPlaylist(index) {
         if (typeof track.localRef === 'string' && track.localRef.startsWith('idb:')) {
             try {
                 await idbDeleteLocalFile(track.localRef.slice('idb:'.length));
+            } catch {
+                // ignore
+            }
+        }
+        if (typeof track.localRef === 'string' && track.localRef.startsWith('app:') && isNativeCapacitor()) {
+            try {
+                const folderImport = window.Capacitor?.Plugins?.LocalFolderImport;
+                if (folderImport && typeof folderImport.deleteImportedFiles === 'function') {
+                    await folderImport.deleteImportedFiles({ paths: [track.localRef.slice('app:'.length)] });
+                }
             } catch {
                 // ignore
             }
