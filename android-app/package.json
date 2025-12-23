@@ -1,7 +1,7 @@
 {
   "name": "audio-visualizer-android",
   "version": "1.0.0",
-  "description": "Audio Visualizer Pro - Android APK版",
+  "description": "Audio Visualizer - Android APK版",
   "main": "index.js",
   "scripts": {
     "dev": "npx cap open android",

@@ -1,4 +1,4 @@
-# Audio Visualizer Pro - 全体セットアップガイド
+# Audio Visualizer - 全体セットアップガイド
 
 このプロジェクトは3つのプラットフォームで同じ機能を提供します：
 - **Web版**: ブラウザで即座に利用（セットアップ不要）
@@ -210,6 +210,15 @@ zipalign -v 4 android/app/build/outputs/apk/release/app-release-unsigned.apk \
 - [PC版 README](pc-app/README.md)
 - [Android版 README](android-app/README.md)
 - [Google API ガイド](audio/GOOGLE_API_GUIDE.md)（Google Drive連携用）
+
+---
+
+## 🔐 秘密情報（重要）
+
+以下はリポジトリにコミットしないでください（`.gitignore` で除外しています）：
+- `android-app/android/keystore.properties`
+- `android-app/android/app/google-services.json`
+- `*.jks`, `*.keystore`, `.env*`
 
 ---
 

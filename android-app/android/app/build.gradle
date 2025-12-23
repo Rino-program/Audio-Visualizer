@@ -8,6 +8,8 @@ if (keystorePropertiesFile.exists()) {
     }
 }
 
+def hasReleaseKeystore = keystorePropertiesFile.exists()
+
 android {
     namespace "com.audiovisualizer.app"
     compileSdk rootProject.ext.compileSdkVersion
@@ -39,16 +41,14 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            if (keystorePropertiesFile.exists()) {
-                signingConfig signingConfigs.release
-            }
+            signingConfig hasReleaseKeystore ? signingConfigs.release : signingConfigs.debug
         }
 
         // GitHub Releases: explicitly unsigned APK
         githubRelease {
             initWith release
-            signingConfig null
             matchingFallbacks = ['release']
+            signingConfig hasReleaseKeystore ? signingConfigs.release : signingConfigs.debug
         }
     }
 }

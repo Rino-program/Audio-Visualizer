@@ -127,6 +127,14 @@ button, input, select {
     object-fit: cover;
 }
 
+.video-container.background-mode.fit-contain #bgVideo {
+    object-fit: contain;
+}
+
+.video-container.background-mode.fit-fill #bgVideo {
+    object-fit: fill;
+}
+
 /* Drag & Drop Feedback */
 body.drag-over::after {
     content: 'ファイルをドロップして追加';
@@ -185,12 +193,18 @@ body.drag-over::after {
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid var(--glass-border);
     color: #fff;
-    padding: 8px;
-    border-radius: 4px;
+    padding: 6px 10px;
+    border-radius: 6px;
     cursor: pointer;
-    font-size: 0.85rem;
-    transition: background 0.2s;
+    font-size: 0.8rem;
+    transition: var(--transition);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 .action-btn:hover {
     background: rgba(255, 255, 255, 0.2);
@@ -313,6 +327,50 @@ body.drag-over::after {
     box-shadow: var(--glass-shadow);
     background-image: linear-gradient(to bottom right, var(--glass-highlight), transparent);
 }
+.hint {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin: 6px 0;
+}
+.storage-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+.storage-actions .mini-btn {
+    flex: 1;
+    min-width: 120px;
+    white-space: nowrap;
+    padding: 8px 12px;
+}
+.storage-list {
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-md);
+    padding: 8px;
+    background: rgba(255,255,255,0.02);
+    max-height: 260px;
+    overflow-y: auto;
+}
+.storage-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    border-bottom: 1px solid var(--glass-border);
+}
+.storage-item:last-child {
+    border-bottom: none;
+}
+.storage-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.icon-btn.danger {
+    color: #f87171;
+    border-color: #f87171;
+}
 
 /* Top Bar */
 .top-bar {
@@ -326,6 +384,7 @@ body.drag-over::after {
     max-width: 1200px;
     margin-left: auto;
     margin-right: auto;
+    flex-shrink: 0;
 }
 .status-display {
     display: flex;
@@ -395,12 +454,14 @@ body.drag-over::after {
     color: var(--text-main);
     width: 40px;
     height: 40px;
+    padding: 0;
     border-radius: var(--radius-md);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 1.1rem;
+    line-height: 1;
     transition: var(--transition);
 }
 
@@ -429,6 +490,7 @@ body.drag-over::after {
     width: 100%;
     max-width: 900px;
     margin: 0 auto; /* Center horizontally */
+    flex-shrink: 0;
 }
 
 /* Prevent accidental text selection when dragging ranges on mobile */
@@ -492,9 +554,11 @@ input[type=range]:hover::-webkit-slider-thumb {
 
 /* Main Controls Row */
 .main-controls {
-    display: flex;
-    justify-content: space-between;
+    /* Use grid so the center group stays truly centered even if left/right widths differ */
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
+    column-gap: 16px;
 }
 
 .control-group {
@@ -504,13 +568,21 @@ input[type=range]:hover::-webkit-slider-thumb {
     flex: 1;
 }
 
+.control-group.left {
+    justify-content: flex-start;
+    justify-self: start;
+}
+
 .control-group.center {
+    flex: 0 0 auto;
     justify-content: center;
     gap: 24px;
+    justify-self: center;
 }
 
 .control-group.right {
     justify-content: flex-end;
+    justify-self: end;
 }
 
 .control-group.hidden {
@@ -529,6 +601,8 @@ input[type=range]:hover::-webkit-slider-thumb {
     justify-content: center;
     transition: var(--transition);
     border-radius: 50%;
+    padding: 0;
+    line-height: 1;
 }
 
 .ctrl-btn.sm {
@@ -634,10 +708,10 @@ select option {
     border-bottom: 1px solid var(--glass-border);
     display: flex;
     flex-direction: row;
-    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 10px;
+    flex-wrap: wrap;
 }
 
 .playlist-header h3 {
@@ -650,14 +724,19 @@ select option {
 
 .playlist-actions {
     display: flex;
-    gap: 6px;
+    gap: 8px;
     align-items: center;
     justify-content: flex-start;
     flex-wrap: nowrap;
-    flex: 1;
-    min-width: 160px; /* これを下回ると折り返す */
-    overflow-x: auto;
-    scrollbar-width: none;
+    flex-shrink: 0;
+}
+/* Ensure tappable targets on small screens */
+@media (max-width: 768px) {
+    /* Only enlarge tap targets where we explicitly want it (playlist header). */
+    .playlist-actions .icon-btn {
+        min-width: 44px;
+        min-height: 44px;
+    }
 }
 .playlist-actions::-webkit-scrollbar { display: none; }
 
@@ -665,24 +744,12 @@ select option {
     flex-shrink: 0;
 }
 
-.file-btn, .drive-btn {
-    background: rgba(255, 255, 255, 0.1);
-    padding: 6px 10px;
-    border-radius: var(--radius-sm);
-    font-size: 0.75rem;
+.file-btn {
     cursor: pointer;
     border: none;
-    color: var(--text-main);
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    transition: var(--transition);
-    white-space: nowrap;
-    flex-shrink: 0;
-}
-
-.file-btn:hover, .drive-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
+    justify-content: center;
 }
 
 .playlist-items {
@@ -1077,45 +1144,132 @@ select option {
     }
 
     .icon-btn {
+        width: 34px;
+        height: 34px;
+        font-size: 0.9rem;
+    }
+
+    .top-bar {
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: stretch;
+        padding: calc(12px + var(--safe-top)) 12px 8px;
+        gap: 8px;
+    }
+    .status-display {
+        text-align: center;
+        width: 100%;
+        min-width: 0;
+        order: 1;
+    }
+    .top-controls {
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-shrink: 0;
+        order: 2;
+    }
+
+    .controls-bar {
+        /* Make padding symmetric so horizontal space matches both edges */
+        padding: 12px;
+        gap: 10px;
+    }
+
+    /* Stack controls vertically to avoid squashing and let each row breathe */
+    .main-controls {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .control-group {
+        min-width: 0;
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .control-group.left {
+        order: 1;
+        display: flex;
+        gap: 8px;
+        justify-content: flex-start;
+    }
+    .control-group.center {
+        order: 2;
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 10px;
+        justify-content: center;
+        align-items: center;
+        overflow-x: auto;
+        scroll-padding-left: 12px;
+        scroll-padding-right: 24px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        margin: 0;
+        width: 100%;
+    }
+    .control-group.center::-webkit-scrollbar {
+        display: none;
+    }
+    .control-group.right {
+        order: 3;
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+    }
+
+    .ctrl-btn.play-btn {
+        width: 60px;
+        height: 60px;
+        font-size: 1.7rem;
+    }
+
+    .ctrl-btn.sm {
+        width: 36px;
+        height: 36px;
+        font-size: 0.95rem;
+        flex-shrink: 0;
+    }
+
+    .icon-btn {
         width: 36px;
         height: 36px;
         font-size: 1rem;
     }
 
-    .top-bar {
-        flex-direction: column;
-        gap: 12px;
-        align-items: stretch;
-        padding: calc(56px + var(--safe-top)) 12px 12px; /* top padding leaves room for fixed buttons */
-        padding-right: 12px; /* Cancel desktop fixed-button padding */
+    /* Playback controls: keep buttons square and prevent shrinking/cropping */
+    #playbackControls > button {
+        flex: 0 0 auto;
+    }
+    #playbackControls .icon-btn,
+    #playbackControls .ctrl-btn.sm {
+        width: 40px;
+        height: 40px;
+        min-width: 40px;
+        min-height: 40px;
+        line-height: 1;
+    }
+    #playbackControls .ctrl-btn.play-btn {
+        width: 56px;
+        height: 56px;
+        min-width: 56px;
+        min-height: 56px;
+        line-height: 1;
     }
 
-    .status-display {
-        text-align: center;
-        margin-bottom: 4px;
+    .volume-controls {
+        display: none; /* Hide volume slider on mobile to save space, use system volume */
     }
 
-    .top-controls {
-        justify-content: space-between;
+    .mode-select {
+        min-width: 120px;
+        font-size: 0.85rem;
+        padding: 6px 10px;
     }
-
-    .controls-bar {
-        padding: 16px;
-        gap: 12px;
-    }
-
-    .main-controls {
-        flex-wrap: wrap;
-        gap: 12px;
-    }
-
-    .control-group {
-        min-width: auto;
-    }
-
-    .control-group.left { order: 2; justify-content: flex-start; }
-    .control-group.center { order: 1; width: 100%; margin-bottom: 8px; }
-    .control-group.right { order: 3; justify-content: flex-end; }
 
     /* Playlist becomes a bottom sheet on mobile */
     .playlist-panel {
@@ -1123,7 +1277,7 @@ select option {
         left: 12px;
         right: 12px;
         top: auto;
-        bottom: calc(160px + var(--safe-bottom));
+        bottom: calc(150px + var(--safe-bottom));
         width: auto;
         max-height: min(70vh, calc(100vh - 200px));
         border-radius: var(--radius-lg);
@@ -1140,13 +1294,17 @@ select option {
     }
 
     .playlist-header {
-        gap: 10px;
-        align-items: flex-start;
+        padding: 8px 10px;
+        gap: 8px;
+        flex-wrap: nowrap;
+    }
+    
+    .playlist-header h3 {
+        font-size: 0.85rem;
     }
 
     .playlist-actions {
-        flex-wrap: wrap;
-        justify-content: flex-end;
+        gap: 6px;
     }
 
     .volume-controls {
@@ -1224,6 +1382,7 @@ select option {
     }
 
     .main-controls {
+        display: flex;
         flex-wrap: nowrap;
         gap: 10px;
     }

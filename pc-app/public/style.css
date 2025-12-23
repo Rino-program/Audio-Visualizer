@@ -127,6 +127,14 @@ button, input, select {
     object-fit: cover;
 }
 
+.video-container.background-mode.fit-contain #bgVideo {
+    object-fit: contain;
+}
+
+.video-container.background-mode.fit-fill #bgVideo {
+    object-fit: fill;
+}
+
 /* Drag & Drop Feedback */
 body.drag-over::after {
     content: 'ファイルをドロップして追加';

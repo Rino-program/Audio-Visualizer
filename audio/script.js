@@ -60,6 +60,7 @@ const state = {
         lowPowerMode: false,
         showVideo: true,
         videoMode: 'window', // 'window' or 'background'
+        videoFitMode: 'cover', // 'cover', 'contain', 'fill'
         repeatMode: 'none',  // 'none', 'one', 'all'
         shuffle: false,
         gDriveClientId: '',
@@ -196,8 +197,8 @@ function init() {
         }
     });
     audio.addEventListener('error', handleAudioError);
-    audio.addEventListener('seeking', () => { if (bgVideo.src) bgVideo.currentTime = audio.currentTime; });
-    audio.addEventListener('seeked', () => { if (bgVideo.src) bgVideo.currentTime = audio.currentTime; });
+    audio.addEventListener('seeking', () => { if (bgVideo.src) bgVideo.currentTime = audio.currentTime + 0.15; });
+    audio.addEventListener('seeked', () => { if (bgVideo.src) bgVideo.currentTime = audio.currentTime + 0.15; });
 
     bgVideo.addEventListener('error', () => {
         console.warn('Video load failed');
@@ -394,6 +395,7 @@ function initDraggableVideo() {
     const handle = container.querySelector('.video-handle');
     let isDragging = false;
     let startX, startY, initialX, initialY;
+    let isFirstDrag = true; // 初回ドラッグフラグ
 
     // 保存された位置を復元
     const savedPos = localStorage.getItem('videoWindowPos');
@@ -402,35 +404,72 @@ function initDraggableVideo() {
         container.style.left = left;
         container.style.top = top;
         container.style.transform = 'none';
+        isFirstDrag = false; // 位置が保存されている場合は初回ではない
     }
 
+    // Mouse events
     handle.onmousedown = e => {
         if (state.settings.videoMode === 'background') return;
+        e.preventDefault();
+        
+        // 初回ドラッグ時はハンドルの右上を基準にする
+        if (isFirstDrag) {
+            const rect = handle.getBoundingClientRect();
+            const handleCenterX = rect.right; // 右端
+            const handleCenterY = rect.top; // 上端
+            const offsetX = e.clientX - handleCenterX;
+            const offsetY = e.clientY - handleCenterY;
+            
+            // コンテナの位置を調整
+            container.style.left = `${container.offsetLeft + offsetX}px`;
+            container.style.top = `${container.offsetTop + offsetY}px`;
+            container.style.transform = 'none';
+            
+            isFirstDrag = false;
+        }
+        
+        startDragging(e.clientX, e.clientY);
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', stopDragging);
+    };
+
+    function startDragging(clientX, clientY) {
         isDragging = true;
         container.classList.add('dragging');
-        startX = e.clientX;
-        startY = e.clientY;
+        startX = clientX;
+        startY = clientY;
         initialX = container.offsetLeft;
         initialY = container.offsetTop;
         container.style.transform = 'none';
-        document.onmousemove = onMouseMove;
-        document.onmouseup = onMouseUp;
-    };
+    }
+
+    function constrainPosition(x, y) {
+        const containerRect = container.getBoundingClientRect();
+        const maxX = window.innerWidth - containerRect.width;
+        const maxY = window.innerHeight - containerRect.height;
+        
+        return {
+            x: Math.max(0, Math.min(x, maxX)),
+            y: Math.max(0, Math.min(y, maxY))
+        };
+    }
 
     function onMouseMove(e) {
         if (!isDragging) return;
+        e.preventDefault();
         const dx = e.clientX - startX;
         const dy = e.clientY - startY;
-        container.style.left = `${initialX + dx}px`;
-        container.style.top = `${initialY + dy}px`;
+        const { x, y } = constrainPosition(initialX + dx, initialY + dy);
+        container.style.left = `${x}px`;
+        container.style.top = `${y}px`;
     }
 
-    function onMouseUp() {
+    function stopDragging() {
         if (!isDragging) return;
         isDragging = false;
         container.classList.remove('dragging');
-        document.onmousemove = null;
-        document.onmouseup = null;
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', stopDragging);
         
         // 位置を保存
         localStorage.setItem('videoWindowPos', JSON.stringify({
@@ -448,6 +487,16 @@ function updateVideoVisibility() {
     container.classList.toggle('hidden', !state.settings.showVideo || !isVideo);
     container.classList.toggle('background-mode', state.settings.videoMode === 'background');
     
+    // フィットモードクラスを適用
+    container.classList.remove('fit-contain', 'fit-fill');
+    if (state.settings.videoMode === 'background') {
+        if (state.settings.videoFitMode === 'contain') {
+            container.classList.add('fit-contain');
+        } else if (state.settings.videoFitMode === 'fill') {
+            container.classList.add('fit-fill');
+        }
+    }
+    
     // ウィンドウモードで位置が未設定なら中央下に配置
     if (state.settings.videoMode === 'window' && !localStorage.getItem('videoWindowPos')) {
         container.style.top = 'auto';
@@ -457,7 +506,8 @@ function updateVideoVisibility() {
     }
 
     // 負荷軽減: 背景ぼかしが0の場合はフィルターを完全に削除
-    if (state.settings.bgBlur > 0) {
+    // ウィンドウモード時は背景ぼかしを適用しない（混乱を避けるため）
+    if (state.settings.videoMode === 'background' && state.settings.bgBlur > 0) {
         bgVideo.style.filter = `blur(${state.settings.bgBlur}px)`;
         bgVideo.style.webkitFilter = `blur(${state.settings.bgBlur}px)`;
     } else {
@@ -470,9 +520,9 @@ function updateVideoVisibility() {
             bgVideo.src = track.url;
             bgVideo.load(); // 明示的にロード
             
-            // ロード完了後に時間を合わせる
+            // ロード完了後に時間を合わせる（MVを0.15秒先に）
             const onLoaded = () => {
-                bgVideo.currentTime = audio.currentTime;
+                bgVideo.currentTime = audio.currentTime + 0.15;
                 if (state.isPlaying) bgVideo.play().catch(() => {});
                 bgVideo.removeEventListener('loadedmetadata', onLoaded);
             };
@@ -550,6 +600,7 @@ function setupSettingsInputs() {
     $('lowPowerModeCheckbox').onchange = e => { state.settings.lowPowerMode = e.target.checked; };
     $('showVideoCheckbox').onchange = e => { state.settings.showVideo = e.target.checked; updateVideoVisibility(); };
     $('videoModeSelect').onchange = e => { state.settings.videoMode = e.target.value; updateVideoVisibility(); };
+    $('videoFitModeSelect').onchange = e => { state.settings.videoFitMode = e.target.value; updateVideoVisibility(); };
     $('lowFreqSlider').oninput = e => {
         state.settings.lowFreq = +e.target.value;
         $('lowFreqValue').textContent = state.settings.lowFreq + 'Hz';
@@ -692,6 +743,7 @@ function applySettingsToUI() {
     $('lowPowerModeCheckbox').checked = state.settings.lowPowerMode;
     $('showVideoCheckbox').checked = state.settings.showVideo;
     $('videoModeSelect').value = state.settings.videoMode;
+    $('videoFitModeSelect').value = state.settings.videoFitMode || 'cover';
     $('lowFreqSlider').value = state.settings.lowFreq;
     $('lowFreqValue').textContent = state.settings.lowFreq + 'Hz';
     $('highFreqSlider').value = state.settings.highFreq;
@@ -1431,11 +1483,13 @@ function draw() {
     
     // フォアグラウンドに復帰したとき、動画と音声の同期を確認
     if (bgVideo.src && state.isPlaying && state.settings.showVideo) {
-        const timeDiff = Math.abs(bgVideo.currentTime - audio.currentTime);
+        const videoOffset = 0.15; // MVを少し先に進める（0.15秒）
+        const targetTime = audio.currentTime + videoOffset;
+        const timeDiff = Math.abs(bgVideo.currentTime - targetTime);
         // 遅延が1秒以上ある場合のみ同期（小さなズレは無視）
         if (timeDiff > 1.0) {
             console.log(`Syncing video: audio=${audio.currentTime.toFixed(2)}s, video=${bgVideo.currentTime.toFixed(2)}s`);
-            bgVideo.currentTime = audio.currentTime;
+            bgVideo.currentTime = targetTime;
         }
     }
 

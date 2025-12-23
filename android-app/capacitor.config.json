@@ -1,6 +1,6 @@
 {
   "appId": "com.audiovisualizer.app",
-  "appName": "Audio Visualizer Pro",
+  "appName": "Audio Visualizer",
   "webDir": "www",
   "bundledWebRuntime": false,
   "server": {

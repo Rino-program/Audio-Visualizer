@@ -1,8 +1,8 @@
-# Audio Visualizer Pro - PC版（Electron）
+# Audio Visualizer - PC版（Electron）
 
 ## 概要
 
-Web版のAudio Visualizer ProをElectronでラップしたWindows向けデスクトップアプリです。インストール不要のポータブル形式で配布できます。
+Web版のAudio VisualizerをElectronでラップしたWindows向けデスクトップアプリです。インストール不要のポータブル形式で配布できます。
 
 ## 機能
 

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="color-scheme" content="dark">
     <meta name="theme-color" content="#0f172a">
-    <title>Audio Visualizer Pro V7</title>
+    <title>Audio Visualizer</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Roboto+Mono:wght@400&display=swap" rel="stylesheet">
 </head>
@@ -152,7 +152,7 @@
                         <span id="sensitivityValue">1.0</span>
                     </div>
                 </div>
-                <div class="setting-item">
+                <div class="setting-item" style="display: none;">
                     <label>ビジュアライザー品質</label>
                     <select id="qualitySelect">
                         <option value="2048">低 (高速)</option>
@@ -185,6 +185,14 @@
                     <select id="videoModeSelect">
                         <option value="window">ウィンドウ (移動可能)</option>
                         <option value="background">背景 (全画面)</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label>背景表示時のフィットモード</label>
+                    <select id="videoFitModeSelect">
+                        <option value="cover">画面を埋める (cover)</option>
+                        <option value="contain">全体を表示 (contain)</option>
+                        <option value="fill">引き伸ばす (fill)</option>
                     </select>
                 </div>
                 <div class="setting-item">
@@ -222,7 +230,7 @@
                     <input type="color" id="fixedColorPicker">
                 </div>
                 <div class="setting-item">
-                    <label>背景ぼかし (Blur)</label>
+                    <label>背景ぼかし (Blur) <small style="color: #888;">(※背景表示時のみ適用)</small></label>
                     <div class="range-wrapper">
                         <input type="range" id="bgBlurSlider" min="0" max="20" step="1" value="0">
                         <span id="bgBlurValue">0px</span>

@@ -1,7 +1,7 @@
-# Audio Visualizer Pro - Android版
+# Audio Visualizer - Android版
 
 ## 概要
-Web版のAudio Visualizer ProをCapacitorでAndroidアプリ化したものです。APKとしてインストール・配布できます。
+Web版のAudio VisualizerをCapacitorでAndroidアプリ化したものです。APKとしてインストール・配布できます。
 
 ## 機能
 - 音声ファイル再生とリアルタイムビジュアライザー（9モード）

@@ -116,7 +116,8 @@ public class LocalFolderImportPlugin extends Plugin {
                     new String[]{
                             DocumentsContract.Document.COLUMN_DOCUMENT_ID,
                             DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-                            DocumentsContract.Document.COLUMN_MIME_TYPE
+                            DocumentsContract.Document.COLUMN_MIME_TYPE,
+                            DocumentsContract.Document.COLUMN_SIZE
                     },
                     null,
                     null,
@@ -129,6 +130,7 @@ public class LocalFolderImportPlugin extends Plugin {
                     String childDocId = cursor.getString(0);
                     String displayName = cursor.getString(1);
                     String mimeType = cursor.getString(2);
+                    long size = cursor.getLong(3);
 
                     if (childDocId == null) continue;
                     if (DocumentsContract.Document.MIME_TYPE_DIR.equals(mimeType)) {
@@ -177,6 +179,7 @@ public class LocalFolderImportPlugin extends Plugin {
                     fileObj.put("name", displayName != null ? displayName : safeName);
                     fileObj.put("path", outFile.getAbsolutePath());
                     fileObj.put("isVideo", isVideo);
+                    fileObj.put("size", size > 0 ? size : outFile.length());
                     out.put(fileObj);
                 }
             } catch (Exception ignored) {

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="color-scheme" content="dark">
     <meta name="theme-color" content="#0f172a">
-    <title>Audio Visualizer Pro V7</title>
+    <title>Audio Visualizer</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Roboto+Mono:wght@400&display=swap" rel="stylesheet">
 </head>
@@ -39,6 +39,7 @@
                     <button id="sourceFileBtn" class="toggle-btn active" title="ファイル再生モード" aria-label="ファイル再生モード">📁 File</button>
                     <button id="sourceMicBtn" class="toggle-btn" title="マイク入力モード" aria-label="マイク入力モード">🎤 Mic</button>
                 </div>
+                <button id="playlistToggle" class="icon-btn" title="プレイリスト" aria-label="プレイリストを開く">📂</button>
                 <button id="openSettingsBtn" class="icon-btn" title="設定" aria-label="設定を開く">⚙️</button>
             </div>
         </div>
@@ -55,9 +56,8 @@
 
             <!-- Main Controls Row -->
             <div class="main-controls">
-                <!-- Left: Volume & Playlist -->
+                <!-- Left: Volume -->
                 <div class="control-group left">
-                    <button id="playlistToggle" class="icon-btn" title="プレイリスト" aria-label="プレイリストを開く">📂</button>
                     <div class="volume-controls">
                         <span id="volIcon">🔊</span>
                         <input type="range" id="volSlider" min="0" max="1" step="0.05" value="1" aria-label="音量">
@@ -67,11 +67,9 @@
                 <!-- Center: Playback -->
                 <div class="control-group center" id="playbackControls">
                     <button id="shuffleBtn" class="icon-btn sm" title="シャッフル" aria-label="シャッフル">🔀</button>
-                    <button id="seekBackBtn" class="icon-btn sm" title="10秒戻す" aria-label="10秒戻す">⏪10</button>
                     <button id="prevBtn" class="ctrl-btn sm" aria-label="前の曲">⏮</button>
                     <button id="playBtn" class="ctrl-btn play-btn" aria-label="再生/一時停止">▶</button>
                     <button id="nextBtn" class="ctrl-btn sm" aria-label="次の曲">⏭</button>
-                    <button id="seekForwardBtn" class="icon-btn sm" title="10秒進む" aria-label="10秒進む">10⏩</button>
                     <button id="repeatBtn" class="icon-btn sm" title="リピート" aria-label="リピート">🔁</button>
                 </div>
 
@@ -99,11 +97,12 @@
                 <h3>プレイリスト</h3>
                 <div class="playlist-actions">
                     <button id="clearPlaylistBtn" class="icon-btn sm" title="すべて削除" aria-label="プレイリストをすべて削除">🗑️</button>
-                    <label class="file-btn" id="nativeFileBtn">
-                        📁 追加
+                    <button id="folderImportBtn" class="icon-btn sm" title="フォルダ追加" aria-label="フォルダから一括追加">📁</button>
+                    <label class="icon-btn sm file-btn" id="nativeFileBtn" title="ファイル追加">
+                        ➕
                         <input type="file" id="fileInput" multiple hidden>
                     </label>
-                    <button id="gDriveBtn" class="drive-btn" aria-label="Google Driveから追加">☁️ Drive</button>
+                    <button id="gDriveBtn" class="icon-btn sm" title="Google Drive" aria-label="Google Driveから追加">☁️</button>
                 </div>
                 <button id="closePlaylistBtn" class="icon-btn sm" title="閉じる" aria-label="プレイリストを閉じる">✖</button>
             </div>
@@ -119,7 +118,6 @@
     <!-- Persistent Controls (Always Visible) -->
     <div id="persistentControls">
         <button id="toggleUIBtn" class="icon-btn" title="UI表示切替 (H)" aria-label="UI表示を切り替える">🔳</button>
-        <button id="fullscreenBtn" class="icon-btn" title="全画面表示" aria-label="全画面表示を切り替える">⛶</button>
     </div>
 
     <!-- Settings Modal -->
@@ -136,6 +134,7 @@
                 <button class="tab-btn" data-tab="player">プレーヤー</button>
                 <button class="tab-btn" data-tab="presets">プリセット</button>
                 <button class="tab-btn" data-tab="gdrive">Drive連携</button>
+                    <button class="tab-btn" data-tab="storage">保存管理</button>
                 <button class="tab-btn" data-tab="help">ヘルプ</button>
             </div>
 
@@ -154,14 +153,15 @@
                         <span id="sensitivityValue">1.0</span>
                     </div>
                 </div>
-                <div class="setting-item">
-                    <label>ビジュアライザー品質</label>
+                <div class="setting-item" style="display: none;">
+                    <label>ビジュアライザー品質（FFT）</label>
                     <select id="qualitySelect">
-                        <option value="2048">低 (高速)</option>
-                        <option value="4096" selected>中 (標準)</option>
-                        <option value="8192">高 (詳細)</option>
-                        <option value="16384">最高 (超詳細)</option>
+                        <option value="1024">省電力 (軽量)</option>
+                        <option value="2048" selected>バランス</option>
+                        <option value="4096">高精細</option>
+                        <option value="8192">超精細</option>
                     </select>
+                    <p class="hint">※ 品質が高いほどCPU負荷が増えます。バー本数も自動調整します。</p>
                 </div>
                 <div class="setting-item">
                     <label>バーの本数</label>
@@ -187,6 +187,14 @@
                     <select id="videoModeSelect">
                         <option value="window">ウィンドウ (移動可能)</option>
                         <option value="background">背景 (全画面)</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label>背景表示時のフィットモード</label>
+                    <select id="videoFitModeSelect">
+                        <option value="cover">画面を埋める (cover)</option>
+                        <option value="contain">全体を表示 (contain)</option>
+                        <option value="fill">引き伸ばす (fill)</option>
                     </select>
                 </div>
                 <div class="setting-item">
@@ -224,7 +232,7 @@
                     <input type="color" id="fixedColorPicker">
                 </div>
                 <div class="setting-item">
-                    <label>背景ぼかし (Blur)</label>
+                    <label>背景ぼかし (Blur) <small style="color: #888;">(※背景表示時のみ適用)</small></label>
                     <div class="range-wrapper">
                         <input type="range" id="bgBlurSlider" min="0" max="20" step="1" value="0">
                         <span id="bgBlurValue">0px</span>
@@ -321,11 +329,6 @@
                     </label>
                 </div>
 
-                <div class="setting-item">
-                    <label>
-                        <input type="checkbox" id="storeLocalFilesCheckbox"> ローカルファイルをアプリ内に保存する (容量が増えます)
-                    </label>
-                </div>
             </div>
 
             <div class="tab-content" id="tab-presets">
@@ -363,6 +366,23 @@
                 </div>
             </div>
 
+            <div class="tab-content" id="tab-storage">
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="storeLocalFilesCheckbox"> ファイルをアプリ内に保存する（容量を使用）
+                    </label>
+                    <p class="hint">有効時: 取り込んだファイルをアプリ内に保持。無効時: URI参照のみで保存しません。</p>
+                </div>
+                <div class="setting-item">
+                    <div class="storage-actions">
+                        <button id="storageRefreshBtn" class="mini-btn">🔄 更新</button>
+                        <button id="storageDeleteAllBtn" class="mini-btn danger">🗑️ すべて削除</button>
+                    </div>
+                    <div id="storageSummary" class="hint"></div>
+                    <div id="storageList" class="storage-list"></div>
+                </div>
+            </div>
+
             <div class="tab-content" id="tab-help">
                 <div class="help-section">
                     <h3>キーボードショートカット</h3>
@@ -371,7 +391,6 @@
                         <li>前の曲 / 次の曲 <span>← / →</span></li>
                         <li>音量アップ / ダウン <span>↑ / ↓</span></li>
                         <li>再生速度ダウン / アップ <span>[ / ]</span></li>
-                        <li>全画面表示切替 <span>F</span></li>
                         <li>UI表示切替 <span>H</span></li>
                         <li>動画表示切替 <span>V</span></li>
                         <li>低電力モード切替 <span>L</span></li>
@@ -391,7 +410,18 @@
         </div>
     </div>
 
-    <script src="capacitor.js"></script>
+    <script>
+        // Capacitor.jsは実際のAndroidビルドでのみ利用可能
+        // ローカル開発時は404エラーを回避
+        if (window.location.protocol !== 'file:' || document.querySelector('script[src*="capacitor"]')) {
+            const script = document.createElement('script');
+            script.src = 'capacitor.js';
+            script.onerror = function() {
+                console.log('Capacitor.js not available (local development mode)');
+            };
+            document.head.appendChild(script);
+        }
+    </script>
     <script src="script.js"></script>
 </body>
 </html>

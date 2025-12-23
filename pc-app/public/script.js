@@ -60,6 +60,7 @@ const state = {
 		lowPowerMode: false,
 		showVideo: true,
 		videoMode: 'window', // 'window' or 'background'
+		videoFitMode: 'cover',
 		repeatMode: 'none',  // 'none', 'one', 'all'
 		shuffle: false,
 		gDriveClientId: '',
@@ -251,8 +252,8 @@ async function init() {
 		}
 	});
 	audio.addEventListener('error', handleAudioError);
-	audio.addEventListener('seeking', () => { if (bgVideo.src) bgVideo.currentTime = audio.currentTime; });
-	audio.addEventListener('seeked', () => { if (bgVideo.src) bgVideo.currentTime = audio.currentTime; });
+	audio.addEventListener('seeking', () => { if (bgVideo.src) bgVideo.currentTime = audio.currentTime + 0.15; });
+	audio.addEventListener('seeked', () => { if (bgVideo.src) bgVideo.currentTime = audio.currentTime + 0.15; });
 
 	bgVideo.addEventListener('error', () => {
 		console.warn('Video load failed');
@@ -453,6 +454,7 @@ function initDraggableVideo() {
 	const handle = container.querySelector('.video-handle');
 	let isDragging = false;
 	let startX, startY, initialX, initialY;
+	let isFirstDrag = true;
 
 	// 保存された位置を復元
 	const savedPos = localStorage.getItem('videoWindowPos');
@@ -461,6 +463,15 @@ function initDraggableVideo() {
 		container.style.left = left;
 		container.style.top = top;
 		container.style.transform = 'none';
+		isFirstDrag = false;
+	}
+
+	function constrainPosition(x, y, w, h) {
+		// 画面外に出ないように制限
+		const minVisible = 50; // 最低50px表示させる
+		x = Math.max(-w + minVisible, Math.min(window.innerWidth - minVisible, x));
+		y = Math.max(0, Math.min(window.innerHeight - minVisible, y));
+		return { x, y };
 	}
 
 	handle.onmousedown = e => {
@@ -469,8 +480,18 @@ function initDraggableVideo() {
 		container.classList.add('dragging');
 		startX = e.clientX;
 		startY = e.clientY;
-		initialX = container.offsetLeft;
-		initialY = container.offsetTop;
+		
+		if (isFirstDrag) {
+			// 初回ドラッグ時はハンドルの右上を基準にする
+			const rect = container.getBoundingClientRect();
+			initialX = rect.right - container.offsetWidth;
+			initialY = rect.top;
+			isFirstDrag = false;
+		} else {
+			initialX = container.offsetLeft;
+			initialY = container.offsetTop;
+		}
+		
 		container.style.transform = 'none';
 		document.onmousemove = onMouseMove;
 		document.onmouseup = onMouseUp;
@@ -480,8 +501,12 @@ function initDraggableVideo() {
 		if (!isDragging) return;
 		const dx = e.clientX - startX;
 		const dy = e.clientY - startY;
-		container.style.left = `${initialX + dx}px`;
-		container.style.top = `${initialY + dy}px`;
+		const newX = initialX + dx;
+		const newY = initialY + dy;
+		
+		const constrained = constrainPosition(newX, newY, container.offsetWidth, container.offsetHeight);
+		container.style.left = `${constrained.x}px`;
+		container.style.top = `${constrained.y}px`;
 	}
 
 	function onMouseUp() {
@@ -507,6 +532,16 @@ function updateVideoVisibility() {
 	container.classList.toggle('hidden', !state.settings.showVideo || !isVideo);
 	container.classList.toggle('background-mode', state.settings.videoMode === 'background');
 	
+	// フィットモードクラスの適用
+	container.classList.remove('fit-contain', 'fit-fill');
+	if (state.settings.videoMode === 'background') {
+		if (state.settings.videoFitMode === 'contain') {
+			container.classList.add('fit-contain');
+		} else if (state.settings.videoFitMode === 'fill') {
+			container.classList.add('fit-fill');
+		}
+	}
+	
 	// モード切替時に残りやすいスタイルを整理
 	if (state.settings.videoMode !== 'window') {
 		container.style.bottom = '';
@@ -520,8 +555,8 @@ function updateVideoVisibility() {
 		container.style.transform = 'translateX(-50%)';
 	}
 
-	// 負荷軽減: 背景ぼかしが0の場合はフィルターを完全に削除
-	if (state.settings.bgBlur > 0) {
+	// 背景ぼかしは背景表示時のみ適用
+	if (state.settings.bgBlur > 0 && state.settings.videoMode === 'background') {
 		bgVideo.style.filter = `blur(${state.settings.bgBlur}px)`;
 		bgVideo.style.webkitFilter = `blur(${state.settings.bgBlur}px)`;
 	} else {
@@ -536,7 +571,7 @@ function updateVideoVisibility() {
             
 			// ロード完了後に時間を合わせる
 			const onLoaded = () => {
-				bgVideo.currentTime = audio.currentTime;
+				bgVideo.currentTime = audio.currentTime + 0.15;
 				if (state.isPlaying) bgVideo.play().catch(() => {});
 				bgVideo.removeEventListener('loadedmetadata', onLoaded);
 			};
@@ -771,6 +806,7 @@ function setupSettingsInputs() {
 	$('lowPowerModeCheckbox').onchange = e => { state.settings.lowPowerMode = e.target.checked; };
 	$('showVideoCheckbox').onchange = e => { state.settings.showVideo = e.target.checked; updateVideoVisibility(); };
 	$('videoModeSelect').onchange = e => { state.settings.videoMode = e.target.value; updateVideoVisibility(); };
+	$('videoFitModeSelect').onchange = e => { state.settings.videoFitMode = e.target.value; updateVideoVisibility(); };
 	$('lowFreqSlider').oninput = e => {
 		state.settings.lowFreq = +e.target.value;
 		$('lowFreqValue').textContent = state.settings.lowFreq + 'Hz';
@@ -913,6 +949,7 @@ function applySettingsToUI() {
 	$('lowPowerModeCheckbox').checked = state.settings.lowPowerMode;
 	$('showVideoCheckbox').checked = state.settings.showVideo;
 	$('videoModeSelect').value = state.settings.videoMode;
+	$('videoFitModeSelect').value = state.settings.videoFitMode || 'cover';
 	$('lowFreqSlider').value = state.settings.lowFreq;
 	$('lowFreqValue').textContent = state.settings.lowFreq + 'Hz';
 	$('highFreqSlider').value = state.settings.highFreq;
@@ -1673,9 +1710,10 @@ function draw(ts = 0) {
 	if (bgVideo.src && state.isPlaying && state.settings.showVideo) {
 		if (!lastVideoSyncTs || ts - lastVideoSyncTs > 250) {
 			lastVideoSyncTs = ts;
-			const timeDiff = Math.abs(bgVideo.currentTime - audio.currentTime);
+			const targetTime = audio.currentTime + 0.15;
+			const timeDiff = Math.abs(bgVideo.currentTime - targetTime);
 			if (timeDiff > 1.0) {
-				bgVideo.currentTime = audio.currentTime;
+				bgVideo.currentTime = targetTime;
 			}
 		}
 	}
