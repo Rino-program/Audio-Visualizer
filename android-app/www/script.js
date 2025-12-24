@@ -2555,6 +2555,8 @@ function releaseObjectUrlForTrack(track) {
  * @param {number} dt - Delta time in seconds
  */
 function computeDisplayValues(rawFreq, dt) {
+    if (!rawFreq || rawFreq.length === 0) return;
+    
     const barCount = state.settings.barCount;
     
     // Ensure arrays are initialized
@@ -2570,7 +2572,8 @@ function computeDisplayValues(rawFreq, dt) {
     
     // Normalize raw frequency data to 0-1
     const cur = new Float32Array(barCount);
-    for (let i = 0; i < barCount; i++) {
+    const len = Math.min(rawFreq.length, barCount);
+    for (let i = 0; i < len; i++) {
         cur[i] = rawFreq[i] / 255;
     }
     
@@ -2594,7 +2597,7 @@ function computeDisplayValues(rawFreq, dt) {
     }
     
     // Update sand heights if sandMode is enabled
-    if (state.settings.sandMode && dt > 0) {
+    if (state.settings.sandMode && dt > 0 && H > 0) {
         const fallRate = state.settings.sandFallRate || 200; // pixels/second
         
         for (let i = 0; i < barCount; i++) {
@@ -2613,9 +2616,9 @@ function computeDisplayValues(rawFreq, dt) {
                 state.sandHeights[i] = Math.max(0, sandHeight - normalizedFallRate);
             }
         }
-    } else {
+    } else if (!state.settings.sandMode) {
         // Reset sand heights if sandMode is disabled
-        state.sandHeights.fill(0);
+        if (state.sandHeights) state.sandHeights.fill(0);
     }
     
     // Store current levels for next frame
@@ -2771,12 +2774,33 @@ function drawBars(fd, maxH, drawH, drawStartY) {
     }
 }
 function drawWaveform(maxH, drawH, drawStartY) {
-    let startIdx = 0; for (let i = 0; i < state.bufLen - 1; i++) { if (state.timeData[i] < 128 && state.timeData[i+1] >= 128) { startIdx = i; break; } }
-    ctx.beginPath(); const slice = W / (state.bufLen - startIdx); const centerY = drawStartY + drawH / 2;
-    for (let i = startIdx; i < state.bufLen; i++) { const v = state.timeData[i] / 128 - 1; const y = centerY + v * maxH * 0.5; i === startIdx ? ctx.moveTo(0, y) : ctx.lineTo((i - startIdx) * slice, y); }
-    ctx.strokeStyle = state.settings.rainbow ? `hsl(${(Date.now() * 0.1) % 360}, 80%, 60%)` : state.settings.fixedColor; ctx.lineWidth = 3;
-    if (state.settings.glowStrength > 0) { ctx.shadowBlur = state.settings.glowStrength; ctx.shadowColor = ctx.strokeStyle; }
-    ctx.stroke(); ctx.shadowBlur = 0;
+    let startIdx = 0;
+    for (let i = 0; i < state.bufLen - 1; i++) {
+        if (state.timeData[i] < 128 && state.timeData[i+1] >= 128) {
+            startIdx = i;
+            break;
+        }
+    }
+    ctx.beginPath();
+    const slice = W / (state.bufLen - startIdx);
+    const centerY = drawStartY + drawH / 2;
+    for (let i = startIdx; i < state.bufLen; i++) {
+        const v = state.timeData[i] / 128 - 1;
+        const y = centerY + v * maxH * 0.5;
+        i === startIdx ? ctx.moveTo(0, y) : ctx.lineTo((i - startIdx) * slice, y);
+    }
+    
+    // Use precomputed timeHue (multiplied by 2 for waveform for visual variety)
+    const hue = Math.floor((state.renderCache.timeHue * 2) % 360);
+    ctx.strokeStyle = state.settings.rainbow ? `hsl(${hue}, 80%, 60%)` : state.settings.fixedColor;
+    ctx.lineWidth = 3;
+    
+    if (state.settings.glowStrength > 0) {
+        ctx.shadowBlur = state.settings.glowStrength;
+        ctx.shadowColor = ctx.strokeStyle;
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
 }
 function drawDigitalBlocks(fd, maxH, drawH, drawStartY) {
     const cols = 32; const rows = 20; const cellW = W / cols; const cellH = drawH / rows;
@@ -2933,7 +2957,6 @@ function drawMirrorBars(fd, maxH, drawH, drawStartY) {
             ctx.fillRect(i * bw + 1, cy + sandH, bw - 2, sandThickness);
         }
     }
-}
 }
 
 document.addEventListener('DOMContentLoaded', () => {
