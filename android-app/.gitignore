@@ -1,0 +1,24 @@
+# Android signing / Firebase secrets (never commit)
+android/keystore.properties
+android/app/google-services.json
+*.jks
+*.keystore
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Build outputs
+android/app/build/
+android/app/release/
+android/.gradle/
+android/build/
+
+# IDE
+.idea/
+*.iml
+local.properties
+
+# Capacitor
+capacitor.config.ts.bak

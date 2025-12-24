@@ -41,6 +41,19 @@ const state = {
     timeData: null,
     bufLen: 0,
     
+    // Performance optimization: reusable arrays and cache
+    prevLevels: null,        // Float32Array for previous frame levels
+    displayValues: null,     // Float32Array for computed display values
+    sandHeights: null,       // Float32Array for sand mode positions
+    renderCache: {
+        gradient: null,
+        shadowColor: '',
+        shadowBlur: 0,
+        timeHue: 0,
+        barColors: [],       // Precomputed color strings for each bar
+        lastSettingsHash: '' // Track when to invalidate cache
+    },
+    
     // Settings
     settings: {
         smoothing: 0.7,
@@ -70,9 +83,80 @@ const state = {
         sleepTimer: 0,
         autoPlayNext: true,
         stopOnVideoEnd: false,
-        storeLocalFiles: false
+        storeLocalFiles: false,
+        
+        // New visualization settings
+        changeMode: 'off',        // 'off' | 'plus' | 'plusminus'
+        sandMode: false,
+        sandFallRate: 200,        // pixels/second
+        sandLineThickness: 2,     // pixels
+        circleAngleOffset: 0      // degrees
     }
 };
+
+// ============== BLOB URL CACHE (LRU) ==============
+class BlobUrlCache {
+    constructor(capacity = 2) {
+        this.capacity = capacity;
+        this.cache = new Map(); // Map<url, { track, timestamp }>
+    }
+    
+    add(url, track) {
+        if (!url || !track) return;
+        
+        // If already in cache, update timestamp
+        if (this.cache.has(url)) {
+            this.cache.get(url).timestamp = Date.now();
+            return;
+        }
+        
+        // Evict oldest if at capacity
+        if (this.cache.size >= this.capacity) {
+            let oldestUrl = null;
+            let oldestTime = Infinity;
+            for (const [cachedUrl, data] of this.cache.entries()) {
+                if (data.timestamp < oldestTime) {
+                    oldestTime = data.timestamp;
+                    oldestUrl = cachedUrl;
+                }
+            }
+            if (oldestUrl) {
+                this.remove(oldestUrl);
+            }
+        }
+        
+        this.cache.set(url, { track, timestamp: Date.now() });
+    }
+    
+    remove(url) {
+        if (!url) return;
+        const entry = this.cache.get(url);
+        if (entry) {
+            this.cache.delete(url);
+            // Only revoke if it's marked as ephemeral
+            if (entry.track && entry.track.ephemeral) {
+                try {
+                    URL.revokeObjectURL(url);
+                } catch (e) {
+                    console.warn('Failed to revoke blob URL:', e);
+                }
+            }
+        }
+    }
+    
+    clear() {
+        for (const url of this.cache.keys()) {
+            this.remove(url);
+        }
+        this.cache.clear();
+    }
+    
+    has(url) {
+        return this.cache.has(url);
+    }
+}
+
+const blobUrlCache = new BlobUrlCache(2);
 
 // --- Playlist action helpers (simplified, no more-menu) ---
 function initPlaylistOverflowHelpers() {
@@ -736,8 +820,16 @@ function updateVideoVisibility() {
     }
     
     if (isVideo && state.settings.showVideo) {
-        if (bgVideo.src !== track.url) {
-            bgVideo.src = track.url;
+        const newVideoUrl = track.url;
+        if (bgVideo.src !== newVideoUrl) {
+            // Release old ephemeral video URL if exists
+            const oldSrc = bgVideo.src;
+            if (oldSrc && oldSrc.startsWith('blob:')) {
+                // Check if this is an ephemeral URL that should be released
+                // (We don't revoke it immediately since it might still be in the cache)
+            }
+            
+            bgVideo.src = newVideoUrl || '';
             bgVideo.load(); // 明示的にロード
             
             // ロード完了後に時間を合わせる（MVを0.15秒先に）
@@ -1317,6 +1409,44 @@ function setupSettingsInputs() {
     $('autoPlayNextCheckbox').onchange = e => { state.settings.autoPlayNext = e.target.checked; };
     $('stopOnVideoEndCheckbox').onchange = e => { state.settings.stopOnVideoEnd = e.target.checked; };
 
+    // New visualization settings
+    const changeModeSelect = $('changeModeSelect');
+    if (changeModeSelect) {
+        changeModeSelect.onchange = e => { state.settings.changeMode = e.target.value; };
+    }
+    
+    const sandModeCheckbox = $('sandModeCheckbox');
+    if (sandModeCheckbox) {
+        sandModeCheckbox.onchange = e => { state.settings.sandMode = e.target.checked; };
+    }
+    
+    const sandFallRateSlider = $('sandFallRateSlider');
+    if (sandFallRateSlider) {
+        sandFallRateSlider.oninput = e => {
+            state.settings.sandFallRate = +e.target.value;
+            const valueEl = $('sandFallRateValue');
+            if (valueEl) valueEl.textContent = state.settings.sandFallRate;
+        };
+    }
+    
+    const sandLineThicknessSlider = $('sandLineThicknessSlider');
+    if (sandLineThicknessSlider) {
+        sandLineThicknessSlider.oninput = e => {
+            state.settings.sandLineThickness = +e.target.value;
+            const valueEl = $('sandLineThicknessValue');
+            if (valueEl) valueEl.textContent = state.settings.sandLineThickness;
+        };
+    }
+    
+    const circleAngleOffsetSlider = $('circleAngleOffsetSlider');
+    if (circleAngleOffsetSlider) {
+        circleAngleOffsetSlider.oninput = e => {
+            state.settings.circleAngleOffset = +e.target.value;
+            const valueEl = $('circleAngleOffsetValue');
+            if (valueEl) valueEl.textContent = state.settings.circleAngleOffset;
+        };
+    }
+
     // persistSettingsCheckboxは既に上で処理済みなので重複を避ける
     setupPresets();
 }
@@ -1442,6 +1572,34 @@ function applySettingsToUI() {
     $('sleepTimerSelect').value = state.settings.sleepTimer;
     $('autoPlayNextCheckbox').checked = state.settings.autoPlayNext;
     $('stopOnVideoEndCheckbox').checked = state.settings.stopOnVideoEnd;
+
+    // New visualization settings
+    const changeModeSelect = $('changeModeSelect');
+    if (changeModeSelect) changeModeSelect.value = state.settings.changeMode || 'off';
+    
+    const sandModeCheckbox = $('sandModeCheckbox');
+    if (sandModeCheckbox) sandModeCheckbox.checked = state.settings.sandMode || false;
+    
+    const sandFallRateSlider = $('sandFallRateSlider');
+    const sandFallRateValue = $('sandFallRateValue');
+    if (sandFallRateSlider && sandFallRateValue) {
+        sandFallRateSlider.value = state.settings.sandFallRate || 200;
+        sandFallRateValue.textContent = state.settings.sandFallRate || 200;
+    }
+    
+    const sandLineThicknessSlider = $('sandLineThicknessSlider');
+    const sandLineThicknessValue = $('sandLineThicknessValue');
+    if (sandLineThicknessSlider && sandLineThicknessValue) {
+        sandLineThicknessSlider.value = state.settings.sandLineThickness || 2;
+        sandLineThicknessValue.textContent = state.settings.sandLineThickness || 2;
+    }
+    
+    const circleAngleOffsetSlider = $('circleAngleOffsetSlider');
+    const circleAngleOffsetValue = $('circleAngleOffsetValue');
+    if (circleAngleOffsetSlider && circleAngleOffsetValue) {
+        circleAngleOffsetSlider.value = state.settings.circleAngleOffset || 0;
+        circleAngleOffsetValue.textContent = state.settings.circleAngleOffset || 0;
+    }
 
     state.settings.eq.forEach((val, i) => {
         const freq = EQ_FREQS[i];
@@ -1683,7 +1841,7 @@ function prevTrack() {
     playTrack(prevIdx);
 }
 
-function playTrack(index) {
+async function playTrack(index) {
     if (index < 0 || index >= state.playlist.length) return;
     clearPlayTimeout();
     state.currentIndex = index;
@@ -1699,19 +1857,50 @@ function playTrack(index) {
     
     audio.pause();
     audio.currentTime = 0;
-    audio.src = track.url;
-    audio.load();
-    connectFileSource();
-    updateVideoVisibility();
-    state.playTimeout = setTimeout(() => { 
-        audio.play().catch(e => {
-            console.warn("Playback failed:", e);
-            showOverlay('⚠️ 再生に失敗しました');
-            // 失敗した場合は次の曲へ（無限ループ防止のため少し待つ）
+    
+    // Ensure URL is available (async load if needed)
+    try {
+        let url = track.url;
+        if (!url) {
+            showOverlay('⏳ 読み込み中...', 0);
+            url = await ensureUrlForTrack(track);
+            els.overlayMsg.classList.add('hidden');
+        }
+        
+        if (!url) {
+            console.error('Failed to get URL for track:', track.name);
+            showOverlay('⚠️ ファイルを読み込めませんでした');
             setTimeout(nextTrack, 2000);
-        }); 
-        state.playTimeout = null;
-    }, 100);
+            return;
+        }
+        
+        audio.src = url;
+        audio.load();
+        connectFileSource();
+        updateVideoVisibility();
+        
+        // Prefetch next track asynchronously (don't await)
+        const nextIndex = (index + 1) % state.playlist.length;
+        if (nextIndex !== index && state.playlist[nextIndex]) {
+            ensureUrlForTrack(state.playlist[nextIndex]).catch(e => {
+                console.warn('Failed to prefetch next track:', e);
+            });
+        }
+        
+        state.playTimeout = setTimeout(() => { 
+            audio.play().catch(e => {
+                console.warn("Playback failed:", e);
+                showOverlay('⚠️ 再生に失敗しました');
+                // 失敗した場合は次の曲へ（無限ループ防止のため少し待つ）
+                setTimeout(nextTrack, 2000);
+            }); 
+            state.playTimeout = null;
+        }, 100);
+    } catch (e) {
+        console.error('Error in playTrack:', e);
+        showOverlay('⚠️ エラーが発生しました');
+        setTimeout(nextTrack, 2000);
+    }
 }
 
 function seek() { if (state.inputSource === 'file') audio.currentTime = els.seekBar.value; }
@@ -1768,8 +1957,11 @@ async function handleFiles(files) {
         const file = item.file;
         const filePath = typeof file.path === 'string' ? file.path : '';
         let localRef = null;
+        let url = null;
+        
         if (filePath) {
             localRef = `path:${filePath}`;
+            url = toCapacitorFileUrl(filePath);
             upsertLibraryEntry({ ref: localRef, type: 'path', name: file.name, sizeBytes: file.size, isVideo: item.isVideo });
         } else {
             if (state.settings.storeLocalFiles) {
@@ -1777,21 +1969,29 @@ async function handleFiles(files) {
                     const id = await idbPutLocalFile(file);
                     localRef = `idb:${id}`;
                     upsertLibraryEntry({ ref: localRef, type: 'idb', name: file.name, sizeBytes: file.size, isVideo: item.isVideo });
-                } catch {
+                    // URL will be created lazily via ensureUrlForTrack
+                } catch (e) {
+                    console.warn('Failed to store file in IDB:', e);
                     localRef = null;
                 }
-            } else {
-                localRef = null; // use blob only
+            }
+            
+            // If not stored or storage failed, keep blob reference
+            if (!localRef) {
+                // Store file blob for later URL creation
+                url = null; // Will be created on-demand
             }
         }
 
         state.playlist.push({
             name: file.name,
-            url: URL.createObjectURL(file),
+            url: url,
             source: 'local',
             isVideo: item.isVideo,
             localRef,
-            size: file.size
+            size: file.size,
+            fileBlob: !localRef ? file : null, // Keep blob reference if not stored
+            ephemeral: false
         });
     }
     renderPlaylist();
@@ -2181,17 +2381,29 @@ async function fetchDriveFile(fileId, fileName) {
         const r = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, { headers: { 'Authorization': 'Bearer ' + accessToken } }); 
         if (!r.ok) {
             showOverlay('❌ 取得に失敗しました');
+            console.error('Drive fetch failed:', r.status, r.statusText);
             return; 
         }
         const blob = await r.blob(); 
         const ext = fileName.toLowerCase().split('.').pop();
         const videoExt = new Set(['mp4', 'webm', 'mkv', 'mov']);
         const isVideo = videoExt.has(ext);
-        state.playlist.push({ name: fileName, url: URL.createObjectURL(blob), source: 'drive', isVideo: isVideo }); 
+        
+        // Store blob reference without creating URL immediately
+        state.playlist.push({
+            name: fileName,
+            url: null,
+            source: 'drive',
+            isVideo: isVideo,
+            fileId: fileId,
+            fileBlob: blob,
+            ephemeral: false
+        }); 
         renderPlaylist(); 
         if (state.currentIndex === -1) playTrack(state.playlist.length - 1); 
         showOverlay(`✅ ${fileName} を追加しました`);
     } catch (e) {
+        console.error('fetchDriveFile error:', e);
         showOverlay('❌ エラーが発生しました');
     } 
 }
@@ -2267,10 +2479,159 @@ function getFilteredData() {
     return out;
 }
 function freqToIdx(f) { return state.audioCtx ? Math.round(f * state.analyser.fftSize / state.audioCtx.sampleRate) : 0; }
+
+// ============== BLOB URL MANAGEMENT ==============
+/**
+ * Ensure a track has a valid URL, loading from storage if needed.
+ * Creates ephemeral blob URLs and adds them to the cache.
+ */
+async function ensureUrlForTrack(track) {
+    if (!track) return null;
+    
+    // Already has a URL
+    if (track.url) return track.url;
+    
+    try {
+        // If fileBlob is available, create URL synchronously
+        if (track.fileBlob) {
+            const url = URL.createObjectURL(track.fileBlob);
+            track.url = url;
+            track.ephemeral = true;
+            blobUrlCache.add(url, track);
+            return url;
+        }
+        
+        // Load from storage based on localRef
+        const localRef = track.localRef;
+        if (!localRef) return null;
+        
+        let blob = null;
+        
+        if (localRef.startsWith('idb:')) {
+            const id = localRef.slice('idb:'.length);
+            const file = await idbGetLocalFile(id);
+            if (file) blob = file;
+        } else if (localRef.startsWith('path:')) {
+            // Path-based file - cannot create blob URL synchronously
+            // Return null and rely on Capacitor's convertFileSrc
+            return null;
+        } else if (localRef.startsWith('uri:')) {
+            // URI-based file - use Capacitor conversion
+            const uri = localRef.slice('uri:'.length);
+            return toCapacitorFileUrl(uri);
+        } else if (localRef.startsWith('app:')) {
+            const p = localRef.slice('app:'.length);
+            return toCapacitorFileUrl(p);
+        }
+        
+        if (blob) {
+            const url = URL.createObjectURL(blob);
+            track.url = url;
+            track.ephemeral = true;
+            blobUrlCache.add(url, track);
+            return url;
+        }
+    } catch (e) {
+        console.error('Failed to ensure URL for track:', track.name, e);
+    }
+    
+    return null;
+}
+
+/**
+ * Release a track's blob URL if it's ephemeral
+ */
+function releaseObjectUrlForTrack(track) {
+    if (!track || !track.url || !track.ephemeral) return;
+    blobUrlCache.remove(track.url);
+    track.url = null;
+    track.ephemeral = false;
+}
+
+/**
+ * Compute display values based on changeMode and sandMode.
+ * Updates state.displayValues and state.sandHeights.
+ * @param {Uint8Array} rawFreq - Raw frequency data (0-255)
+ * @param {number} dt - Delta time in seconds
+ */
+function computeDisplayValues(rawFreq, dt) {
+    if (!rawFreq || rawFreq.length === 0) return;
+    
+    const barCount = state.settings.barCount;
+    
+    // Ensure arrays are initialized
+    if (!state.prevLevels || state.prevLevels.length !== barCount) {
+        state.prevLevels = new Float32Array(barCount);
+    }
+    if (!state.displayValues || state.displayValues.length !== barCount) {
+        state.displayValues = new Float32Array(barCount);
+    }
+    if (!state.sandHeights || state.sandHeights.length !== barCount) {
+        state.sandHeights = new Float32Array(barCount);
+    }
+    
+    // Normalize raw frequency data to 0-1
+    const cur = new Float32Array(barCount);
+    const len = Math.min(rawFreq.length, barCount);
+    for (let i = 0; i < len; i++) {
+        cur[i] = rawFreq[i] / 255;
+    }
+    
+    // Compute display values based on changeMode
+    const changeMode = state.settings.changeMode;
+    for (let i = 0; i < barCount; i++) {
+        let displayVal = cur[i];
+        
+        if (changeMode === 'plus') {
+            // Show only increases (current - previous, clamped to 0-1)
+            const delta = cur[i] - state.prevLevels[i];
+            displayVal = Math.max(0, Math.min(1, delta));
+        } else if (changeMode === 'plusminus') {
+            // Show absolute changes
+            const delta = Math.abs(cur[i] - state.prevLevels[i]);
+            displayVal = Math.min(1, delta);
+        }
+        // else 'off': use cur[i] as-is
+        
+        state.displayValues[i] = displayVal;
+    }
+    
+    // Update sand heights if sandMode is enabled
+    if (state.settings.sandMode && dt > 0 && H > 0) {
+        const fallRate = state.settings.sandFallRate || 200; // pixels/second
+        
+        for (let i = 0; i < barCount; i++) {
+            const currentHeight = cur[i]; // Normalized 0-1
+            const sandHeight = state.sandHeights[i];
+            
+            // "No warp while airborne" rule:
+            // Sand follows bar only when bar is at or above sand position
+            if (currentHeight >= sandHeight) {
+                state.sandHeights[i] = currentHeight;
+            } else {
+                // Sand falls by fallRate * dt (convert to normalized units)
+                // Assuming maxH is around 0.9 * canvas height, we need to scale fallRate
+                // For simplicity, we'll use a normalized fall rate
+                const normalizedFallRate = (fallRate * dt) / (H * 0.9);
+                state.sandHeights[i] = Math.max(0, sandHeight - normalizedFallRate);
+            }
+        }
+    } else if (!state.settings.sandMode) {
+        // Reset sand heights if sandMode is disabled
+        if (state.sandHeights) state.sandHeights.fill(0);
+    }
+    
+    // Store current levels for next frame
+    for (let i = 0; i < barCount; i++) {
+        state.prevLevels[i] = cur[i];
+    }
+}
+
 function getColor(i, v = 1, total = state.settings.barCount) {
     if (state.settings.rainbow) {
         const baseHue = (i / total) * 360;
-        const timeHue = (state.mode === 1 || state.mode === 4) ? (Date.now() * 0.05) : 0;
+        // Use precomputed timeHue from renderCache
+        const timeHue = state.renderCache.timeHue || 0;
         const hue = Math.floor((baseHue + timeHue) % 360);
         const lightness = Math.max(0, Math.min(100, Math.round(50 + v * 20)));
         return `hsl(${hue}, 80%, ${lightness}%)`;
@@ -2280,6 +2641,8 @@ function getColor(i, v = 1, total = state.settings.barCount) {
 
 let lastDrawTs = 0;
 let lastVideoSyncCheckTs = 0;
+let lastFrameTime = 0;
+
 function draw(ts = 0) {
     requestAnimationFrame(draw);
 
@@ -2289,6 +2652,10 @@ function draw(ts = 0) {
     const targetFps = state.settings.lowPowerMode ? 30 : 60;
     const minInterval = 1000 / targetFps;
     if (lastDrawTs && ts - lastDrawTs < minInterval) return;
+    
+    // Calculate delta time for animations
+    const dt = lastFrameTime ? (ts - lastFrameTime) / 1000 : 0.016; // default to ~60fps
+    lastFrameTime = ts;
     lastDrawTs = ts;
 
     // 動画と音声の同期チェックは間引く（毎フレームやると重い）
@@ -2316,6 +2683,25 @@ function draw(ts = 0) {
     
     if (!state.analyser) return;
     const fd = getFilteredData();
+    
+    // Compute display values with change/sand modes
+    computeDisplayValues(fd, dt);
+    
+    // Precompute per-frame values to reduce GC pressure
+    // Update renderCache.timeHue once per frame
+    if (state.settings.rainbow && (state.mode === 1 || state.mode === 4)) {
+        state.renderCache.timeHue = (ts * 0.05) % 360;
+    } else {
+        state.renderCache.timeHue = 0;
+    }
+    
+    // Precompute bar colors array if needed (when settings change)
+    const settingsHash = `${state.settings.rainbow}_${state.settings.fixedColor}_${state.settings.barCount}_${state.mode}`;
+    if (state.renderCache.lastSettingsHash !== settingsHash) {
+        state.renderCache.lastSettingsHash = settingsHash;
+        state.renderCache.barColors = [];
+        // Colors will be computed on-demand in draw functions
+    }
     
     // Use full screen height for visualization
     const drawH = H;
@@ -2356,21 +2742,65 @@ function draw(ts = 0) {
 }
 
 // Modes (Same as V6 but with drawH adjustment and Y offset)
+// Updated to use displayValues and support sand mode
 function drawBars(fd, maxH, drawH, drawStartY) {
-    const n = fd.length; const bw = W / n;
+    const n = state.displayValues ? state.displayValues.length : fd.length;
+    const bw = W / n;
+    const sandEnabled = state.settings.sandMode && state.sandHeights;
+    const sandThickness = state.settings.sandLineThickness || 2;
+    
     for (let i = 0; i < n; i++) {
-        const v = fd[i] / 255; const h = v * maxH; const color = getColor(i, v, n);
-        if (state.settings.glowStrength > 0 && v > 0.1) { ctx.shadowBlur = state.settings.glowStrength * v; ctx.shadowColor = color; }
-        ctx.fillStyle = color; ctx.fillRect(i * bw + 1, drawStartY + drawH - h, bw - 2, h); ctx.shadowBlur = 0;
+        // Use displayValues if available, otherwise fall back to raw data
+        const v = state.displayValues ? state.displayValues[i] : (fd[i] / 255);
+        const h = v * maxH;
+        const color = getColor(i, v, n);
+        
+        // Draw main bar
+        if (state.settings.glowStrength > 0 && v > 0.1) {
+            ctx.shadowBlur = state.settings.glowStrength * v;
+            ctx.shadowColor = color;
+        }
+        ctx.fillStyle = color;
+        ctx.fillRect(i * bw + 1, drawStartY + drawH - h, bw - 2, h);
+        ctx.shadowBlur = 0;
+        
+        // Draw sand line if enabled
+        if (sandEnabled && state.sandHeights[i] > 0) {
+            const sandH = state.sandHeights[i] * maxH;
+            const sandY = drawStartY + drawH - sandH;
+            ctx.fillStyle = color;
+            ctx.fillRect(i * bw + 1, sandY - sandThickness, bw - 2, sandThickness);
+        }
     }
 }
 function drawWaveform(maxH, drawH, drawStartY) {
-    let startIdx = 0; for (let i = 0; i < state.bufLen - 1; i++) { if (state.timeData[i] < 128 && state.timeData[i+1] >= 128) { startIdx = i; break; } }
-    ctx.beginPath(); const slice = W / (state.bufLen - startIdx); const centerY = drawStartY + drawH / 2;
-    for (let i = startIdx; i < state.bufLen; i++) { const v = state.timeData[i] / 128 - 1; const y = centerY + v * maxH * 0.5; i === startIdx ? ctx.moveTo(0, y) : ctx.lineTo((i - startIdx) * slice, y); }
-    ctx.strokeStyle = state.settings.rainbow ? `hsl(${(Date.now() * 0.1) % 360}, 80%, 60%)` : state.settings.fixedColor; ctx.lineWidth = 3;
-    if (state.settings.glowStrength > 0) { ctx.shadowBlur = state.settings.glowStrength; ctx.shadowColor = ctx.strokeStyle; }
-    ctx.stroke(); ctx.shadowBlur = 0;
+    let startIdx = 0;
+    for (let i = 0; i < state.bufLen - 1; i++) {
+        if (state.timeData[i] < 128 && state.timeData[i+1] >= 128) {
+            startIdx = i;
+            break;
+        }
+    }
+    ctx.beginPath();
+    const slice = W / (state.bufLen - startIdx);
+    const centerY = drawStartY + drawH / 2;
+    for (let i = startIdx; i < state.bufLen; i++) {
+        const v = state.timeData[i] / 128 - 1;
+        const y = centerY + v * maxH * 0.5;
+        i === startIdx ? ctx.moveTo(0, y) : ctx.lineTo((i - startIdx) * slice, y);
+    }
+    
+    // Use precomputed timeHue (multiplied by 2 for waveform for visual variety)
+    const hue = Math.floor((state.renderCache.timeHue * 2) % 360);
+    ctx.strokeStyle = state.settings.rainbow ? `hsl(${hue}, 80%, 60%)` : state.settings.fixedColor;
+    ctx.lineWidth = 3;
+    
+    if (state.settings.glowStrength > 0) {
+        ctx.shadowBlur = state.settings.glowStrength;
+        ctx.shadowColor = ctx.strokeStyle;
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
 }
 function drawDigitalBlocks(fd, maxH, drawH, drawStartY) {
     const cols = 32; const rows = 20; const cellW = W / cols; const cellH = drawH / rows;
@@ -2380,30 +2810,88 @@ function drawDigitalBlocks(fd, maxH, drawH, drawStartY) {
     }
 }
 function drawCircle(fd, maxH, drawH, drawStartY) {
-    const cx = W / 2, cy = drawStartY + drawH / 2; const r = Math.min(W, drawH) * 0.25; const n = fd.length; const circumference = 2 * Math.PI * r; const barW = (circumference / n) * 0.8;
+    const cx = W / 2, cy = drawStartY + drawH / 2;
+    const r = Math.min(W, drawH) * 0.25;
+    const n = state.displayValues ? state.displayValues.length : fd.length;
+    const circumference = 2 * Math.PI * r;
+    const barW = (circumference / n) * 0.8;
+    const angleOffset = (state.settings.circleAngleOffset || 0) * Math.PI / 180;
+    const sandEnabled = state.settings.sandMode && state.sandHeights;
+    
     for (let i = 0; i < n; i++) {
-        const ang = (i / n) * Math.PI * 2 - Math.PI / 2; const v = fd[i] / 255; const len = v * maxH * 0.6;
-        ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang); const color = getColor(i, v, n); ctx.fillStyle = color;
-        if (state.settings.glowStrength > 0 && v > 0.2) { ctx.shadowBlur = state.settings.glowStrength; ctx.shadowColor = color; }
-        ctx.fillRect(r, -barW/2, len, barW); ctx.restore();
+        const ang = (i / n) * Math.PI * 2 - Math.PI / 2 + angleOffset;
+        const v = state.displayValues ? state.displayValues[i] : (fd[i] / 255);
+        const len = v * maxH * 0.6;
+        
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(ang);
+        const color = getColor(i, v, n);
+        ctx.fillStyle = color;
+        
+        // Draw main bar
+        if (state.settings.glowStrength > 0 && v > 0.2) {
+            ctx.shadowBlur = state.settings.glowStrength;
+            ctx.shadowColor = color;
+        }
+        ctx.fillRect(r, -barW/2, len, barW);
+        ctx.shadowBlur = 0;
+        
+        // Draw sand as small circle at bar tip if enabled
+        if (sandEnabled && state.sandHeights[i] > 0) {
+            const sandLen = state.sandHeights[i] * maxH * 0.6;
+            const sandRadius = barW / 3;
+            ctx.beginPath();
+            ctx.arc(r + sandLen, 0, sandRadius, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+        }
+        
+        ctx.restore();
     }
 }
 function drawSpectrum(fd, maxH, drawH, drawStartY) {
-    const n = fd.length; const bw = W / n; ctx.beginPath(); ctx.moveTo(0, drawStartY + drawH);
+    const n = fd.length;
+    const bw = W / n;
+    ctx.beginPath();
+    ctx.moveTo(0, drawStartY + drawH);
+    
     for (let i = 0; i < n; i++) {
-        const v = fd[i] / 255; const h = v * maxH; const x = i * bw + bw / 2; const y = drawStartY + drawH - h;
-        if (i === 0) ctx.lineTo(x, y); else { const prevX = (i - 1) * bw + bw / 2; const prevY = drawStartY + drawH - (fd[i - 1] / 255) * maxH; const cx = (prevX + x) / 2; ctx.bezierCurveTo(cx, prevY, cx, y, x, y); }
+        const v = fd[i] / 255;
+        const h = v * maxH;
+        const x = i * bw + bw / 2;
+        const y = drawStartY + drawH - h;
+        if (i === 0) {
+            ctx.lineTo(x, y);
+        } else {
+            const prevX = (i - 1) * bw + bw / 2;
+            const prevY = drawStartY + drawH - (fd[i - 1] / 255) * maxH;
+            const cx = (prevX + x) / 2;
+            ctx.bezierCurveTo(cx, prevY, cx, y, x, y);
+        }
     }
-    ctx.lineTo(W, drawStartY + drawH); ctx.closePath(); 
+    ctx.lineTo(W, drawStartY + drawH);
+    ctx.closePath();
     
-    const grad = ctx.createLinearGradient(0, drawStartY + drawH - maxH, 0, drawStartY + drawH); 
-    const hue = Math.floor((Date.now() * 0.05) % 360);
-    const c = state.settings.rainbow ? `hsl(${hue}, 80%, 60%)` : state.settings.fixedColor; 
-    grad.addColorStop(0, c); grad.addColorStop(1, 'transparent'); 
-    ctx.fillStyle = grad; ctx.fill(); 
+    // Cache gradient to avoid recreating every frame
+    const gradientKey = `${drawStartY}_${drawH}_${maxH}`;
+    if (!state.renderCache.gradient || state.renderCache.gradientKey !== gradientKey) {
+        state.renderCache.gradient = ctx.createLinearGradient(0, drawStartY + drawH - maxH, 0, drawStartY + drawH);
+        state.renderCache.gradientKey = gradientKey;
+    }
     
-    ctx.strokeStyle = state.settings.rainbow ? `hsl(${hue}, 80%, 80%)` : '#fff'; 
-    ctx.lineWidth = 2; ctx.stroke();
+    const grad = state.renderCache.gradient;
+    // Use precomputed timeHue
+    const hue = Math.floor(state.renderCache.timeHue % 360);
+    const c = state.settings.rainbow ? `hsl(${hue}, 80%, 60%)` : state.settings.fixedColor;
+    grad.addColorStop(0, c);
+    grad.addColorStop(1, 'transparent');
+    ctx.fillStyle = grad;
+    ctx.fill();
+    
+    ctx.strokeStyle = state.settings.rainbow ? `hsl(${hue}, 80%, 80%)` : '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
 }
 function drawGalaxy(fd, drawH, drawStartY) {
     const cx = W/2, cy = drawStartY + drawH/2; const bass = fd[0] / 255; ctx.save(); ctx.translate(cx, cy); ctx.rotate(Date.now() * 0.0005);
@@ -2441,11 +2929,33 @@ function drawHexagon(fd, drawH, drawStartY) {
     }
 }
 function drawMirrorBars(fd, maxH, drawH, drawStartY) {
-    const n = fd.length; const bw = W / n; const cy = drawStartY + drawH / 2;
+    const n = state.displayValues ? state.displayValues.length : fd.length;
+    const bw = W / n;
+    const cy = drawStartY + drawH / 2;
+    const sandEnabled = state.settings.sandMode && state.sandHeights;
+    const sandThickness = state.settings.sandLineThickness || 2;
+    
     for (let i = 0; i < n; i++) {
-        const v = fd[i] / 255; const h = v * maxH * 0.5; const color = getColor(i, v, n);
-        if (state.settings.glowStrength > 0 && v > 0.1) { ctx.shadowBlur = state.settings.glowStrength; ctx.shadowColor = color; }
-        ctx.fillStyle = color; ctx.fillRect(i * bw + 1, cy - h, bw - 2, h); ctx.fillRect(i * bw + 1, cy, bw - 2, h); ctx.shadowBlur = 0;
+        const v = state.displayValues ? state.displayValues[i] : (fd[i] / 255);
+        const h = v * maxH * 0.5;
+        const color = getColor(i, v, n);
+        
+        if (state.settings.glowStrength > 0 && v > 0.1) {
+            ctx.shadowBlur = state.settings.glowStrength;
+            ctx.shadowColor = color;
+        }
+        ctx.fillStyle = color;
+        ctx.fillRect(i * bw + 1, cy - h, bw - 2, h);
+        ctx.fillRect(i * bw + 1, cy, bw - 2, h);
+        ctx.shadowBlur = 0;
+        
+        // Draw sand lines if enabled
+        if (sandEnabled && state.sandHeights[i] > 0) {
+            const sandH = state.sandHeights[i] * maxH * 0.5;
+            ctx.fillStyle = color;
+            ctx.fillRect(i * bw + 1, cy - sandH - sandThickness, bw - 2, sandThickness);
+            ctx.fillRect(i * bw + 1, cy + sandH, bw - 2, sandThickness);
+        }
     }
 }
 
