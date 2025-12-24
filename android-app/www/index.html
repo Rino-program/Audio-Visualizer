@@ -238,6 +238,45 @@
                         <span id="bgBlurValue">0px</span>
                     </div>
                 </div>
+                <hr style="border-color: var(--glass-border); margin: 20px 0;">
+                <h4 style="margin: 10px 0; font-size: 0.9rem; color: #aaa;">変化可視化 & サンドモード</h4>
+                <div class="setting-item">
+                    <label>変化モード (Change Mode)</label>
+                    <select id="changeModeSelect">
+                        <option value="off">オフ (通常)</option>
+                        <option value="plus">増加のみ表示 (Plus)</option>
+                        <option value="plusminus">変化量表示 (Plus/Minus)</option>
+                    </select>
+                    <p class="hint">※ 前フレームとの差分を可視化します</p>
+                </div>
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="sandModeCheckbox"> サンドモード (Sand Mode)
+                    </label>
+                    <p class="hint">※ バーの頂点に落下するライン/粒子を表示</p>
+                </div>
+                <div class="setting-item">
+                    <label>サンド落下速度</label>
+                    <div class="range-wrapper">
+                        <input type="range" id="sandFallRateSlider" min="50" max="500" step="10" value="200">
+                        <span id="sandFallRateValue">200</span>
+                    </div>
+                </div>
+                <div class="setting-item">
+                    <label>サンドライン太さ</label>
+                    <div class="range-wrapper">
+                        <input type="range" id="sandLineThicknessSlider" min="1" max="5" step="0.5" value="2">
+                        <span id="sandLineThicknessValue">2</span>
+                    </div>
+                </div>
+                <div class="setting-item">
+                    <label>サークル回転オフセット (度)</label>
+                    <div class="range-wrapper">
+                        <input type="range" id="circleAngleOffsetSlider" min="0" max="360" step="5" value="0">
+                        <span id="circleAngleOffsetValue">0</span>
+                    </div>
+                    <p class="hint">※ サークルモード時の開始角度</p>
+                </div>
             </div>
 
             <div class="tab-content" id="tab-audio">
