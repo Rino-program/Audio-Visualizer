@@ -135,6 +135,7 @@
                 <button class="tab-btn" data-tab="audio">音声/入力</button>
                 <button class="tab-btn" data-tab="player">プレーヤー</button>
                 <button class="tab-btn" data-tab="presets">プリセット</button>
+                <button class="tab-btn" data-tab="storage">ストレージ</button>
                 <button class="tab-btn" data-tab="gdrive">Drive連携</button>
                 <button class="tab-btn" data-tab="help">ヘルプ</button>
             </div>
@@ -215,6 +216,33 @@
                     <div class="range-wrapper">
                         <input type="range" id="opacitySlider" min="0.1" max="1.0" step="0.1" value="1.0">
                         <span id="opacityValue">1.0</span>
+                    </div>
+                </div>
+                <div class="setting-item">
+                    <label>変化モード (Change)</label>
+                    <select id="changeModeSelect">
+                        <option value="off">通常</option>
+                        <option value="plus">増分のみ</option>
+                        <option value="plusminus">上下変化</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="sandModeCheckbox"> 砂モード (Bars/Circle)
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label>砂の落下速度</label>
+                    <div class="range-wrapper">
+                        <input type="range" id="sandFallRateSlider" min="0.1" max="2.0" step="0.1">
+                        <span id="sandFallRateValue">0.6</span>
+                    </div>
+                </div>
+                <div class="setting-item">
+                    <label>円形バー角度補正</label>
+                    <div class="range-wrapper">
+                        <input type="range" id="circleAngleOffsetSlider" min="-180" max="180" step="1" value="0">
+                        <span id="circleAngleOffsetValue">0°</span>
                     </div>
                 </div>
                 <div class="setting-item">
@@ -347,6 +375,31 @@
                         <button class="action-btn" id="loadPreset2">Slot 2 読込</button>
                         <button class="action-btn" id="savePreset3">Slot 3 保存</button>
                         <button class="action-btn" id="loadPreset3">Slot 3 読込</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-content" id="tab-storage">
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="storeLocalFilesCheckbox"> ファイルをアプリ内に保存する (PC)
+                    </label>
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 5px;">
+                        ONにすると、追加したファイルをアプリのデータフォルダにコピーします。元のファイルを移動・削除しても再生可能です。
+                    </p>
+                </div>
+                <hr style="border-color: var(--glass-border); margin: 20px 0;">
+                <div class="storage-management">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h3>保存済みファイル</h3>
+                        <div style="display: flex; gap: 5px;">
+                            <button id="storageRefreshBtn" class="mini-btn">🔄 更新</button>
+                            <button id="storageDeleteAllBtn" class="mini-btn danger">🗑️ 全削除</button>
+                        </div>
+                    </div>
+                    <div id="storageSummary" style="font-size: 0.8rem; color: var(--primary); margin-bottom: 10px;"></div>
+                    <div id="storageList" class="storage-list">
+                        <!-- JSで生成 -->
                     </div>
                 </div>
             </div>

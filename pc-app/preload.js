@@ -1,2 +1,8 @@
-// Preload runs in isolated context. Expose safe APIs if needed.
-// This app relies on standard browser APIs only; nothing to expose for now.
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('electronAPI', {
+  saveFile: (data) => ipcRenderer.invoke('save-file', data),
+  deleteFile: (name) => ipcRenderer.invoke('delete-file', name),
+  listFiles: () => ipcRenderer.invoke('list-files'),
+  getAppPath: () => ipcRenderer.invoke('get-app-path')
+});

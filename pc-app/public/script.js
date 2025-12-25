@@ -40,7 +40,14 @@ const state = {
 	freqData: null,
 	timeData: null,
 	bufLen: 0,
-    
+	displayValues: null,
+	prevLevels: null,
+	sandHeights: null,
+	curLevels: null,
+	
+	// Race condition protection
+	playRequestId: 0,
+	
 	// Settings
 	settings: {
 		smoothing: 0.7,
@@ -49,7 +56,7 @@ const state = {
 		lowFreq: 20,
 		highFreq: 16000,
 		glowStrength: 20,
-		fftSize: 4096,
+		fftSize: 2048,
 		opacity: 1.0,
 		bgBlur: 0,
 		mirror: false,
@@ -69,9 +76,121 @@ const state = {
 		playbackRate: 1.0,
 		sleepTimer: 0,
 		autoPlayNext: true,
-		stopOnVideoEnd: false
+		stopOnVideoEnd: false,
+		storeLocalFiles: false,
+		// New visualization settings
+		changeMode: 'off', // 'off' | 'plus' | 'plusminus'
+		sandMode: false,
+		sandFallRate: 0.6, // per second
+		circleAngleOffset: 0
 	}
 };
+
+// ============== BLOB URL CACHE ==============
+function isBlobUrl(url) { return typeof url === 'string' && url.startsWith('blob:'); }
+
+class BlobUrlCache {
+	constructor(maxSize = 2) {
+		this.maxSize = maxSize;
+		this.list = []; // [{ track, url }]
+	}
+	put(track, url) {
+		// remove existing entry for this track
+		this.list = this.list.filter(e => e.track !== track);
+		this.list.push({ track, url });
+		this.enforceLimit([audio.src, bgVideo.src]);
+	}
+	release(track) {
+		const idx = this.list.findIndex(e => e.track === track);
+		if (idx >= 0) {
+			const url = this.list[idx].url;
+			this.list.splice(idx, 1);
+			this.safeRevoke(url);
+		}
+	}
+	safeRevoke(url) {
+		try {
+			if (url && isBlobUrl(url) && audio.src !== url && bgVideo.src !== url) {
+				URL.revokeObjectURL(url);
+			}
+		} catch {}
+	}
+	enforceLimit(excludeUrls = []) {
+		while (this.list.length > this.maxSize) {
+			const oldest = this.list[0];
+			this.list.shift();
+			if (!excludeUrls.includes(oldest.url)) {
+				this.safeRevoke(oldest.url);
+				// mark track url cleared if matches
+				if (oldest.track && oldest.track.url === oldest.url) {
+					oldest.track.url = undefined;
+					oldest.track.ephemeral = false;
+				}
+			} else {
+				// push back if excluded
+				this.list.push(oldest);
+				break;
+			}
+		}
+	}
+}
+const blobCache = new BlobUrlCache(2);
+
+async function ensureUrlForTrack(track) {
+	if (!track) throw new Error('Track is undefined');
+	if (track.url && (!track.ephemeral || isBlobUrl(track.url))) return track.url;
+	// Local file via blob stored
+	if (track.fileBlob instanceof Blob) {
+		const url = URL.createObjectURL(track.fileBlob);
+		track.url = url;
+		track.ephemeral = true;
+		blobCache.put(track, url);
+		return url;
+	}
+	// Local references
+	if (typeof track.localRef === 'string') {
+		if (track.localRef.startsWith('app-data://')) {
+			track.url = track.localRef;
+			track.ephemeral = false;
+			return track.url;
+		} else if (track.localRef.startsWith('path:')) {
+			const p = track.localRef.slice('path:'.length);
+			track.url = fileUrlFromPath(p);
+			track.ephemeral = false;
+			return track.url;
+		} else if (track.localRef.startsWith('idb:')) {
+			const id = track.localRef.slice('idb:'.length);
+			try {
+				const file = await idbGetLocalFile(id);
+				if (file) {
+					const url = URL.createObjectURL(file);
+					track.url = url;
+					track.ephemeral = true;
+					blobCache.put(track, url);
+					return url;
+				}
+			} catch (e) {
+				console.warn('IDB read failed', e);
+			}
+		}
+	}
+	// Direct URL (http/https)
+	if (track.url && (track.url.startsWith('http://') || track.url.startsWith('https://'))) {
+		return track.url;
+	}
+	// Fallback
+	throw new Error('Unable to ensure URL for track');
+}
+
+function releaseObjectUrlForTrack(track) {
+	if (!track || !track.url) return;
+	if (track.ephemeral && isBlobUrl(track.url) && audio.src !== track.url && bgVideo.src !== track.url) {
+		try { URL.revokeObjectURL(track.url); } catch {}
+		track.url = undefined;
+		track.ephemeral = false;
+	}
+	blobCache.release(track);
+}
 
 const EQ_FREQS = [60, 170, 350, 1000, 3000, 6000, 12000, 14000];
 
@@ -85,6 +204,9 @@ const COLOR_PRESETS = [
 	{ name: 'Ocean', color: '#4facfe' },
 	{ name: 'Flame', color: '#eb4d4b' }
 ];
+
+const LIBRARY_STORAGE_KEY = 'audioVisualizerLibraryV7';
+let library = {};
 
 // ============== DOM ELEMENTS ==============
 const $ = id => document.getElementById(id);
@@ -141,8 +263,177 @@ const els = {
 	sleepTimerStatus: $('sleepTimerStatus'),
 	autoPlayNextCheckbox: $('autoPlayNextCheckbox'),
 	stopOnVideoEndCheckbox: $('stopOnVideoEndCheckbox'),
-	persistSettingsCheckbox: $('persistSettingsCheckbox')
+	persistSettingsCheckbox: $('persistSettingsCheckbox'),
+	storageList: $('storageList'),
+	storageSummary: $('storageSummary'),
+	storageRefreshBtn: $('storageRefreshBtn'),
+	storageDeleteAllBtn: $('storageDeleteAllBtn')
 };
+
+function loadLibraryFromStorage() {
+	try {
+		const raw = localStorage.getItem(LIBRARY_STORAGE_KEY);
+		const parsed = JSON.parse(raw);
+		return parsed && typeof parsed === 'object' ? parsed : {};
+	} catch {
+		return {};
+	}
+}
+
+function saveLibraryToStorage() {
+	localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(library));
+}
+
+function upsertLibraryEntry(entry) {
+	if (!entry || !entry.ref) return;
+	library[entry.ref] = {
+		name: entry.name || entry.ref,
+		type: entry.type || 'app-data',
+		sizeBytes: entry.sizeBytes || 0,
+		isVideo: !!entry.isVideo,
+		createdAt: entry.createdAt || Date.now()
+	};
+	saveLibraryToStorage();
+	renderStorageList();
+}
+
+function removeLibraryEntries(refs) {
+	let changed = false;
+	refs.forEach(ref => {
+		if (library[ref]) {
+			delete library[ref];
+			changed = true;
+		}
+	});
+	if (changed) {
+		saveLibraryToStorage();
+		renderStorageList();
+	}
+}
+
+function rebuildLibraryFromPlaylist() {
+	const refs = new Set();
+	state.playlist.forEach(t => {
+		if (t && t.localRef) {
+			refs.add(t.localRef);
+			if (!library[t.localRef]) {
+				upsertLibraryEntry({ 
+					ref: t.localRef, 
+					name: t.name, 
+					type: t.localRef.startsWith('app-data://') ? 'app-data' : (t.localRef.startsWith('idb:') ? 'idb' : 'path'), 
+					sizeBytes: t.size || 0,
+					isVideo: !!t.isVideo 
+				});
+			}
+		}
+	});
+	// Remove stale entries not referenced anywhere
+	const stale = Object.keys(library).filter(ref => !refs.has(ref));
+	if (stale.length) removeLibraryEntries(stale);
+}
+
+function formatBytes(bytes) {
+	if (!bytes || bytes <= 0) return '';
+	const units = ['B','KB','MB','GB'];
+	let v = bytes;
+	let u = 0;
+	while (v >= 1024 && u < units.length - 1) { v /= 1024; u++; }
+	return `${v.toFixed(v >= 10 ? 0 : 1)}${units[u]}`;
+}
+
+async function deleteLibraryEntry(ref) {
+	if (!ref) return;
+	try {
+		if (ref.startsWith('idb:')) {
+			await idbDeleteLocalFile(ref.slice('idb:'.length));
+		} else if (ref.startsWith('app-data://') && window.electronAPI) {
+			const fileName = decodeURIComponent(ref.replace('app-data://', ''));
+			await window.electronAPI.deleteFile(fileName);
+		}
+	} catch {
+		// ignore deletion errors
+	}
+	removeTracksByLocalRefs([ref]);
+	removeLibraryEntries([ref]);
+}
+
+function removeTracksByLocalRefs(refs) {
+	const refSet = new Set(refs);
+	const removedIdx = [];
+	state.playlist.forEach((t, idx) => {
+		if (t && refSet.has(t.localRef)) {
+			removedIdx.push(idx);
+			if (isBlobUrl(t.url)) {
+				try { URL.revokeObjectURL(t.url); } catch {}
+			}
+		}
+	});
+	if (removedIdx.length === 0) return;
+
+	// Remove tracks and adjust current index
+	const removedBeforeCurrent = removedIdx.filter(i => i < state.currentIndex).length;
+	const wasPlayingRemoved = removedIdx.includes(state.currentIndex);
+
+	state.playlist = state.playlist.filter((_, idx) => !removedIdx.includes(idx));
+	if (wasPlayingRemoved) {
+		audio.pause();
+		state.isPlaying = false;
+		updatePlayBtn();
+		state.currentIndex = -1;
+		els.statusText.textContent = '待機中...';
+	} else if (state.currentIndex >= 0) {
+		state.currentIndex = Math.max(-1, state.currentIndex - removedBeforeCurrent);
+	}
+	renderPlaylist();
+	updateVideoVisibility();
+	saveSettingsToStorage();
+}
+
+async function deleteAllLibraryEntries() {
+	const refs = Object.keys(library);
+	if (refs.length === 0) {
+		showOverlay('削除対象がありません');
+		return;
+	}
+	const ok = confirm('アプリ内に保持しているファイルをすべて削除しますか？\nプレイリストからも削除されます。');
+	if (!ok) return;
+	for (const ref of refs) {
+		await deleteLibraryEntry(ref);
+	}
+	showOverlay('🗑️ すべて削除しました');
+	renderStorageList();
+}
+
+function renderStorageList() {
+	if (!els.storageList) return;
+	const refs = Object.keys(library);
+	if (refs.length === 0) {
+		els.storageList.innerHTML = '<div class="hint">保存済みのファイルはありません</div>';
+		if (els.storageSummary) els.storageSummary.textContent = '';
+		return;
+	}
+
+	let totalSize = 0;
+	const itemsHtml = refs.map(ref => {
+		const entry = library[ref];
+		totalSize += (entry.sizeBytes || 0);
+		const typeLabel = entry.type === 'app-data' ? '💾 アプリ保存' : (entry.type === 'idb' ? '📦 DB保存' : '🔗 パス参照');
+		return `
+			<div class="storage-item">
+				<div class="info">
+					<div class="name">${entry.name}</div>
+					<div class="meta">${typeLabel} • ${formatBytes(entry.sizeBytes)}</div>
+				</div>
+				<button class="delete-btn" onclick="deleteLibraryEntry('${ref}')" title="削除">✖</button>
+			</div>
+		`;
+	}).join('');
+
+	els.storageList.innerHTML = itemsHtml;
+	if (els.storageSummary) {
+		els.storageSummary.textContent = `合計: ${refs.length}ファイル (${formatBytes(totalSize)})`;
+	}
+}
 
 let playlistRenderQueued = false;
 function scheduleRenderPlaylist() {
@@ -203,7 +494,11 @@ let bottomBarH = 0;
 // ============== INITIALIZATION ==============
 async function init() {
 	loadSettings();
+	library = loadLibraryFromStorage();
 	await loadPlaylistFromStorage();
+	rebuildLibraryFromPlaylist();
+	renderStorageList();
+
 	resize();
 	window.addEventListener('resize', resize);
 	// Calculate UI heights after initial render
@@ -228,7 +523,7 @@ async function init() {
 	audio.addEventListener('playing', () => {
 		if (bgVideo.src && state.settings.showVideo) {
 			// 音声が実際に再生開始された瞬間に動画の時間を同期
-			bgVideo.currentTime = audio.currentTime;
+			bgVideo.currentTime = audio.currentTime + 0.2;
 			bgVideo.play().catch(() => {});
 		}
 		const track = state.playlist[state.currentIndex];
@@ -252,8 +547,8 @@ async function init() {
 		}
 	});
 	audio.addEventListener('error', handleAudioError);
-	audio.addEventListener('seeking', () => { if (bgVideo.src) bgVideo.currentTime = audio.currentTime + 0.15; });
-	audio.addEventListener('seeked', () => { if (bgVideo.src) bgVideo.currentTime = audio.currentTime + 0.15; });
+	audio.addEventListener('seeking', () => { if (bgVideo.src) bgVideo.currentTime = audio.currentTime + 0.2; });
+	audio.addEventListener('seeked', () => { if (bgVideo.src) bgVideo.currentTime = audio.currentTime + 0.2; });
 
 	bgVideo.addEventListener('error', () => {
 		console.warn('Video load failed');
@@ -318,6 +613,17 @@ async function init() {
 		}
 	};
 	els.fileInput.onchange = handleLocalFiles;
+	// Ensure visible "追加" control reliably opens the file picker
+	try {
+		const fileBtn = document.querySelector('.playlist-panel .file-btn');
+		if (fileBtn) {
+			fileBtn.addEventListener('click', e => {
+				const input = document.getElementById('fileInput');
+				if (!input) return;
+				input.click();
+			});
+		}
+	} catch (err) { console.warn('fileBtn bind failed', err); }
 	els.gDriveBtn.onclick = openGDrivePicker;
 	els.closeVideoBtn.onclick = () => { state.settings.showVideo = false; updateVideoVisibility(); applySettingsToUI(); };
 	els.toggleVideoModeBtn.onclick = () => {
@@ -366,6 +672,9 @@ async function init() {
 			await handleFiles(files);
 		}
 	});
+
+	if (els.storageRefreshBtn) els.storageRefreshBtn.onclick = renderStorageList;
+	if (els.storageDeleteAllBtn) els.storageDeleteAllBtn.onclick = deleteAllLibraryEntries;
 
 	// Auto-hide UI
 	document.addEventListener('mousemove', resetUITimeout);
@@ -706,14 +1015,22 @@ async function idbDeleteLocalFile(id) {
 }
 
 async function deleteAllLocalTrackStorage(tracks) {
-	const deletions = tracks
-		.filter(t => t && t.source === 'local' && typeof t.localRef === 'string' && t.localRef.startsWith('idb:'))
-		.map(t => t.localRef.slice('idb:'.length));
-	for (const id of deletions) {
-		try {
-			await idbDeleteLocalFile(id);
-		} catch {
-			// ignore
+	for (const t of tracks) {
+		if (!t || t.source !== 'local' || typeof t.localRef !== 'string') continue;
+		
+		if (t.localRef.startsWith('idb:')) {
+			try {
+				await idbDeleteLocalFile(t.localRef.slice('idb:'.length));
+			} catch {
+				// ignore
+			}
+		} else if (t.localRef.startsWith('app-data://') && window.electronAPI) {
+			try {
+				const fileName = decodeURIComponent(t.localRef.replace('app-data://', ''));
+				await window.electronAPI.deleteFile(fileName);
+			} catch (err) {
+				console.error('Failed to delete file from app storage:', err);
+			}
 		}
 	}
 }
@@ -764,6 +1081,11 @@ async function loadPlaylistFromStorage() {
 				} catch {
 					// ignore
 				}
+				continue;
+			}
+			if (localRef && localRef.startsWith('app-data://')) {
+				restored.push({ name, url: localRef, source: 'local', isVideo, localRef });
+				continue;
 			}
 			continue;
 		}
@@ -840,6 +1162,13 @@ function setupSettingsInputs() {
 	$('clientIdInput').onchange = e => { state.settings.gDriveClientId = e.target.value.trim(); };
 	$('apiKeyInput').onchange = e => { state.settings.gDriveApiKey = e.target.value.trim(); };
 	$('persistSettingsCheckbox').onchange = e => { state.settings.persistSettings = e.target.checked; };
+	const storeLocalFilesCheckbox = $('storeLocalFilesCheckbox');
+	if (storeLocalFilesCheckbox) {
+		storeLocalFilesCheckbox.onchange = e => {
+			state.settings.storeLocalFiles = e.target.checked;
+			showOverlay(state.settings.storeLocalFiles ? '💾 ローカル保存: ON' : '🔗 ローカル保存: OFF (パス参照のみ)');
+		};
+	}
 
 	$('sleepTimerSelect').onchange = e => {
 		state.settings.sleepTimer = +e.target.value;
@@ -847,6 +1176,16 @@ function setupSettingsInputs() {
 	};
 	$('autoPlayNextCheckbox').onchange = e => { state.settings.autoPlayNext = e.target.checked; };
 	$('stopOnVideoEndCheckbox').onchange = e => { state.settings.stopOnVideoEnd = e.target.checked; };
+
+	// New settings handlers
+	const changeModeSelect = $('changeModeSelect');
+	if (changeModeSelect) changeModeSelect.onchange = e => { state.settings.changeMode = e.target.value; };
+	const sandModeCheckbox = $('sandModeCheckbox');
+	if (sandModeCheckbox) sandModeCheckbox.onchange = e => { state.settings.sandMode = e.target.checked; };
+	const sandFallRateSlider = $('sandFallRateSlider');
+	if (sandFallRateSlider) sandFallRateSlider.oninput = e => { state.settings.sandFallRate = +e.target.value; $('sandFallRateValue').textContent = state.settings.sandFallRate.toFixed(1); };
+	const circleAngleOffsetSlider = $('circleAngleOffsetSlider');
+	if (circleAngleOffsetSlider) circleAngleOffsetSlider.oninput = e => { state.settings.circleAngleOffset = +e.target.value; $('circleAngleOffsetValue').textContent = `${state.settings.circleAngleOffset}°`; };
 
 	// persistSettingsCheckboxは既に上で処理済みなので重複を避ける
 	setupPresets();
@@ -965,10 +1304,26 @@ function applySettingsToUI() {
 	$('clientIdInput').value = state.settings.gDriveClientId;
 	$('apiKeyInput').value = state.settings.gDriveApiKey;
 	$('persistSettingsCheckbox').checked = state.settings.persistSettings;
+	const storeLocalFilesCheckbox = $('storeLocalFilesCheckbox');
+	if (storeLocalFilesCheckbox) storeLocalFilesCheckbox.checked = !!state.settings.storeLocalFiles;
     
 	$('sleepTimerSelect').value = state.settings.sleepTimer;
 	$('autoPlayNextCheckbox').checked = state.settings.autoPlayNext;
 	$('stopOnVideoEndCheckbox').checked = state.settings.stopOnVideoEnd;
+
+	// Apply new settings to UI
+	const changeModeSelect = $('changeModeSelect');
+	if (changeModeSelect) changeModeSelect.value = state.settings.changeMode || 'off';
+	const sandModeCheckbox = $('sandModeCheckbox');
+	if (sandModeCheckbox) sandModeCheckbox.checked = !!state.settings.sandMode;
+	const sandFallRateSlider = $('sandFallRateSlider');
+	if (sandFallRateSlider) sandFallRateSlider.value = state.settings.sandFallRate || 0.6;
+	const sandFallRateValue = $('sandFallRateValue');
+	if (sandFallRateValue) sandFallRateValue.textContent = (state.settings.sandFallRate || 0.6).toFixed(1);
+	const circleAngleOffsetSlider = $('circleAngleOffsetSlider');
+	if (circleAngleOffsetSlider) circleAngleOffsetSlider.value = state.settings.circleAngleOffset || 0;
+	const circleAngleOffsetValue = $('circleAngleOffsetValue');
+	if (circleAngleOffsetValue) circleAngleOffsetValue.textContent = `${state.settings.circleAngleOffset || 0}°`;
 
 	state.settings.eq.forEach((val, i) => {
 		const freq = EQ_FREQS[i];
@@ -1180,27 +1535,49 @@ function playTrack(index) {
 	els.statusText.textContent = `🎵 ${track.name}`;
 	document.title = `${track.name} - Audio Visualizer`;
 	renderPlaylist();
-    
+	
 	// 再生中の曲をオーバーレイで表示
 	showOverlay(`Now Playing: ${track.name}`, 3000);
-    
+	
 	if (state.playTimeout) clearTimeout(state.playTimeout);
-    
+	
+	// Race condition protection
+	const requestId = ++state.playRequestId;
 	audio.pause();
 	audio.currentTime = 0;
-	audio.src = track.url;
-	audio.load();
-	connectFileSource();
-	updateVideoVisibility();
-	state.playTimeout = setTimeout(() => { 
-		audio.play().catch(e => {
-			console.warn("Playback failed:", e);
-			showOverlay('⚠️ 再生に失敗しました');
-			// 失敗した場合は次の曲へ（無限ループ防止のため少し待つ）
+	
+	(async () => {
+		try {
+			const url = await ensureUrlForTrack(track);
+			if (requestId !== state.playRequestId) return; // outdated
+			audio.src = url;
+			audio.load();
+			connectFileSource();
+			updateVideoVisibility();
+			
+			// Prefetch next track (non-blocking)
+			const nextIdx = (state.currentIndex + 1) % state.playlist.length;
+			if (state.playlist[nextIdx]) {
+				ensureUrlForTrack(state.playlist[nextIdx]).catch(() => {});
+			}
+			
+			// Enforce cache limit
+			blobCache.enforceLimit([audio.src, bgVideo.src]);
+			
+			state.playTimeout = setTimeout(() => { 
+				audio.play().catch(e => {
+					console.warn("Playback failed:", e);
+					showOverlay('⚠️ 再生に失敗しました');
+					setTimeout(nextTrack, 2000);
+				}); 
+				state.playTimeout = null;
+			}, 100);
+		} catch (e) {
+			console.warn('ensureUrlForTrack failed', e);
+			showOverlay('⚠️ URL準備に失敗しました');
 			setTimeout(nextTrack, 2000);
-		}); 
-		state.playTimeout = null;
-	}, 100);
+		}
+	})();
 }
 
 function seek() { if (state.inputSource === 'file') audio.currentTime = els.seekBar.value; }
@@ -1257,28 +1634,40 @@ async function handleFiles(files) {
 		const file = item.file;
 		const filePath = typeof file.path === 'string' ? file.path : '';
 		let localRef = null;
-		if (filePath) {
-			localRef = `path:${filePath}`;
-		} else {
+		let fileBlob = null;
+		let url = undefined;
+
+		if (state.settings.storeLocalFiles && window.electronAPI) {
 			try {
-				const id = await idbPutLocalFile(file);
-				localRef = `idb:${id}`;
-			} catch {
-				localRef = null;
+				const arrayBuffer = await file.arrayBuffer();
+				const savedUrl = await window.electronAPI.saveFile({ name: file.name, arrayBuffer });
+				localRef = savedUrl; // app-data://...
+				url = savedUrl;
+				upsertLibraryEntry({ ref: localRef, type: 'app-data', name: file.name, sizeBytes: file.size, isVideo: item.isVideo });
+			} catch (err) {
+				console.error('Failed to save file to app storage:', err);
+				fileBlob = file;
 			}
+		} else if (filePath) {
+			localRef = `path:${filePath}`;
+			url = fileUrlFromPath(filePath);
+			upsertLibraryEntry({ ref: localRef, type: 'path', name: file.name, sizeBytes: file.size, isVideo: item.isVideo });
+		} else {
+			fileBlob = file;
 		}
 
-		state.playlist.push({
-			name: file.name,
-			url: URL.createObjectURL(file),
-			source: 'local',
+		state.playlist.push({ 
+			name: file.name, 
+			url: url,
+			fileBlob: fileBlob,
+			source: 'local', 
 			isVideo: item.isVideo,
-			localRef
+			localRef: localRef,
+			ephemeral: false
 		});
 	}
 	renderPlaylist();
 	if (state.currentIndex === -1) playTrack(state.playlist.length - accepted.length);
-	saveSettingsToStorage();
     
 	setTimeout(() => {
 		showOverlay(`✅ ${accepted.length}個のファイルを追加しました`);
@@ -1465,11 +1854,20 @@ async function removeFromPlaylist(index) {
 	const track = state.playlist[index];
 	if (track.source === 'local') {
 		if (isBlobUrl(track.url)) URL.revokeObjectURL(track.url);
-		if (typeof track.localRef === 'string' && track.localRef.startsWith('idb:')) {
-			try {
-				await idbDeleteLocalFile(track.localRef.slice('idb:'.length));
-			} catch {
-				// ignore
+		if (typeof track.localRef === 'string') {
+			if (track.localRef.startsWith('idb:')) {
+				try {
+					await idbDeleteLocalFile(track.localRef.slice('idb:'.length));
+				} catch {
+					// ignore
+				}
+			} else if (track.localRef.startsWith('app-data://') && window.electronAPI) {
+				try {
+					const fileName = decodeURIComponent(track.localRef.replace('app-data://', ''));
+					await window.electronAPI.deleteFile(fileName);
+				} catch (err) {
+					console.error('Failed to delete file from app storage:', err);
+				}
 			}
 		}
 	}
@@ -1691,27 +2089,74 @@ function getColor(i, v = 1, total = state.settings.barCount) {
 	return state.settings.fixedColor;
 }
 
+// ============== Display Values & Sand ==============
+function ensureFrameBuffers(n) {
+	if (!state.displayValues || state.displayValues.length !== n) state.displayValues = new Float32Array(n);
+	if (!state.prevLevels || state.prevLevels.length !== n) state.prevLevels = new Float32Array(n);
+	if (!state.sandHeights || state.sandHeights.length !== n) state.sandHeights = new Float32Array(n);
+	if (!state.curLevels || state.curLevels.length !== n) state.curLevels = new Float32Array(n);
+}
+
+function computeDisplayValues(rawFreq, dtSec) {
+	const n = rawFreq.length;
+	ensureFrameBuffers(n);
+	const disp = state.displayValues;
+	const prev = state.prevLevels;
+	const sand = state.sandHeights;
+	const cur_levels = state.curLevels;
+	const mode = state.settings.changeMode;
+	for (let i = 0; i < n; i++) {
+		const cur = Math.max(0, Math.min(1, rawFreq[i] / 255));
+		cur_levels[i] = cur;
+		let v = cur;
+		if (mode === 'plus') v = Math.max(0, cur - prev[i]);
+		else if (mode === 'plusminus') v = cur - prev[i];
+		disp[i] = v;
+		// sand update
+		if (state.settings.sandMode) {
+			if (cur >= sand[i]) sand[i] = cur;
+			else sand[i] = Math.max(0, sand[i] - state.settings.sandFallRate * dtSec);
+		} else {
+			sand[i] = 0;
+		}
+		prev[i] = cur;
+	}
+	return disp;
+}
+
+// ============== Shake & Sparkles ==============
+function computeEnergy(display) {
+	let sum = 0, peak = 0, n = display.length;
+	for (let i = 0; i < n; i++) { const v = Math.abs(display[i]); sum += v; if (v > peak) peak = v; }
+	const avg = sum / Math.max(1, n);
+	return Math.max(avg, peak);
+}
+// Shake and Sparkles features removed
+
 let lastDrawTs = 0;
-let lastVideoSyncTs = 0;
+let lastVideoSyncCheckTs = 0;
 
 function draw(ts = 0) {
 	requestAnimationFrame(draw);
 
-	// バックグラウンド中は描画しない（復帰時に同期を取る）
+	// バックグラウンド中は描画を行わない（復帰時に同期チェックで追従）
 	if (document.hidden) return;
 
-	// 軽量化モード: 30FPS相当の間引き（setTimeoutを使わない）
-	if (state.settings.lowPowerMode) {
-		if (lastDrawTs && ts - lastDrawTs < 1000 / 30) return;
-	}
+	const targetFps = state.settings.lowPowerMode ? 30 : 60;
+	const minInterval = 1000 / targetFps;
+	const dtSecRaw = lastDrawTs ? (ts - lastDrawTs) / 1000 : 0;
+	if (lastDrawTs && ts - lastDrawTs < minInterval) return;
+	const dtSec = dtSecRaw || (minInterval / 1000);
 	lastDrawTs = ts;
-	
-	// 動画同期チェックは毎フレーム行わず、間引く
+
+	// 動画と音声の同期チェックは間引く（毎フレームやると重い）
 	if (bgVideo.src && state.isPlaying && state.settings.showVideo) {
-		if (!lastVideoSyncTs || ts - lastVideoSyncTs > 250) {
-			lastVideoSyncTs = ts;
-			const targetTime = audio.currentTime + 0.15;
+		if (!lastVideoSyncCheckTs || ts - lastVideoSyncCheckTs >= 250) {
+			lastVideoSyncCheckTs = ts;
+			const videoOffset = 0.2; // MVを少し先に進める（0.2秒）
+			const targetTime = audio.currentTime + videoOffset;
 			const timeDiff = Math.abs(bgVideo.currentTime - targetTime);
+			// 遅延が1秒以上ある場合のみ同期（小さなズレは無視）
 			if (timeDiff > 1.0) {
 				bgVideo.currentTime = targetTime;
 			}
@@ -1726,10 +2171,20 @@ function draw(ts = 0) {
 		ctx.fillStyle = '#0a0a0f';
 		ctx.fillRect(0, 0, W, H);
 	}
-    
+	
 	if (!state.analyser) return;
 	const fd = getFilteredData();
-    
+	const display = computeDisplayValues(fd, dtSec);
+	// Precompute colors for the frame
+	const nBars = fd.length;
+	const colors = new Array(nBars);
+	for (let i = 0; i < nBars; i++) {
+		colors[i] = getColor(i, Math.max(0, Math.min(1, fd[i] / 255)), nBars);
+	}
+	// Motion preferences
+	const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+	// Shake removed
+	
 	// Use full screen height for visualization
 	const drawH = H;
 	const drawStartY = 0;
@@ -1747,17 +2202,19 @@ function draw(ts = 0) {
 		ctx.scale(-1, 1);
 	}
 
+	ctx.save();
 	switch (state.mode) {
-		case 0: drawBars(fd, maxH, drawH, drawStartY); break;
+		case 0: drawBarsFromDisplay(display, colors, maxH, drawH, drawStartY); break;
 		case 1: drawWaveform(maxH, drawH, drawStartY); break;
 		case 2: drawDigitalBlocks(fd, maxH, drawH, drawStartY); break;
-		case 3: drawCircle(fd, maxH, drawH, drawStartY); break;
+		case 3: drawCircleFromDisplay(display, colors, maxH, drawH, drawStartY); break;
 		case 4: drawSpectrum(fd, maxH, drawH, drawStartY); break;
 		case 5: drawGalaxy(fd, drawH, drawStartY); break;
 		case 6: drawMonitor(fd, drawH, drawStartY); break;
 		case 7: drawHexagon(fd, drawH, drawStartY); break;
 		case 8: drawMirrorBars(fd, maxH, drawH, drawStartY); break;
 	}
+	ctx.restore();
 
 	if (state.settings.mirror) {
 		ctx.restore();
@@ -1765,10 +2222,47 @@ function draw(ts = 0) {
 
 	ctx.globalAlpha = 1.0;
 
+
+
 	if (state.settings.lowPowerMode) state.settings.glowStrength = originalGlow;
 }
 
-// Modes (Same as V6 but with drawH adjustment and Y offset)
+// ============== Shake & Sparkles ==============
+function computeEnergy(display) {
+	let sum = 0, peak = 0, n = display.length;
+	for (let i = 0; i < n; i++) { const v = Math.abs(display[i]); sum += v; if (v > peak) peak = v; }
+	const avg = sum / Math.max(1, n);
+	return Math.max(avg, peak);
+}
+// Shake and Sparkles features removed
+
+// Modes (updated bars/circle to use display & sand)
+function drawBarsFromDisplay(display, colors, maxH, drawH, drawStartY) {
+	const n = display.length; const bw = W / n;
+	// global glow based on max level
+	let peak = 0; for (let i = 0; i < n; i++) { peak = Math.max(peak, Math.abs(display[i])); }
+	if (state.settings.glowStrength > 0) {
+		ctx.shadowBlur = state.settings.glowStrength * Math.max(0.2, peak);
+		ctx.shadowColor = state.settings.rainbow ? '#ffffff' : state.settings.fixedColor;
+	}
+	for (let i = 0; i < n; i++) {
+		const v = Math.max(0, display[i]); const h = v * maxH; const color = colors[i];
+		ctx.fillStyle = color;
+		ctx.fillRect(i * bw + 1, drawStartY + drawH - h, bw - 2, h);
+		// sand marker: use same color as bar
+		if (state.settings.sandMode) {
+			const sh = state.sandHeights ? state.sandHeights[i] * maxH : 0;
+			if (sh > 0) {
+				ctx.fillStyle = color; // use bar color, not white
+				ctx.globalAlpha = 0.6;
+				const y = drawStartY + drawH - sh;
+				ctx.fillRect(i * bw + 1, y - 2, bw - 2, 4);
+				ctx.globalAlpha = 1.0;
+			}
+		}
+	}
+	ctx.shadowBlur = 0;
+}
 function drawBars(fd, maxH, drawH, drawStartY) {
 	const n = fd.length; const bw = W / n;
 	for (let i = 0; i < n; i++) {
@@ -1791,6 +2285,28 @@ function drawDigitalBlocks(fd, maxH, drawH, drawStartY) {
 		const idx = Math.floor(i / cols * fd.length); const v = fd[idx] / 255; const activeRows = Math.floor(v * rows);
 		for (let j = 0; j < rows; j++) { if (rows - j <= activeRows) { ctx.fillStyle = getColor(i, (rows-j)/rows, cols); ctx.fillRect(i * cellW + 2, drawStartY + j * cellH + 2, cellW - 4, cellH - 4); } else { ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(i * cellW + 2, drawStartY + j * cellH + 2, cellW - 4, cellH - 4); } }
 	}
+}
+function drawCircleFromDisplay(display, colors, maxH, drawH, drawStartY) {
+	const cx = W / 2, cy = drawStartY + drawH / 2; const r = Math.min(W, drawH) * 0.25; const n = display.length; const circumference = 2 * Math.PI * r; const barW = (circumference / n) * 0.8;
+	const angleOffset = ((state.settings.circleAngleOffset || 0) % 360) * Math.PI / 180;
+	for (let i = 0; i < n; i++) {
+		const ang = (i / n) * Math.PI * 2 - Math.PI / 2 + angleOffset; const v = Math.max(0, display[i]); const len = v * maxH * 0.6;
+		ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang); const color = colors[i]; ctx.fillStyle = color;
+		if (state.settings.glowStrength > 0 && v > 0.2) { ctx.shadowBlur = state.settings.glowStrength; ctx.shadowColor = color; }
+		ctx.fillRect(r, -barW/2, len, barW); ctx.restore();
+		if (state.settings.sandMode) {
+			const sh = state.sandHeights ? state.sandHeights[i] * maxH * 0.6 : 0;
+			if (sh > 0) {
+				ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang);
+				ctx.fillStyle = color; // use bar color, not white
+				ctx.globalAlpha = 0.6;
+				ctx.beginPath(); ctx.arc(r + sh, 0, Math.max(1.5, barW * 0.3), 0, Math.PI * 2); ctx.fill();
+				ctx.globalAlpha = 1.0;
+				ctx.restore();
+			}
+		}
+	}
+	ctx.shadowBlur = 0;
 }
 function drawCircle(fd, maxH, drawH, drawStartY) {
 	const cx = W / 2, cy = drawStartY + drawH / 2; const r = Math.min(W, drawH) * 0.25; const n = fd.length; const circumference = 2 * Math.PI * r; const barW = (circumference / n) * 0.8;

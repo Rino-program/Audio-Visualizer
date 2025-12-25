@@ -40,6 +40,13 @@ const state = {
     freqData: null,
     timeData: null,
     bufLen: 0,
+    displayValues: null,
+    prevLevels: null,
+    sandHeights: null,
+    curLevels: null,
+    
+    // Race condition protection
+    playRequestId: 0,
     
     // Settings
     settings: {
@@ -49,7 +56,7 @@ const state = {
         lowFreq: 20,
         highFreq: 16000,
         glowStrength: 20,
-        fftSize: 4096,
+        fftSize: 2048,
         opacity: 1.0,
         bgBlur: 0,
         mirror: false,
@@ -69,9 +76,93 @@ const state = {
         playbackRate: 1.0,
         sleepTimer: 0,
         autoPlayNext: true,
-        stopOnVideoEnd: false
+        stopOnVideoEnd: false,
+        // New visualization settings
+        changeMode: 'off', // 'off' | 'plus' | 'plusminus'
+        sandMode: false,
+        sandFallRate: 0.6, // per second
+        circleAngleOffset: 0
     }
 };
+
+// ============== BLOB URL CACHE ==============
+function isBlobUrl(url) { return typeof url === 'string' && url.startsWith('blob:'); }
+
+class BlobUrlCache {
+    constructor(maxSize = 2) {
+        this.maxSize = maxSize;
+        this.list = []; // [{ track, url }]
+    }
+    put(track, url) {
+        // remove existing entry for this track
+        this.list = this.list.filter(e => e.track !== track);
+        this.list.push({ track, url });
+        this.enforceLimit([audio.src, bgVideo.src]);
+    }
+    release(track) {
+        const idx = this.list.findIndex(e => e.track === track);
+        if (idx >= 0) {
+            const url = this.list[idx].url;
+            this.list.splice(idx, 1);
+            this.safeRevoke(url);
+        }
+    }
+    safeRevoke(url) {
+        try {
+            if (url && isBlobUrl(url) && audio.src !== url && bgVideo.src !== url) {
+                URL.revokeObjectURL(url);
+            }
+        } catch {}
+    }
+    enforceLimit(excludeUrls = []) {
+        while (this.list.length > this.maxSize) {
+            const oldest = this.list[0];
+            this.list.shift();
+            if (!excludeUrls.includes(oldest.url)) {
+                this.safeRevoke(oldest.url);
+                // mark track url cleared if matches
+                if (oldest.track && oldest.track.url === oldest.url) {
+                    oldest.track.url = undefined;
+                    oldest.track.ephemeral = false;
+                }
+            } else {
+                // push back if excluded
+                this.list.push(oldest);
+                break;
+            }
+        }
+    }
+}
+const blobCache = new BlobUrlCache(2);
+
+async function ensureUrlForTrack(track) {
+    if (!track) throw new Error('Track is undefined');
+    if (track.url && (!track.ephemeral || isBlobUrl(track.url))) return track.url;
+    // Local file via blob stored
+    if (track.fileBlob instanceof Blob) {
+        const url = URL.createObjectURL(track.fileBlob);
+        track.url = url;
+        track.ephemeral = true;
+        blobCache.put(track, url);
+        return url;
+    }
+    // Direct URL (http/https)
+    if (track.url && (track.url.startsWith('http://') || track.url.startsWith('https://'))) {
+        return track.url;
+    }
+    // Fallback
+    throw new Error('Unable to ensure URL for track');
+}
+
+function releaseObjectUrlForTrack(track) {
+    if (!track || !track.url) return;
+    if (track.ephemeral && isBlobUrl(track.url) && audio.src !== track.url && bgVideo.src !== track.url) {
+        try { URL.revokeObjectURL(track.url); } catch {}
+        track.url = undefined;
+        track.ephemeral = false;
+    }
+    blobCache.release(track);
+}
 
 const EQ_FREQS = [60, 170, 350, 1000, 3000, 6000, 12000, 14000];
 
@@ -173,7 +264,7 @@ function init() {
     audio.addEventListener('playing', () => {
         if (bgVideo.src && state.settings.showVideo) {
             // 音声が実際に再生開始された瞬間に動画の時間を同期
-            bgVideo.currentTime = audio.currentTime;
+            bgVideo.currentTime = audio.currentTime + 0.2;
             bgVideo.play().catch(() => {});
         }
         const track = state.playlist[state.currentIndex];
@@ -197,8 +288,8 @@ function init() {
         }
     });
     audio.addEventListener('error', handleAudioError);
-    audio.addEventListener('seeking', () => { if (bgVideo.src) bgVideo.currentTime = audio.currentTime + 0.15; });
-    audio.addEventListener('seeked', () => { if (bgVideo.src) bgVideo.currentTime = audio.currentTime + 0.15; });
+    audio.addEventListener('seeking', () => { if (bgVideo.src) bgVideo.currentTime = audio.currentTime + 0.2; });
+    audio.addEventListener('seeked', () => { if (bgVideo.src) bgVideo.currentTime = audio.currentTime + 0.2; });
 
     bgVideo.addEventListener('error', () => {
         console.warn('Video load failed');
@@ -260,6 +351,17 @@ function init() {
         }
     };
     els.fileInput.onchange = handleLocalFiles;
+    // Ensure the playlist "追加" control opens the file picker reliably
+    try {
+        const fileBtn = document.querySelector('.playlist-panel .file-btn');
+        if (fileBtn) {
+            fileBtn.addEventListener('click', e => {
+                const input = document.getElementById('fileInput');
+                if (!input) return;
+                input.click();
+            });
+        }
+    } catch (err) { console.warn('fileBtn bind failed', err); }
     els.gDriveBtn.onclick = openGDrivePicker;
     els.closeVideoBtn.onclick = () => { state.settings.showVideo = false; updateVideoVisibility(); applySettingsToUI(); };
     els.toggleVideoModeBtn.onclick = () => {
@@ -642,6 +744,16 @@ function setupSettingsInputs() {
     $('autoPlayNextCheckbox').onchange = e => { state.settings.autoPlayNext = e.target.checked; };
     $('stopOnVideoEndCheckbox').onchange = e => { state.settings.stopOnVideoEnd = e.target.checked; };
 
+    // New settings handlers
+    const changeModeSelect = $('changeModeSelect');
+    if (changeModeSelect) changeModeSelect.onchange = e => { state.settings.changeMode = e.target.value; };
+    const sandModeCheckbox = $('sandModeCheckbox');
+    if (sandModeCheckbox) sandModeCheckbox.onchange = e => { state.settings.sandMode = e.target.checked; };
+    const sandFallRateSlider = $('sandFallRateSlider');
+    if (sandFallRateSlider) sandFallRateSlider.oninput = e => { state.settings.sandFallRate = +e.target.value; $('sandFallRateValue').textContent = state.settings.sandFallRate.toFixed(1); };
+    const circleAngleOffsetSlider = $('circleAngleOffsetSlider');
+    if (circleAngleOffsetSlider) circleAngleOffsetSlider.oninput = e => { state.settings.circleAngleOffset = +e.target.value; $('circleAngleOffsetValue').textContent = `${state.settings.circleAngleOffset}°`; };
+
     // persistSettingsCheckboxは既に上で処理済みなので重複を避ける
     setupPresets();
 }
@@ -763,6 +875,20 @@ function applySettingsToUI() {
     $('sleepTimerSelect').value = state.settings.sleepTimer;
     $('autoPlayNextCheckbox').checked = state.settings.autoPlayNext;
     $('stopOnVideoEndCheckbox').checked = state.settings.stopOnVideoEnd;
+
+    // Apply new settings to UI
+    const changeModeSelect = $('changeModeSelect');
+    if (changeModeSelect) changeModeSelect.value = state.settings.changeMode || 'off';
+    const sandModeCheckbox = $('sandModeCheckbox');
+    if (sandModeCheckbox) sandModeCheckbox.checked = !!state.settings.sandMode;
+    const sandFallRateSlider = $('sandFallRateSlider');
+    if (sandFallRateSlider) sandFallRateSlider.value = state.settings.sandFallRate || 0.6;
+    const sandFallRateValue = $('sandFallRateValue');
+    if (sandFallRateValue) sandFallRateValue.textContent = (state.settings.sandFallRate || 0.6).toFixed(1);
+    const circleAngleOffsetSlider = $('circleAngleOffsetSlider');
+    if (circleAngleOffsetSlider) circleAngleOffsetSlider.value = state.settings.circleAngleOffset || 0;
+    const circleAngleOffsetValue = $('circleAngleOffsetValue');
+    if (circleAngleOffsetValue) circleAngleOffsetValue.textContent = `${state.settings.circleAngleOffset || 0}°`;
 
     state.settings.eq.forEach((val, i) => {
         const freq = EQ_FREQS[i];
@@ -980,21 +1106,43 @@ function playTrack(index) {
     
     if (state.playTimeout) clearTimeout(state.playTimeout);
     
+    // Race condition protection
+    const requestId = ++state.playRequestId;
     audio.pause();
     audio.currentTime = 0;
-    audio.src = track.url;
-    audio.load();
-    connectFileSource();
-    updateVideoVisibility();
-    state.playTimeout = setTimeout(() => { 
-        audio.play().catch(e => {
-            console.warn("Playback failed:", e);
-            showOverlay('⚠️ 再生に失敗しました');
-            // 失敗した場合は次の曲へ（無限ループ防止のため少し待つ）
+    
+    (async () => {
+        try {
+            const url = await ensureUrlForTrack(track);
+            if (requestId !== state.playRequestId) return; // outdated
+            audio.src = url;
+            audio.load();
+            connectFileSource();
+            updateVideoVisibility();
+            
+            // Prefetch next track (non-blocking)
+            const nextIdx = (state.currentIndex + 1) % state.playlist.length;
+            if (state.playlist[nextIdx]) {
+                ensureUrlForTrack(state.playlist[nextIdx]).catch(() => {});
+            }
+            
+            // Enforce cache limit
+            blobCache.enforceLimit([audio.src, bgVideo.src]);
+            
+            state.playTimeout = setTimeout(() => { 
+                audio.play().catch(e => {
+                    console.warn("Playback failed:", e);
+                    showOverlay('⚠️ 再生に失敗しました');
+                    setTimeout(nextTrack, 2000);
+                }); 
+                state.playTimeout = null;
+            }, 100);
+        } catch (e) {
+            console.warn('ensureUrlForTrack failed', e);
+            showOverlay('⚠️ URL準備に失敗しました');
             setTimeout(nextTrack, 2000);
-        }); 
-        state.playTimeout = null;
-    }, 100);
+        }
+    })();
 }
 
 function seek() { if (state.inputSource === 'file') audio.currentTime = els.seekBar.value; }
@@ -1048,7 +1196,13 @@ function handleFiles(files) {
     showOverlay(`📥 ${accepted.length}個のファイルを取り込み中...`);
 
     accepted.forEach(item => {
-        state.playlist.push({ name: item.file.name, url: URL.createObjectURL(item.file), source: 'local', isVideo: item.isVideo });
+        state.playlist.push({ 
+            name: item.file.name, 
+            fileBlob: item.file,
+            source: 'local', 
+            isVideo: item.isVideo,
+            ephemeral: false
+        });
     });
     renderPlaylist();
     if (state.currentIndex === -1) playTrack(state.playlist.length - accepted.length);
@@ -1472,34 +1626,77 @@ function getColor(i, v = 1, total = state.settings.barCount) {
     return state.settings.fixedColor;
 }
 
-function draw() {
-    // バックグラウンドから復帰時に同期を取る
-    if (document.hidden) {
-        // バックグラウンド中は動画を再生し続けるが、描画は行わない
-        // 復帰時に同期するため何もしない
-        requestAnimationFrame(draw);
-        return;
-    }
-    
-    // フォアグラウンドに復帰したとき、動画と音声の同期を確認
-    if (bgVideo.src && state.isPlaying && state.settings.showVideo) {
-        const videoOffset = 0.15; // MVを少し先に進める（0.15秒）
-        const targetTime = audio.currentTime + videoOffset;
-        const timeDiff = Math.abs(bgVideo.currentTime - targetTime);
-        // 遅延が1秒以上ある場合のみ同期（小さなズレは無視）
-        if (timeDiff > 1.0) {
-            console.log(`Syncing video: audio=${audio.currentTime.toFixed(2)}s, video=${bgVideo.currentTime.toFixed(2)}s`);
-            bgVideo.currentTime = targetTime;
-        }
-    }
+// ============== Display Values & Sand ==============
+function ensureFrameBuffers(n) {
+    if (!state.displayValues || state.displayValues.length !== n) state.displayValues = new Float32Array(n);
+    if (!state.prevLevels || state.prevLevels.length !== n) state.prevLevels = new Float32Array(n);
+    if (!state.sandHeights || state.sandHeights.length !== n) state.sandHeights = new Float32Array(n);
+    if (!state.curLevels || state.curLevels.length !== n) state.curLevels = new Float32Array(n);
+}
 
-    if (state.settings.lowPowerMode) {
-        // 軽量化モード: 30FPSに制限
-        setTimeout(() => {
-            requestAnimationFrame(draw);
-        }, 1000 / 30);
-    } else {
-        requestAnimationFrame(draw);
+function computeDisplayValues(rawFreq, dtSec) {
+    const n = rawFreq.length;
+    ensureFrameBuffers(n);
+    const disp = state.displayValues;
+    const prev = state.prevLevels;
+    const sand = state.sandHeights;
+    const cur_levels = state.curLevels;
+    const mode = state.settings.changeMode;
+    for (let i = 0; i < n; i++) {
+        const cur = Math.max(0, Math.min(1, rawFreq[i] / 255));
+        cur_levels[i] = cur;
+        let v = cur;
+        if (mode === 'plus') v = Math.max(0, cur - prev[i]);
+        else if (mode === 'plusminus') v = cur - prev[i];
+        disp[i] = v;
+        // sand update
+        if (state.settings.sandMode) {
+            if (cur >= sand[i]) sand[i] = cur;
+            else sand[i] = Math.max(0, sand[i] - state.settings.sandFallRate * dtSec);
+        } else {
+            sand[i] = 0;
+        }
+        prev[i] = cur;
+    }
+    return disp;
+}
+
+// ============== Shake & Sparkles ==============
+function computeEnergy(display) {
+    let sum = 0, peak = 0, n = display.length;
+    for (let i = 0; i < n; i++) { const v = Math.abs(display[i]); sum += v; if (v > peak) peak = v; }
+    const avg = sum / Math.max(1, n);
+    return Math.max(avg, peak);
+}
+// Shake and Sparkles features removed
+
+let lastDrawTs = 0;
+let lastVideoSyncCheckTs = 0;
+function draw(ts = 0) {
+    requestAnimationFrame(draw);
+
+    // バックグラウンド中は描画を行わない（復帰時に同期チェックで追従）
+    if (document.hidden) return;
+
+    const targetFps = state.settings.lowPowerMode ? 30 : 60;
+    const minInterval = 1000 / targetFps;
+    const dtSecRaw = lastDrawTs ? (ts - lastDrawTs) / 1000 : 0;
+    if (lastDrawTs && ts - lastDrawTs < minInterval) return;
+    const dtSec = dtSecRaw || (minInterval / 1000);
+    lastDrawTs = ts;
+
+    // 動画と音声の同期チェックは間引く（毎フレームやると重い）
+    if (bgVideo.src && state.isPlaying && state.settings.showVideo) {
+        if (!lastVideoSyncCheckTs || ts - lastVideoSyncCheckTs >= 250) {
+            lastVideoSyncCheckTs = ts;
+            const videoOffset = 0.2; // MVを少し先に進める（0.2秒）
+            const targetTime = audio.currentTime + videoOffset;
+            const timeDiff = Math.abs(bgVideo.currentTime - targetTime);
+            // 遅延が1秒以上ある場合のみ同期（小さなズレは無視）
+            if (timeDiff > 1.0) {
+                bgVideo.currentTime = targetTime;
+            }
+        }
     }
 
     if (state.settings.videoMode === 'background' && state.playlist[state.currentIndex]?.isVideo && state.settings.showVideo) {
@@ -1513,6 +1710,16 @@ function draw() {
     
     if (!state.analyser) return;
     const fd = getFilteredData();
+    const display = computeDisplayValues(fd, dtSec);
+    // Precompute colors for the frame
+    const nBars = fd.length;
+    const colors = new Array(nBars);
+    for (let i = 0; i < nBars; i++) {
+        colors[i] = getColor(i, Math.max(0, Math.min(1, fd[i] / 255)), nBars);
+    }
+    // Motion preferences
+    const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Shake removed
     
     // Use full screen height for visualization
     const drawH = H;
@@ -1531,17 +1738,19 @@ function draw() {
         ctx.scale(-1, 1);
     }
 
+    ctx.save();
     switch (state.mode) {
-        case 0: drawBars(fd, maxH, drawH, drawStartY); break;
+        case 0: drawBarsFromDisplay(display, colors, maxH, drawH, drawStartY); break;
         case 1: drawWaveform(maxH, drawH, drawStartY); break;
         case 2: drawDigitalBlocks(fd, maxH, drawH, drawStartY); break;
-        case 3: drawCircle(fd, maxH, drawH, drawStartY); break;
+        case 3: drawCircleFromDisplay(display, colors, maxH, drawH, drawStartY); break;
         case 4: drawSpectrum(fd, maxH, drawH, drawStartY); break;
         case 5: drawGalaxy(fd, drawH, drawStartY); break;
         case 6: drawMonitor(fd, drawH, drawStartY); break;
         case 7: drawHexagon(fd, drawH, drawStartY); break;
         case 8: drawMirrorBars(fd, maxH, drawH, drawStartY); break;
     }
+    ctx.restore();
 
     if (state.settings.mirror) {
         ctx.restore();
@@ -1549,10 +1758,46 @@ function draw() {
 
     ctx.globalAlpha = 1.0;
 
+
+
     if (state.settings.lowPowerMode) state.settings.glowStrength = originalGlow;
 }
+// ============== Shake & Sparkles ==============
+function computeEnergy(display) {
+    let sum = 0, peak = 0, n = display.length;
+    for (let i = 0; i < n; i++) { const v = Math.abs(display[i]); sum += v; if (v > peak) peak = v; }
+    const avg = sum / Math.max(1, n);
+    return Math.max(avg, peak);
+}
+// Shake and Sparkles features removed
 
-// Modes (Same as V6 but with drawH adjustment and Y offset)
+// Modes (updated bars/circle to use display & sand)
+function drawBarsFromDisplay(display, colors, maxH, drawH, drawStartY) {
+    const n = display.length; const bw = W / n;
+    // global glow based on max level
+    let peak = 0; for (let i = 0; i < n; i++) { peak = Math.max(peak, Math.abs(display[i])); }
+    if (state.settings.glowStrength > 0) {
+        ctx.shadowBlur = state.settings.glowStrength * Math.max(0.2, peak);
+        ctx.shadowColor = state.settings.rainbow ? '#ffffff' : state.settings.fixedColor;
+    }
+    for (let i = 0; i < n; i++) {
+        const v = Math.max(0, display[i]); const h = v * maxH; const color = colors[i];
+        ctx.fillStyle = color;
+        ctx.fillRect(i * bw + 1, drawStartY + drawH - h, bw - 2, h);
+        // sand marker: use same color as bar
+        if (state.settings.sandMode) {
+            const sh = state.sandHeights ? state.sandHeights[i] * maxH : 0;
+            if (sh > 0) {
+                ctx.fillStyle = color; // use bar color, not white
+                ctx.globalAlpha = 0.6;
+                const y = drawStartY + drawH - sh;
+                ctx.fillRect(i * bw + 1, y - 2, bw - 2, 4);
+                ctx.globalAlpha = 1.0;
+            }
+        }
+    }
+    ctx.shadowBlur = 0;
+}
 function drawBars(fd, maxH, drawH, drawStartY) {
     const n = fd.length; const bw = W / n;
     for (let i = 0; i < n; i++) {
@@ -1575,6 +1820,28 @@ function drawDigitalBlocks(fd, maxH, drawH, drawStartY) {
         const idx = Math.floor(i / cols * fd.length); const v = fd[idx] / 255; const activeRows = Math.floor(v * rows);
         for (let j = 0; j < rows; j++) { if (rows - j <= activeRows) { ctx.fillStyle = getColor(i, (rows-j)/rows, cols); ctx.fillRect(i * cellW + 2, drawStartY + j * cellH + 2, cellW - 4, cellH - 4); } else { ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(i * cellW + 2, drawStartY + j * cellH + 2, cellW - 4, cellH - 4); } }
     }
+}
+function drawCircleFromDisplay(display, colors, maxH, drawH, drawStartY) {
+    const cx = W / 2, cy = drawStartY + drawH / 2; const r = Math.min(W, drawH) * 0.25; const n = display.length; const circumference = 2 * Math.PI * r; const barW = (circumference / n) * 0.8;
+    const angleOffset = ((state.settings.circleAngleOffset || 0) % 360) * Math.PI / 180;
+    for (let i = 0; i < n; i++) {
+        const ang = (i / n) * Math.PI * 2 - Math.PI / 2 + angleOffset; const v = Math.max(0, display[i]); const len = v * maxH * 0.6;
+        ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang); const color = colors[i]; ctx.fillStyle = color;
+        if (state.settings.glowStrength > 0 && v > 0.2) { ctx.shadowBlur = state.settings.glowStrength; ctx.shadowColor = color; }
+        ctx.fillRect(r, -barW/2, len, barW); ctx.restore();
+        if (state.settings.sandMode) {
+            const sh = state.sandHeights ? state.sandHeights[i] * maxH * 0.6 : 0;
+            if (sh > 0) {
+                ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang);
+                ctx.fillStyle = color; // use bar color, not white
+                ctx.globalAlpha = 0.6;
+                ctx.beginPath(); ctx.arc(r + sh, 0, Math.max(1.5, barW * 0.3), 0, Math.PI * 2); ctx.fill();
+                ctx.globalAlpha = 1.0;
+                ctx.restore();
+            }
+        }
+    }
+    ctx.shadowBlur = 0;
 }
 function drawCircle(fd, maxH, drawH, drawStartY) {
     const cx = W / 2, cy = drawStartY + drawH / 2; const r = Math.min(W, drawH) * 0.25; const n = fd.length; const circumference = 2 * Math.PI * r; const barW = (circumference / n) * 0.8;

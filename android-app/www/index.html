@@ -218,6 +218,34 @@
                     </div>
                 </div>
                 <div class="setting-item">
+                    <label>変化モード (Change)</label>
+                    <select id="changeModeSelect">
+                        <option value="off">通常</option>
+                        <option value="plus">増分のみ</option>
+                        <option value="plusminus">上下変化</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="sandModeCheckbox"> 砂モード (Bars/Circle)
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label>砂の落下速度</label>
+                    <div class="range-wrapper">
+                        <input type="range" id="sandFallRateSlider" min="0.1" max="2.0" step="0.1">
+                        <span id="sandFallRateValue">0.6</span>
+                    </div>
+                </div>
+                <div class="setting-item">
+                    <label>円形バー角度補正</label>
+                    <div class="range-wrapper">
+                        <input type="range" id="circleAngleOffsetSlider" min="-180" max="180" step="1" value="0">
+                        <span id="circleAngleOffsetValue">0°</span>
+                    </div>
+                    <button type="button" class="mini-btn" id="resetCircleAngleBtn">0° にリセット</button>
+                </div>
+                <div class="setting-item">
                     <label>
                         <input type="checkbox" id="mirrorCheckbox"> 左右反転 (Mirror)
                     </label>

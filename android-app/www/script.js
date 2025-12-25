@@ -21,6 +21,7 @@ const state = {
     uiTimeout: null,
     sleepTimerId: null,
     lastSyncTime: 0,
+    playRequestId: 0,
     
     // Input Source
     inputSource: 'file', // 'file' or 'mic'
@@ -40,6 +41,9 @@ const state = {
     freqData: null,
     timeData: null,
     bufLen: 0,
+    displayValues: null,
+    prevLevels: null,
+    sandHeights: null,
     
     // Settings
     settings: {
@@ -71,6 +75,12 @@ const state = {
         autoPlayNext: true,
         stopOnVideoEnd: false,
         storeLocalFiles: false
+        ,
+        // New visualization settings
+        changeMode: 'off', // 'off' | 'plus' | 'plusminus'
+        sandMode: false,
+        sandFallRate: 0.6, // per second
+        circleAngleOffset: 0
     }
 };
 
@@ -231,6 +241,120 @@ function toCapacitorFileUrl(uri) {
     return uri;
 }
 
+// ============== Blob URL LRU Cache ==============
+class BlobUrlCache {
+    constructor(maxSize = 2) {
+        this.maxSize = maxSize;
+        this.list = []; // [{ track, url }]
+    }
+    put(track, url) {
+        // remove existing entry for this track
+        this.list = this.list.filter(e => e.track !== track);
+        this.list.push({ track, url });
+        this.enforceLimit([audio.src, bgVideo.src]);
+    }
+    release(track) {
+        const idx = this.list.findIndex(e => e.track === track);
+        if (idx >= 0) {
+            const url = this.list[idx].url;
+            this.list.splice(idx, 1);
+            this.safeRevoke(url);
+        }
+    }
+    safeRevoke(url) {
+        try {
+            if (url && isBlobUrl(url) && audio.src !== url && bgVideo.src !== url) {
+                URL.revokeObjectURL(url);
+            }
+        } catch {}
+    }
+    enforceLimit(excludeUrls = []) {
+        while (this.list.length > this.maxSize) {
+            const oldest = this.list[0];
+            this.list.shift();
+            if (!excludeUrls.includes(oldest.url)) {
+                this.safeRevoke(oldest.url);
+                // mark track url cleared if matches
+                if (oldest.track && oldest.track.url === oldest.url) {
+                    oldest.track.url = undefined;
+                    oldest.track.ephemeral = false;
+                }
+            } else {
+                // push back if excluded
+                this.list.push(oldest);
+                break;
+            }
+        }
+    }
+}
+const blobCache = new BlobUrlCache(2);
+
+async function ensureUrlForTrack(track) {
+    if (!track) throw new Error('Track is undefined');
+    if (track.url && (!track.ephemeral || isBlobUrl(track.url))) return track.url;
+    // Local file via blob stored
+    if (track.fileBlob instanceof Blob) {
+        const url = URL.createObjectURL(track.fileBlob);
+        track.url = url;
+        track.ephemeral = true;
+        blobCache.put(track, url);
+        return url;
+    }
+    // Local references
+    if (typeof track.localRef === 'string') {
+        if (track.localRef.startsWith('idb:')) {
+            const id = track.localRef.slice('idb:'.length);
+            try {
+                const file = await idbGetLocalFile(id);
+                if (file) {
+                    const url = URL.createObjectURL(file);
+                    track.url = url;
+                    track.ephemeral = true;
+                    blobCache.put(track, url);
+                    return url;
+                }
+            } catch (e) {
+                console.warn('IDB read failed', e);
+            }
+        } else if (track.localRef.startsWith('app:')) {
+            const p = track.localRef.slice('app:'.length);
+            track.url = toCapacitorFileUrl(p);
+            track.ephemeral = false;
+            return track.url;
+        } else if (track.localRef.startsWith('uri:')) {
+            const uri = track.localRef.slice('uri:'.length);
+            track.url = toCapacitorFileUrl(uri);
+            track.ephemeral = false;
+            return track.url;
+        } else if (track.localRef.startsWith('path:')) {
+            const p = track.localRef.slice('path:'.length);
+            track.url = fileUrlFromPath(p);
+            track.ephemeral = false;
+            return track.url;
+        }
+    }
+    // Drive blob
+    if (track.source === 'drive' && track.fileBlob instanceof Blob) {
+        const url = URL.createObjectURL(track.fileBlob);
+        track.url = url;
+        track.ephemeral = true;
+        blobCache.put(track, url);
+        return url;
+    }
+    // Fallback
+    throw new Error('Unable to ensure URL for track');
+}
+
+function releaseObjectUrlForTrack(track) {
+    if (!track || !track.url) return;
+    if (track.ephemeral && isBlobUrl(track.url) && audio.src !== track.url && bgVideo.src !== track.url) {
+        try { URL.revokeObjectURL(track.url); } catch {}
+        track.url = undefined;
+        track.ephemeral = false;
+    }
+    blobCache.release(track);
+}
+
 let W, H;
 let topBarH = 0;
 let bottomBarH = 0;
@@ -296,8 +420,8 @@ async function init() {
         }
     });
     audio.addEventListener('error', handleAudioError);
-    audio.addEventListener('seeking', () => { if (bgVideo.src) bgVideo.currentTime = audio.currentTime + 0.15; });
-    audio.addEventListener('seeked', () => { if (bgVideo.src) bgVideo.currentTime = audio.currentTime + 0.15; });
+    audio.addEventListener('seeking', () => { if (bgVideo.src) bgVideo.currentTime = audio.currentTime + 0.2; });
+    audio.addEventListener('seeked', () => { if (bgVideo.src) bgVideo.currentTime = audio.currentTime + 0.2; });
 
     bgVideo.addEventListener('error', () => {
         console.warn('Video load failed');
@@ -433,6 +557,20 @@ async function init() {
     }
 
     els.fileInput.onchange = handleLocalFiles;
+    // Ensure the playlist add control opens the file picker (cover WebView label click issues)
+    try {
+        const fileBtn = document.querySelector('.playlist-panel .file-btn') || document.getElementById('nativeFileBtn');
+        if (fileBtn) {
+            fileBtn.addEventListener('click', e => {
+                const input = document.getElementById('fileInput');
+                if (!input) return;
+                // In native Capacitor builds `nativeFileBtn` may have a special handler;
+                // allow that handler to proceed when present (it uses isNativeCapacitor()).
+                // Still call click() to be robust in web builds or when propagation fails.
+                input.click();
+            });
+        }
+    } catch (err) { console.warn('fileBtn bind failed', err); }
     els.gDriveBtn.onclick = openGDrivePicker;
     els.closeVideoBtn.onclick = () => { state.settings.showVideo = false; updateVideoVisibility(); applySettingsToUI(); };
     els.toggleVideoModeBtn.onclick = () => {
@@ -786,14 +924,20 @@ function saveSettingsToStorage() {
     if (state.settings.persistSettings) {
         localStorage.setItem('audioVisualizerSettingsV7', JSON.stringify(state.settings));
     }
-    // プレイリスト情報（ローカルは参照キー(localRef)を保存）
-    const playlistData = state.playlist.map(track => ({
-        name: track.name,
-        source: track.source,
-        isVideo: track.isVideo,
-        localRef: track.localRef || null,
-        ...(track.source === 'drive' && { fileId: track.fileId })
-    }));
+    // プレイリスト情報（ローカルは参照キー(localRef)を保存、URLなし）
+    const playlistData = state.playlist.map(track => {
+        // Skip tracks without valid storage reference when storeLocalFiles is off
+        if (track.source === 'local' && !state.settings.storeLocalFiles && !track.localRef?.startsWith('uri:') && !track.localRef?.startsWith('app:') && !track.localRef?.startsWith('path:')) {
+            return null;
+        }
+        return {
+            name: track.name,
+            source: track.source,
+            isVideo: track.isVideo,
+            localRef: track.localRef || null,
+            ...(track.source === 'drive' && { fileId: track.fileId })
+        };
+    }).filter(Boolean);
     localStorage.setItem('audioVisualizerPlaylistV7', JSON.stringify(playlistData));
     // 後方互換
     localStorage.setItem('audioVisualizerPlaylist', JSON.stringify(playlistData));
@@ -963,7 +1107,9 @@ async function openNativeFolderImport() {
     const plugins = window.Capacitor?.Plugins;
     const folderImport = plugins?.LocalFolderImport;
     if (!folderImport || typeof folderImport.pickAudioFolder !== 'function') {
-        alert('フォルダ一括追加プラグインが見つかりません。android-appで `npx cap sync` してください。');
+        // Fallback to file picker if plugin not available
+        console.warn('フォルダ一括追加プラグインが見つかりません。ファイルピッカーを使用します。');
+        await openNativeFilePicker();
         return;
     }
 
@@ -1003,7 +1149,9 @@ async function openNativeFolderImport() {
         setTimeout(() => showOverlay(`✅ ${files.length}個のファイルを追加しました`), 500);
     } catch (error) {
         console.error('Folder import failed:', error);
-        showOverlay('❌ フォルダの一括追加に失敗しました');
+        // Fallback to file picker
+        console.log('フォルダプラグインエラーのため、ファイルピッカーにフォールバック');
+        await openNativeFilePicker();
     }
 }
 
@@ -1167,20 +1315,16 @@ async function loadPlaylistFromStorage() {
                 continue;
             }
             if (localRef && localRef.startsWith('idb:')) {
-                try {
-                    const id = localRef.slice('idb:'.length);
-                    const file = await idbGetLocalFile(id);
-                    if (!file) continue;
-                    restored.push({ name, url: URL.createObjectURL(file), source: 'local', isVideo, localRef });
-                } catch {
-                    // ignore
-                }
+                // Do not create blob URL here; lazy on demand
+                restored.push({ name, url: undefined, source: 'local', isVideo, localRef });
             }
             continue;
         }
 
         if (source === 'drive') {
-            restored.push({ name, url: '', source: 'drive', isVideo, fileId: item.fileId });
+            // Skip drive tracks if url is not available (no fileBlob) - avoid dangling references
+            if (!item.fileId) continue;
+            restored.push({ name, url: undefined, source: 'drive', isVideo, fileId: item.fileId });
         }
     }
 
@@ -1282,6 +1426,21 @@ function setupSettingsInputs() {
         $('opacityValue').textContent = state.settings.opacity.toFixed(1);
     };
     $('fixedColorPicker').oninput = e => { state.settings.fixedColor = e.target.value; };
+    // New display settings
+    $('changeModeSelect').onchange = e => { state.settings.changeMode = e.target.value; };
+    $('sandModeCheckbox').onchange = e => { state.settings.sandMode = e.target.checked; };
+    $('sandFallRateSlider').oninput = e => { state.settings.sandFallRate = +e.target.value; $('sandFallRateValue').textContent = state.settings.sandFallRate.toFixed(1); };
+    $('circleAngleOffsetSlider').oninput = e => { state.settings.circleAngleOffset = +e.target.value; $('circleAngleOffsetValue').textContent = `${state.settings.circleAngleOffset}°`; };
+    const resetCircleAngleBtn = $('resetCircleAngleBtn');
+    if (resetCircleAngleBtn) {
+        resetCircleAngleBtn.onclick = () => {
+            state.settings.circleAngleOffset = 0;
+            const slider = $('circleAngleOffsetSlider');
+            const valEl = $('circleAngleOffsetValue');
+            if (slider) slider.value = 0;
+            if (valEl) valEl.textContent = '0°';
+        };
+    }
     $('clientIdInput').onchange = e => { state.settings.gDriveClientId = e.target.value.trim(); };
     $('apiKeyInput').onchange = e => { state.settings.gDriveApiKey = e.target.value.trim(); };
     $('persistSettingsCheckbox').onchange = e => { state.settings.persistSettings = e.target.checked; };
@@ -1433,6 +1592,12 @@ function applySettingsToUI() {
     $('opacitySlider').value = state.settings.opacity;
     $('opacityValue').textContent = state.settings.opacity.toFixed(1);
     $('fixedColorPicker').value = state.settings.fixedColor;
+    $('changeModeSelect').value = state.settings.changeMode || 'off';
+    $('sandModeCheckbox').checked = !!state.settings.sandMode;
+    $('sandFallRateSlider').value = state.settings.sandFallRate;
+    $('sandFallRateValue').textContent = (state.settings.sandFallRate || 0.6).toFixed(1);
+    $('circleAngleOffsetSlider').value = state.settings.circleAngleOffset || 0;
+    $('circleAngleOffsetValue').textContent = `${state.settings.circleAngleOffset || 0}°`;
     $('clientIdInput').value = state.settings.gDriveClientId;
     $('apiKeyInput').value = state.settings.gDriveApiKey;
     $('persistSettingsCheckbox').checked = state.settings.persistSettings;
@@ -1697,21 +1862,40 @@ function playTrack(index) {
     
     if (state.playTimeout) clearTimeout(state.playTimeout);
     
+    const requestId = ++state.playRequestId;
     audio.pause();
     audio.currentTime = 0;
-    audio.src = track.url;
-    audio.load();
-    connectFileSource();
-    updateVideoVisibility();
-    state.playTimeout = setTimeout(() => { 
-        audio.play().catch(e => {
-            console.warn("Playback failed:", e);
-            showOverlay('⚠️ 再生に失敗しました');
-            // 失敗した場合は次の曲へ（無限ループ防止のため少し待つ）
+    (async () => {
+        try {
+            const url = await ensureUrlForTrack(track);
+            if (requestId !== state.playRequestId) return; // outdated
+            audio.src = url;
+            audio.load();
+            connectFileSource();
+            updateVideoVisibility();
+            state.playTimeout = setTimeout(() => { 
+                audio.play().catch(e => {
+                    console.warn("Playback failed:", e);
+                    showOverlay('⚠️ 再生に失敗しました');
+                    // 失敗した場合は次の曲へ（無限ループ防止のため少し待つ）
+                    setTimeout(nextTrack, 2000);
+                }); 
+                state.playTimeout = null;
+            }, 100);
+            // Prefetch next track URL asynchronously
+            const nextIdx = (index + 1) % state.playlist.length;
+            if (state.settings.autoPlayNext && nextIdx !== index) {
+                const nextTrack = state.playlist[nextIdx];
+                ensureUrlForTrack(nextTrack).catch(() => {});
+            }
+            // Enforce LRU size after changes
+            blobCache.enforceLimit([audio.src, bgVideo.src]);
+        } catch (e) {
+            console.warn('ensureUrlForTrack failed', e);
+            showOverlay('⚠️ URL準備に失敗しました');
             setTimeout(nextTrack, 2000);
-        }); 
-        state.playTimeout = null;
-    }, 100);
+        }
+    })();
 }
 
 function seek() { if (state.inputSource === 'file') audio.currentTime = els.seekBar.value; }
@@ -1768,30 +1952,32 @@ async function handleFiles(files) {
         const file = item.file;
         const filePath = typeof file.path === 'string' ? file.path : '';
         let localRef = null;
+        let fileBlob = null;
         if (filePath) {
             localRef = `path:${filePath}`;
             upsertLibraryEntry({ ref: localRef, type: 'path', name: file.name, sizeBytes: file.size, isVideo: item.isVideo });
-        } else {
-            if (state.settings.storeLocalFiles) {
-                try {
-                    const id = await idbPutLocalFile(file);
-                    localRef = `idb:${id}`;
-                    upsertLibraryEntry({ ref: localRef, type: 'idb', name: file.name, sizeBytes: file.size, isVideo: item.isVideo });
-                } catch {
-                    localRef = null;
-                }
-            } else {
-                localRef = null; // use blob only
+        } else if (state.settings.storeLocalFiles) {
+            try {
+                const id = await idbPutLocalFile(file);
+                localRef = `idb:${id}`;
+                upsertLibraryEntry({ ref: localRef, type: 'idb', name: file.name, sizeBytes: file.size, isVideo: item.isVideo });
+            } catch {
+                localRef = null;
             }
+        } else {
+            // Lazy blob URL creation later
+            fileBlob = file;
         }
 
         state.playlist.push({
             name: file.name,
-            url: URL.createObjectURL(file),
+            url: undefined,
+            fileBlob,
             source: 'local',
             isVideo: item.isVideo,
             localRef,
-            size: file.size
+            size: file.size,
+            ephemeral: false
         });
     }
     renderPlaylist();
@@ -2187,7 +2373,7 @@ async function fetchDriveFile(fileId, fileName) {
         const ext = fileName.toLowerCase().split('.').pop();
         const videoExt = new Set(['mp4', 'webm', 'mkv', 'mov']);
         const isVideo = videoExt.has(ext);
-        state.playlist.push({ name: fileName, url: URL.createObjectURL(blob), source: 'drive', isVideo: isVideo }); 
+        state.playlist.push({ name: fileName, url: undefined, fileBlob: blob, source: 'drive', isVideo: isVideo, ephemeral: false }); 
         renderPlaylist(); 
         if (state.currentIndex === -1) playTrack(state.playlist.length - 1); 
         showOverlay(`✅ ${fileName} を追加しました`);
@@ -2278,6 +2464,41 @@ function getColor(i, v = 1, total = state.settings.barCount) {
     return state.settings.fixedColor;
 }
 
+// ============== Display value computation (changeMode + sand) ==============
+function ensureFrameBuffers(n) {
+    if (!state.displayValues || state.displayValues.length !== n) state.displayValues = new Float32Array(n);
+    if (!state.prevLevels || state.prevLevels.length !== n) state.prevLevels = new Float32Array(n);
+    if (!state.sandHeights || state.sandHeights.length !== n) state.sandHeights = new Float32Array(n);
+    if (!state.curLevels || state.curLevels.length !== n) state.curLevels = new Float32Array(n);
+}
+
+function computeDisplayValues(rawFreq, dtSec) {
+    const n = rawFreq.length;
+    ensureFrameBuffers(n);
+    const disp = state.displayValues;
+    const prev = state.prevLevels;
+    const sand = state.sandHeights;
+    const cur_levels = state.curLevels;
+    const mode = state.settings.changeMode;
+    for (let i = 0; i < n; i++) {
+        const cur = Math.max(0, Math.min(1, rawFreq[i] / 255));
+        cur_levels[i] = cur; // store raw normalized level for sand
+        let v = cur;
+        if (mode === 'plus') v = Math.max(0, cur - prev[i]);
+        else if (mode === 'plusminus') v = cur - prev[i];
+        disp[i] = v;
+        // sand update: always uses cur (raw level), not display
+        if (state.settings.sandMode) {
+            if (cur >= sand[i]) sand[i] = cur;
+            else sand[i] = Math.max(0, sand[i] - state.settings.sandFallRate * dtSec);
+        } else {
+            sand[i] = 0;
+        }
+        prev[i] = cur;
+    }
+    return disp;
+}
+
 let lastDrawTs = 0;
 let lastVideoSyncCheckTs = 0;
 function draw(ts = 0) {
@@ -2288,14 +2509,16 @@ function draw(ts = 0) {
 
     const targetFps = state.settings.lowPowerMode ? 30 : 60;
     const minInterval = 1000 / targetFps;
+    const dtSecRaw = lastDrawTs ? (ts - lastDrawTs) / 1000 : 0;
     if (lastDrawTs && ts - lastDrawTs < minInterval) return;
+    const dtSec = dtSecRaw || (minInterval / 1000);
     lastDrawTs = ts;
 
     // 動画と音声の同期チェックは間引く（毎フレームやると重い）
     if (bgVideo.src && state.isPlaying && state.settings.showVideo) {
         if (!lastVideoSyncCheckTs || ts - lastVideoSyncCheckTs >= 250) {
             lastVideoSyncCheckTs = ts;
-            const videoOffset = 0.15; // MVを少し先に進める（0.15秒）
+            const videoOffset = 0.2; // MVを少し先に進める（0.2秒）
             const targetTime = audio.currentTime + videoOffset;
             const timeDiff = Math.abs(bgVideo.currentTime - targetTime);
             // 遅延が1秒以上ある場合のみ同期（小さなズレは無視）
@@ -2316,6 +2539,16 @@ function draw(ts = 0) {
     
     if (!state.analyser) return;
     const fd = getFilteredData();
+    const display = computeDisplayValues(fd, dtSec);
+    // Precompute colors for the frame
+    const nBars = fd.length;
+    const colors = new Array(nBars);
+    for (let i = 0; i < nBars; i++) {
+        colors[i] = getColor(i, Math.max(0, Math.min(1, fd[i] / 255)), nBars);
+    }
+    // Motion preferences
+    const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Shake removed
     
     // Use full screen height for visualization
     const drawH = H;
@@ -2334,17 +2567,19 @@ function draw(ts = 0) {
         ctx.scale(-1, 1);
     }
 
+    ctx.save();
     switch (state.mode) {
-        case 0: drawBars(fd, maxH, drawH, drawStartY); break;
+        case 0: drawBarsFromDisplay(display, colors, maxH, drawH, drawStartY); break;
         case 1: drawWaveform(maxH, drawH, drawStartY); break;
         case 2: drawDigitalBlocks(fd, maxH, drawH, drawStartY); break;
-        case 3: drawCircle(fd, maxH, drawH, drawStartY); break;
+        case 3: drawCircleFromDisplay(display, colors, maxH, drawH, drawStartY); break;
         case 4: drawSpectrum(fd, maxH, drawH, drawStartY); break;
         case 5: drawGalaxy(fd, drawH, drawStartY); break;
         case 6: drawMonitor(fd, drawH, drawStartY); break;
         case 7: drawHexagon(fd, drawH, drawStartY); break;
         case 8: drawMirrorBars(fd, maxH, drawH, drawStartY); break;
     }
+    ctx.restore();
 
     if (state.settings.mirror) {
         ctx.restore();
@@ -2352,17 +2587,45 @@ function draw(ts = 0) {
 
     ctx.globalAlpha = 1.0;
 
+
+
     if (state.settings.lowPowerMode) state.settings.glowStrength = originalGlow;
 }
+// ============== Shake & Sparkles ==============
+function computeEnergy(display) {
+    let sum = 0, peak = 0, n = display.length;
+    for (let i = 0; i < n; i++) { const v = Math.abs(display[i]); sum += v; if (v > peak) peak = v; }
+    const avg = sum / Math.max(1, n);
+    return Math.max(avg, peak);
+}
+// Shake and Sparkles features removed
 
-// Modes (Same as V6 but with drawH adjustment and Y offset)
-function drawBars(fd, maxH, drawH, drawStartY) {
-    const n = fd.length; const bw = W / n;
-    for (let i = 0; i < n; i++) {
-        const v = fd[i] / 255; const h = v * maxH; const color = getColor(i, v, n);
-        if (state.settings.glowStrength > 0 && v > 0.1) { ctx.shadowBlur = state.settings.glowStrength * v; ctx.shadowColor = color; }
-        ctx.fillStyle = color; ctx.fillRect(i * bw + 1, drawStartY + drawH - h, bw - 2, h); ctx.shadowBlur = 0;
+// Modes (updated bars/circle to use display & sand)
+function drawBarsFromDisplay(display, colors, maxH, drawH, drawStartY) {
+    const n = display.length; const bw = W / n;
+    // global glow based on max level
+    let peak = 0; for (let i = 0; i < n; i++) { peak = Math.max(peak, Math.abs(display[i])); }
+    if (state.settings.glowStrength > 0) {
+        ctx.shadowBlur = state.settings.glowStrength * Math.max(0.2, peak);
+        ctx.shadowColor = state.settings.rainbow ? '#ffffff' : state.settings.fixedColor;
     }
+    for (let i = 0; i < n; i++) {
+        const v = Math.max(0, display[i]); const h = v * maxH; const color = colors[i];
+        ctx.fillStyle = color;
+        ctx.fillRect(i * bw + 1, drawStartY + drawH - h, bw - 2, h);
+        // sand marker: use same color as bar
+        if (state.settings.sandMode) {
+            const sh = state.sandHeights ? state.sandHeights[i] * maxH : 0;
+            if (sh > 0) {
+                ctx.fillStyle = color; // use bar color, not white
+                ctx.globalAlpha = 0.6;
+                const y = drawStartY + drawH - sh;
+                ctx.fillRect(i * bw + 1, y - 2, bw - 2, 4);
+                ctx.globalAlpha = 1.0;
+            }
+        }
+    }
+    ctx.shadowBlur = 0;
 }
 function drawWaveform(maxH, drawH, drawStartY) {
     let startIdx = 0; for (let i = 0; i < state.bufLen - 1; i++) { if (state.timeData[i] < 128 && state.timeData[i+1] >= 128) { startIdx = i; break; } }
@@ -2379,14 +2642,27 @@ function drawDigitalBlocks(fd, maxH, drawH, drawStartY) {
         for (let j = 0; j < rows; j++) { if (rows - j <= activeRows) { ctx.fillStyle = getColor(i, (rows-j)/rows, cols); ctx.fillRect(i * cellW + 2, drawStartY + j * cellH + 2, cellW - 4, cellH - 4); } else { ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(i * cellW + 2, drawStartY + j * cellH + 2, cellW - 4, cellH - 4); } }
     }
 }
-function drawCircle(fd, maxH, drawH, drawStartY) {
-    const cx = W / 2, cy = drawStartY + drawH / 2; const r = Math.min(W, drawH) * 0.25; const n = fd.length; const circumference = 2 * Math.PI * r; const barW = (circumference / n) * 0.8;
+function drawCircleFromDisplay(display, colors, maxH, drawH, drawStartY) {
+    const cx = W / 2, cy = drawStartY + drawH / 2; const r = Math.min(W, drawH) * 0.25; const n = display.length; const circumference = 2 * Math.PI * r; const barW = (circumference / n) * 0.8;
+    const angleOffset = ((state.settings.circleAngleOffset || 0) % 360) * Math.PI / 180;
     for (let i = 0; i < n; i++) {
-        const ang = (i / n) * Math.PI * 2 - Math.PI / 2; const v = fd[i] / 255; const len = v * maxH * 0.6;
-        ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang); const color = getColor(i, v, n); ctx.fillStyle = color;
+        const ang = (i / n) * Math.PI * 2 - Math.PI / 2 + angleOffset; const v = Math.max(0, display[i]); const len = v * maxH * 0.6;
+        ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang); const color = colors[i]; ctx.fillStyle = color;
         if (state.settings.glowStrength > 0 && v > 0.2) { ctx.shadowBlur = state.settings.glowStrength; ctx.shadowColor = color; }
         ctx.fillRect(r, -barW/2, len, barW); ctx.restore();
+        if (state.settings.sandMode) {
+            const sh = state.sandHeights ? state.sandHeights[i] * maxH * 0.6 : 0;
+            if (sh > 0) {
+                ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang);
+                ctx.fillStyle = color; // use bar color, not white
+                ctx.globalAlpha = 0.6;
+                ctx.beginPath(); ctx.arc(r + sh, 0, Math.max(1.5, barW * 0.3), 0, Math.PI * 2); ctx.fill();
+                ctx.globalAlpha = 1.0;
+                ctx.restore();
+            }
+        }
     }
+    ctx.shadowBlur = 0;
 }
 function drawSpectrum(fd, maxH, drawH, drawStartY) {
     const n = fd.length; const bw = W / n; ctx.beginPath(); ctx.moveTo(0, drawStartY + drawH);
