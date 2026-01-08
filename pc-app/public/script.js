@@ -6,6 +6,9 @@
  */
 
 // ============== STATE ==============
+// MV同期クールダウン（無限ループ防止）
+let videoSyncCooldown = false;
+
 const state = {
 	playlist: [],
 	currentIndex: -1,
@@ -615,13 +618,20 @@ async function init() {
 	els.fileInput.onchange = handleLocalFiles;
 	// Ensure visible "追加" control reliably opens the file picker
 	try {
-		const fileBtn = document.querySelector('.playlist-panel .file-btn');
+		const fileBtn = document.querySelector('.playlist-panel .file-btn') || document.getElementById('nativeFileBtn');
 		if (fileBtn) {
-			fileBtn.addEventListener('click', e => {
-				const input = document.getElementById('fileInput');
-				if (!input) return;
-				input.click();
-			});
+			// If the element is a <label> that contains the file input, the browser
+			// already triggers the file picker automatically. Adding a synthetic
+			// click can cause the input change to fire twice (label native + script).
+			// Avoid attaching an extra click handler for label elements.
+			const tag = (fileBtn.tagName || '').toLowerCase();
+			if (tag !== 'label') {
+				fileBtn.addEventListener('click', e => {
+					const input = document.getElementById('fileInput');
+					if (!input) return;
+					input.click();
+				});
+			}
 		}
 	} catch (err) { console.warn('fileBtn bind failed', err); }
 	els.gDriveBtn.onclick = openGDrivePicker;
@@ -650,6 +660,7 @@ async function init() {
 	setupSettingsInputs();
 	setupPlaylistEventDelegation();
 	initDraggableVideo();
+	initDraggablePlaylist();
 	applySettingsToUI();
 	updateShuffleRepeatUI();
     
@@ -831,6 +842,108 @@ function initDraggableVideo() {
 			top: container.style.top
 		}));
 	}
+}
+
+// プレイリストパネルのドラッグ機能
+function initDraggablePlaylist() {
+	const panel = document.querySelector('.playlist-panel');
+	if (!panel) return;
+	
+	let isDragging = false;
+	let startX, startY, initialX, initialY;
+	let hasSavedPosition = false;
+	
+	// 保存された位置を復元
+	const savedPos = localStorage.getItem('playlistPanelPos');
+	if (savedPos) {
+		try {
+			const { left, top } = JSON.parse(savedPos);
+			panel.style.left = left;
+			panel.style.top = top;
+			panel.style.right = 'auto';
+			panel.style.transform = 'none';
+			hasSavedPosition = true;
+		} catch (e) {}
+	}
+	
+	// ドラッグハンドル（ヘッダー部分）
+	const header = panel.querySelector('.playlist-header');
+	if (!header) return;
+	
+	header.style.cursor = 'move';
+	
+	function constrainPosition(x, y, w, h) {
+		const minVisible = 100;
+		x = Math.max(-w + minVisible, Math.min(window.innerWidth - minVisible, x));
+		y = Math.max(0, Math.min(window.innerHeight - minVisible, y));
+		return { x, y };
+	}
+	
+	function startDrag(e) {
+		// 閉じるボタンはドラッグ対象外
+		if (e.target.id === 'closePlaylistBtn' || e.target.closest('#closePlaylistBtn')) return;
+		
+		isDragging = true;
+		panel.classList.add('dragging');
+		
+		const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+		const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+		startX = clientX;
+		startY = clientY;
+		
+		if (!hasSavedPosition) {
+			const rect = panel.getBoundingClientRect();
+			initialX = rect.left;
+			initialY = rect.top;
+			hasSavedPosition = true;
+		} else {
+			initialX = panel.offsetLeft;
+			initialY = panel.offsetTop;
+		}
+		
+		panel.style.right = 'auto';
+		panel.style.transform = 'none';
+		
+		e.preventDefault();
+	}
+	
+	function onDrag(e) {
+		if (!isDragging) return;
+		
+		const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+		const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+		
+		const dx = clientX - startX;
+		const dy = clientY - startY;
+		const newX = initialX + dx;
+		const newY = initialY + dy;
+		
+		const constrained = constrainPosition(newX, newY, panel.offsetWidth, panel.offsetHeight);
+		panel.style.left = `${constrained.x}px`;
+		panel.style.top = `${constrained.y}px`;
+	}
+	
+	function endDrag() {
+		if (!isDragging) return;
+		isDragging = false;
+		panel.classList.remove('dragging');
+		
+		// 位置を保存
+		localStorage.setItem('playlistPanelPos', JSON.stringify({
+			left: panel.style.left,
+			top: panel.style.top
+		}));
+	}
+	
+	// マウスイベント
+	header.addEventListener('mousedown', startDrag);
+	document.addEventListener('mousemove', onDrag);
+	document.addEventListener('mouseup', endDrag);
+	
+	// タッチイベント
+	header.addEventListener('touchstart', startDrag, { passive: false });
+	document.addEventListener('touchmove', onDrag, { passive: false });
+	document.addEventListener('touchend', endDrag);
 }
 
 function updateVideoVisibility() {
@@ -2150,15 +2263,19 @@ function draw(ts = 0) {
 	lastDrawTs = ts;
 
 	// 動画と音声の同期チェックは間引く（毎フレームやると重い）
-	if (bgVideo.src && state.isPlaying && state.settings.showVideo) {
+	// クールダウン中は同期処理をスキップ（無限ループ防止）
+	if (bgVideo.src && state.isPlaying && state.settings.showVideo && !videoSyncCooldown) {
 		if (!lastVideoSyncCheckTs || ts - lastVideoSyncCheckTs >= 250) {
 			lastVideoSyncCheckTs = ts;
 			const videoOffset = 0.2; // MVを少し先に進める（0.2秒）
 			const targetTime = audio.currentTime + videoOffset;
 			const timeDiff = Math.abs(bgVideo.currentTime - targetTime);
-			// 遅延が1秒以上ある場合のみ同期（小さなズレは無視）
-			if (timeDiff > 1.0) {
+			// 遅延が1.5秒以上ある場合のみ同期（小さなズレは無視）
+			if (timeDiff > 1.5) {
 				bgVideo.currentTime = targetTime;
+				// クールダウン開始（2秒間は同期処理をスキップ）
+				videoSyncCooldown = true;
+				setTimeout(() => { videoSyncCooldown = false; }, 2000);
 			}
 		}
 	}

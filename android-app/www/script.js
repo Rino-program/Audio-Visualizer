@@ -517,7 +517,7 @@ async function init() {
     };
     els.exportBtn.onclick = startExport;
     els.playlistToggle.onclick = togglePlaylist;
-    if (els.folderImportBtn) els.folderImportBtn.onclick = openNativeFolderImport;
+    // folderImportBtnは統合のため削除
     els.closePlaylistBtn.onclick = togglePlaylist;
     els.playlistSearchInput.oninput = scheduleRenderPlaylist;
     els.clearPlaylistBtn.onclick = async () => {
@@ -536,41 +536,31 @@ async function init() {
             showOverlay('✅ プレイリストをクリアしました');
         }
     };
-    // Native環境では設定に応じて
-    // - storeLocalFiles=false: URI保存(FilePicker)
-    // - storeLocalFiles=true : アプリ内保存(file input -> IndexedDB)
+    
+    // ファイル追加ボタン（nativeFileBtn）の統一処理
     const nativeFileBtn = document.getElementById('nativeFileBtn');
-    if (nativeFileBtn && isNativeCapacitor()) {
+    if (nativeFileBtn) {
         nativeFileBtn.addEventListener('click', async e => {
-            if (state.settings.storeLocalFiles) {
-                // allow default label -> input click
-                return;
-            }
             e.preventDefault();
-            const useFolder = confirm('フォルダから一括追加しますか？\n\nOK: フォルダ\nキャンセル: ファイル');
-            if (useFolder) {
-                await openNativeFolderImport();
+            e.stopPropagation();
+            
+            if (isNativeCapacitor()) {
+                // Native環境: ファイルかフォルダを選択
+                const useFolder = confirm('フォルダから一括追加しますか？\n\nOK: フォルダ\nキャンセル: ファイル');
+                if (useFolder) {
+                    await openNativeFolderImport();
+                } else {
+                    await openNativeFilePicker();
+                }
             } else {
-                await openNativeFilePicker();
+                // ブラウザ環境: 標準のファイル選択
+                const fileInput = document.getElementById('fileInput');
+                if (fileInput) fileInput.click();
             }
         });
     }
 
     els.fileInput.onchange = handleLocalFiles;
-    // Ensure the playlist add control opens the file picker (cover WebView label click issues)
-    try {
-        const fileBtn = document.querySelector('.playlist-panel .file-btn') || document.getElementById('nativeFileBtn');
-        if (fileBtn) {
-            fileBtn.addEventListener('click', e => {
-                const input = document.getElementById('fileInput');
-                if (!input) return;
-                // In native Capacitor builds `nativeFileBtn` may have a special handler;
-                // allow that handler to proceed when present (it uses isNativeCapacitor()).
-                // Still call click() to be robust in web builds or when propagation fails.
-                input.click();
-            });
-        }
-    } catch (err) { console.warn('fileBtn bind failed', err); }
     els.gDriveBtn.onclick = openGDrivePicker;
     els.closeVideoBtn.onclick = () => { state.settings.showVideo = false; updateVideoVisibility(); applySettingsToUI(); };
     els.toggleVideoModeBtn.onclick = () => {
@@ -596,6 +586,7 @@ async function init() {
     
     setupSettingsInputs();
     initDraggableVideo();
+    initDraggablePlaylist();
     applySettingsToUI();
     updateShuffleRepeatUI();
     
@@ -701,6 +692,108 @@ function resetUITimeout(e) {
             }
         }, 5000);
     }
+}
+
+// プレイリストパネルのドラッグ機能
+function initDraggablePlaylist() {
+    const panel = els.playlistPanel;
+    const header = panel.querySelector('.playlist-header h3');
+    if (!header) return;
+    
+    let isDragging = false;
+    let startX, startY, initialX, initialY;
+    
+    // ドラッグハンドル用のスタイルを追加
+    header.style.cursor = 'move';
+    header.title = 'ドラッグして移動';
+    
+    // 保存された位置を復元
+    const savedPos = localStorage.getItem('playlistPanelPos');
+    if (savedPos) {
+        try {
+            const { left, top } = JSON.parse(savedPos);
+            panel.style.left = left;
+            panel.style.top = top;
+            panel.style.right = 'auto';
+        } catch(e) {}
+    }
+    
+    const startDragging = (clientX, clientY) => {
+        isDragging = true;
+        panel.classList.add('dragging');
+        startX = clientX;
+        startY = clientY;
+        const rect = panel.getBoundingClientRect();
+        initialX = rect.left;
+        initialY = rect.top;
+    };
+    
+    const constrainPosition = (x, y) => {
+        const panelRect = panel.getBoundingClientRect();
+        const maxX = window.innerWidth - panelRect.width;
+        const maxY = window.innerHeight - panelRect.height;
+        return {
+            x: Math.max(0, Math.min(x, maxX)),
+            y: Math.max(0, Math.min(y, maxY))
+        };
+    };
+    
+    const onMove = (clientX, clientY) => {
+        if (!isDragging) return;
+        const dx = clientX - startX;
+        const dy = clientY - startY;
+        const { x, y } = constrainPosition(initialX + dx, initialY + dy);
+        panel.style.left = `${x}px`;
+        panel.style.top = `${y}px`;
+        panel.style.right = 'auto';
+    };
+    
+    const stopDragging = () => {
+        if (!isDragging) return;
+        isDragging = false;
+        panel.classList.remove('dragging');
+        localStorage.setItem('playlistPanelPos', JSON.stringify({
+            left: panel.style.left,
+            top: panel.style.top
+        }));
+    };
+    
+    // Mouse events
+    header.addEventListener('mousedown', e => {
+        if (e.target.closest('button') || e.target.closest('input')) return;
+        e.preventDefault();
+        startDragging(e.clientX, e.clientY);
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    });
+    
+    function onMouseMove(e) {
+        onMove(e.clientX, e.clientY);
+    }
+    
+    function onMouseUp() {
+        stopDragging();
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+    }
+    
+    // Touch events
+    header.addEventListener('touchstart', e => {
+        if (e.target.closest('button') || e.target.closest('input')) return;
+        e.preventDefault();
+        const touch = e.touches[0];
+        startDragging(touch.clientX, touch.clientY);
+    }, { passive: false });
+    
+    header.addEventListener('touchmove', e => {
+        if (!isDragging) return;
+        e.preventDefault();
+        const touch = e.touches[0];
+        onMove(touch.clientX, touch.clientY);
+    }, { passive: false });
+    
+    header.addEventListener('touchend', stopDragging);
+    header.addEventListener('touchcancel', stopDragging);
 }
 
 function initDraggableVideo() {
@@ -1703,6 +1796,23 @@ async function startMic() {
     stopMic(); // Clean up previous
     
     try {
+        // Android Capacitor環境では事前に権限を要求
+        if (isNativeCapacitor()) {
+            try {
+                const Permissions = window.Capacitor?.Plugins?.Permissions;
+                if (Permissions && typeof Permissions.request === 'function') {
+                    const permResult = await Permissions.request({ permissions: ['microphone'] });
+                    console.log('Permission result:', permResult);
+                    if (permResult?.microphone === 'denied') {
+                        throw { name: 'NotAllowedError', message: 'マイク権限が拒否されました' };
+                    }
+                }
+            } catch (permErr) {
+                console.warn('Permissions plugin error:', permErr);
+                // プラグインがない場合はgetUserMediaに任せる
+            }
+        }
+        
         const constraints = {
             audio: state.micDeviceId ? { deviceId: { exact: state.micDeviceId } } : true
         };
@@ -2501,6 +2611,7 @@ function computeDisplayValues(rawFreq, dtSec) {
 
 let lastDrawTs = 0;
 let lastVideoSyncCheckTs = 0;
+let videoSyncCooldown = 0; // 同期後のクールダウン時間
 function draw(ts = 0) {
     requestAnimationFrame(draw);
 
@@ -2514,16 +2625,21 @@ function draw(ts = 0) {
     const dtSec = dtSecRaw || (minInterval / 1000);
     lastDrawTs = ts;
 
-    // 動画と音声の同期チェックは間引く（毎フレームやると重い）
-    if (bgVideo.src && state.isPlaying && state.settings.showVideo) {
-        if (!lastVideoSyncCheckTs || ts - lastVideoSyncCheckTs >= 250) {
+    // 動画と音声の同期チェック（無限ループ防止のクールダウン付き）
+    if (bgVideo.src && state.isPlaying && state.settings.showVideo && !bgVideo.paused) {
+        // クールダウン中は同期チェックをスキップ
+        if (videoSyncCooldown > 0) {
+            videoSyncCooldown -= dtSec;
+        } else if (!lastVideoSyncCheckTs || ts - lastVideoSyncCheckTs >= 500) {
             lastVideoSyncCheckTs = ts;
-            const videoOffset = 0.2; // MVを少し先に進める（0.2秒）
+            const videoOffset = 0.1; // MVを少し先に進める
             const targetTime = audio.currentTime + videoOffset;
             const timeDiff = Math.abs(bgVideo.currentTime - targetTime);
-            // 遅延が1秒以上ある場合のみ同期（小さなズレは無視）
-            if (timeDiff > 1.0) {
+            // 遅延が1.5秒以上ある場合のみ同期（小さなズレは無視）
+            // 同期後は2秒間クールダウンして無限ループを防止
+            if (timeDiff > 1.5 && bgVideo.readyState >= 2) {
                 bgVideo.currentTime = targetTime;
+                videoSyncCooldown = 2.0; // 2秒間クールダウン
             }
         }
     }

@@ -20,15 +20,20 @@ function createWindow() {
     }
   });
 
-  // Register protocol handler
+  // Register protocol handler (resolve to same base used for storage)
   session.defaultSession.protocol.registerFileProtocol('app-data', (request, callback) => {
-    const url = request.url.replace('app-data://', '');
-    const decodedUrl = decodeURIComponent(url);
     try {
-      const filePath = path.join(app.getPath('userData'), 'music', decodedUrl);
+      // Normalize URL: remove scheme and any leading slashes to avoid
+      // accidental absolute-path joins (which would drop baseDir).
+      let url = request.url.replace('app-data://', '');
+      url = url.replace(/^\/+/, '');
+      const decodedUrl = decodeURIComponent(url);
+      const baseDir = getBaseDir();
+      const filePath = path.join(baseDir, 'music', decodedUrl);
       callback({ path: filePath });
     } catch (error) {
       console.error('Failed to register protocol', error);
+      callback({ error: -6 });
     }
   });
 
@@ -44,21 +49,37 @@ function createWindow() {
   win.loadFile(path.join(__dirname, 'public', 'index.html'));
 }
 
+function getBaseDir() {
+  try {
+    return app.isPackaged ? path.dirname(process.execPath) : app.getPath('userData');
+  } catch (e) {
+    return app.getPath('userData');
+  }
+}
+
 app.whenReady().then(() => {
   createWindow();
 
-  // Ensure music directory exists
-  const musicDir = path.join(app.getPath('userData'), 'music');
-  if (!fs.existsSync(musicDir)) {
-    fs.mkdirSync(musicDir, { recursive: true });
+  // Ensure music directory exists (portable: next to executable; dev: userData)
+  const baseDir = getBaseDir();
+  const musicDir = path.join(baseDir, 'music');
+  try {
+    if (!fs.existsSync(musicDir)) {
+      fs.mkdirSync(musicDir, { recursive: true });
+    }
+  } catch (e) {
+    console.error('Failed to ensure music directory:', e);
   }
 });
 
 // IPC Handlers
 ipcMain.handle('save-file', async (event, { name, arrayBuffer }) => {
-  const musicDir = path.join(app.getPath('userData'), 'music');
+  const baseDir = getBaseDir();
+  const musicDir = path.join(baseDir, 'music');
   const id = Date.now() + '-' + Math.random().toString(36).substring(2, 9);
-  const fileName = `${id}_${name}`;
+  // sanitize incoming name to avoid accidental path segments
+  const safeName = (name || 'file').replace(/[\\/]+/g, '_');
+  const fileName = `${id}_${safeName}`;
   const filePath = path.join(musicDir, fileName);
   const buffer = Buffer.from(arrayBuffer);
   await fs.promises.writeFile(filePath, buffer);
@@ -66,7 +87,8 @@ ipcMain.handle('save-file', async (event, { name, arrayBuffer }) => {
 });
 
 ipcMain.handle('delete-file', async (event, name) => {
-  const filePath = path.join(app.getPath('userData'), 'music', name);
+  const baseDir = getBaseDir();
+  const filePath = path.join(baseDir, 'music', name);
   if (fs.existsSync(filePath)) {
     await fs.promises.unlink(filePath);
     return true;
@@ -75,13 +97,14 @@ ipcMain.handle('delete-file', async (event, name) => {
 });
 
 ipcMain.handle('list-files', async () => {
-  const musicDir = path.join(app.getPath('userData'), 'music');
+  const baseDir = getBaseDir();
+  const musicDir = path.join(baseDir, 'music');
   if (!fs.existsSync(musicDir)) return [];
   return await fs.promises.readdir(musicDir);
 });
 
 ipcMain.handle('get-app-path', () => {
-  return app.getPath('userData');
+  return getBaseDir();
 });
 
 app.on('window-all-closed', () => {

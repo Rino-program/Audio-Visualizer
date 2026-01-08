@@ -120,7 +120,12 @@ button, input, select {
     height: 100%;
     object-fit: contain;
     pointer-events: none;
-    image-rendering: auto;
+    /* 動画の画質を維持する */
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    backface-visibility: hidden;
 }
 
 .video-container.background-mode #bgVideo {
@@ -621,10 +626,16 @@ select option {
     border-radius: var(--radius-lg);
     display: flex;
     flex-direction: column;
-    transition: var(--transition);
+    transition: transform 0.2s, opacity 0.2s, left 0.2s, top 0.2s;
     z-index: 1005;
     overflow: hidden;
     box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+}
+
+.playlist-panel.dragging {
+    transition: none !important;
+    opacity: 0.9;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
 }
 
 .playlist-panel.collapsed {
