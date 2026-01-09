@@ -689,15 +689,10 @@ select option {
     border-radius: var(--radius-lg);
     display: flex;
     flex-direction: column;
-    transition: transform 0.2s, opacity 0.2s, left 0.2s, top 0.2s;
+    transition: var(--transition);
     z-index: 1005;
     overflow: hidden;
     box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-}
-
-.playlist-panel.dragging {
-    transition: none !important;
-    box-shadow: 0 15px 50px rgba(0,0,0,0.7);
 }
 
 .playlist-panel.collapsed {

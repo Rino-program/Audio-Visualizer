@@ -555,7 +555,11 @@ async function init() {
 
 	bgVideo.addEventListener('error', () => {
 		console.warn('Video load failed');
-		showOverlay('⚠️ 動画の読み込みに失敗しました');
+		// MP3等の音声ファイルの場合はエラーメッセージを表示しない
+		const currentTrack = state.playlist[state.currentIndex];
+		if (currentTrack && currentTrack.isVideo) {
+			showOverlay('⚠️ 動画の読み込みに失敗しました');
+		}
 		els.videoContainer.classList.add('hidden');
 	});
 	bgVideo.addEventListener('ended', () => {
@@ -1583,12 +1587,34 @@ function resetEQ() {
 }
 
 // ============== PLAYBACK ==============
+let isToggling = false; // 連打防止フラグ
+
 function togglePlay() {
 	if (state.inputSource === 'mic') return;
 	if (state.playlist.length === 0) return;
 	if (state.currentIndex === -1) { playTrack(0); return; }
+	if (isToggling) return; // 連打防止
+	
+	isToggling = true;
 	initAudioContext();
-	state.isPlaying ? audio.pause() : audio.play().catch(console.error);
+	
+	if (state.isPlaying) {
+		audio.pause();
+		state.isPlaying = false;
+		updatePlayBtn();
+	} else {
+		audio.play().then(() => {
+			state.isPlaying = true;
+			updatePlayBtn();
+		}).catch(e => {
+			console.error('Play failed:', e);
+			state.isPlaying = false;
+			updatePlayBtn();
+		});
+	}
+	
+	// 連打防止解除（300ms後）
+	setTimeout(() => { isToggling = false; }, 300);
 }
 
 function toggleShuffle() {
@@ -2262,20 +2288,35 @@ function draw(ts = 0) {
 	const dtSec = dtSecRaw || (minInterval / 1000);
 	lastDrawTs = ts;
 
-	// 動画と音声の同期チェックは間引く（毎フレームやると重い）
-	// クールダウン中は同期処理をスキップ（無限ループ防止）
-	if (bgVideo.src && state.isPlaying && state.settings.showVideo && !videoSyncCooldown) {
-		if (!lastVideoSyncCheckTs || ts - lastVideoSyncCheckTs >= 250) {
+	// 動画と音声の同期チェック（改良版：スムーズな同期を実現）
+	if (bgVideo.src && state.isPlaying && state.settings.showVideo && !bgVideo.paused) {
+		if (!lastVideoSyncCheckTs || ts - lastVideoSyncCheckTs >= 300) {
 			lastVideoSyncCheckTs = ts;
-			const videoOffset = 0.2; // MVを少し先に進める（0.2秒）
+			const videoOffset = 0.05; // MVを少しだけ先に進める（50ms）
 			const targetTime = audio.currentTime + videoOffset;
-			const timeDiff = Math.abs(bgVideo.currentTime - targetTime);
-			// 遅延が1.5秒以上ある場合のみ同期（小さなズレは無視）
-			if (timeDiff > 1.5) {
-				bgVideo.currentTime = targetTime;
-				// クールダウン開始（2秒間は同期処理をスキップ）
-				videoSyncCooldown = true;
-				setTimeout(() => { videoSyncCooldown = false; }, 2000);
+			const timeDiff = bgVideo.currentTime - targetTime;
+			const absTimeDiff = Math.abs(timeDiff);
+			
+			// 動画が準備できているか確認
+			if (bgVideo.readyState >= 2) {
+				if (absTimeDiff > 2.0) {
+					// 大きなズレ：直接シーク
+					bgVideo.currentTime = targetTime;
+				} else if (absTimeDiff > 0.5) {
+					// 中程度のズレ：再生速度で調整
+					if (timeDiff > 0) {
+						// 動画が先行：少し遅くする
+						bgVideo.playbackRate = Math.max(0.9, 1 - absTimeDiff * 0.2);
+					} else {
+						// 動画が遅れ：少し速くする
+						bgVideo.playbackRate = Math.min(1.1, 1 + absTimeDiff * 0.2);
+					}
+				} else if (absTimeDiff < 0.1) {
+					// 同期OK：通常速度に戻す
+					if (bgVideo.playbackRate !== 1.0) {
+						bgVideo.playbackRate = 1.0;
+					}
+				}
 			}
 		}
 	}

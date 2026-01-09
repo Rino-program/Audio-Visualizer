@@ -237,11 +237,29 @@ let W, H;
 let topBarH = 0;
 let bottomBarH = 0;
 
+// Safari/iOS対応：動的な高さ調整
+function setAppHeight() {
+    // Safari/iOSでの100vh問題を解決
+    const vh = window.innerHeight * 0.01;
+    document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
+}
+
 // ============== INITIALIZATION ==============
 function init() {
     loadSettings();
+    
+    // Safari/iOS対応：初期化時に高さを設定
+    setAppHeight();
+    
     resize();
     window.addEventListener('resize', resize);
+    
+    // Safari/iOS対応：リサイズ・スクロール・向き変更時に高さを再計算
+    window.addEventListener('resize', setAppHeight);
+    window.addEventListener('orientationchange', () => {
+        setTimeout(setAppHeight, 100);
+    });
+    
     // Calculate UI heights after initial render
     requestAnimationFrame(() => {
         calculateUIHeights();
@@ -293,7 +311,11 @@ function init() {
 
     bgVideo.addEventListener('error', () => {
         console.warn('Video load failed');
-        showOverlay('⚠️ 動画の読み込みに失敗しました');
+        // MP3等の音声ファイルの場合はエラーメッセージを表示しない
+        const currentTrack = state.playlist[state.currentIndex];
+        if (currentTrack && currentTrack.isVideo) {
+            showOverlay('⚠️ 動画の読み込みに失敗しました');
+        }
         els.videoContainer.classList.add('hidden');
     });
     bgVideo.addEventListener('ended', () => {
@@ -1145,12 +1167,34 @@ function resetEQ() {
 }
 
 // ============== PLAYBACK ==============
+let isToggling = false; // 連打防止フラグ
+
 function togglePlay() {
     if (state.inputSource === 'mic') return;
     if (state.playlist.length === 0) return;
     if (state.currentIndex === -1) { playTrack(0); return; }
+    if (isToggling) return; // 連打防止
+    
+    isToggling = true;
     initAudioContext();
-    state.isPlaying ? audio.pause() : audio.play().catch(console.error);
+    
+    if (state.isPlaying) {
+        audio.pause();
+        state.isPlaying = false;
+        updatePlayBtn();
+    } else {
+        audio.play().then(() => {
+            state.isPlaying = true;
+            updatePlayBtn();
+        }).catch(e => {
+            console.error('Play failed:', e);
+            state.isPlaying = false;
+            updatePlayBtn();
+        });
+    }
+    
+    // 連打防止解除（300ms後）
+    setTimeout(() => { isToggling = false; }, 300);
 }
 
 function toggleShuffle() {
@@ -1796,21 +1840,40 @@ function draw(ts = 0) {
     const dtSec = dtSecRaw || (minInterval / 1000);
     lastDrawTs = ts;
 
-    // 動画と音声の同期チェック（無限ループ防止のクールダウン付き）
+    // 動画と音声の同期チェック（改良版：スムーズな同期を実現）
     if (bgVideo.src && state.isPlaying && state.settings.showVideo && !bgVideo.paused) {
         // クールダウン中は同期チェックをスキップ
         if (videoSyncCooldown > 0) {
             videoSyncCooldown -= dtSec;
-        } else if (!lastVideoSyncCheckTs || ts - lastVideoSyncCheckTs >= 500) {
+        } else if (!lastVideoSyncCheckTs || ts - lastVideoSyncCheckTs >= 300) {
             lastVideoSyncCheckTs = ts;
-            const videoOffset = 0.1; // MVを少し先に進める
+            const videoOffset = 0.05; // MVを少しだけ先に進める（50ms）
             const targetTime = audio.currentTime + videoOffset;
-            const timeDiff = Math.abs(bgVideo.currentTime - targetTime);
-            // 遅延が1.5秒以上ある場合のみ同期（小さなズレは無視）
-            // 同期後は2秒間クールダウンして無限ループを防止
-            if (timeDiff > 1.5 && bgVideo.readyState >= 2) {
-                bgVideo.currentTime = targetTime;
-                videoSyncCooldown = 2.0; // 2秒間クールダウン
+            const timeDiff = bgVideo.currentTime - targetTime;
+            const absTimeDiff = Math.abs(timeDiff);
+            
+            // 動画が準備できているか確認
+            if (bgVideo.readyState >= 2) {
+                if (absTimeDiff > 2.0) {
+                    // 大きなズレ：直接シーク
+                    bgVideo.currentTime = targetTime;
+                    videoSyncCooldown = 1.5;
+                } else if (absTimeDiff > 0.5) {
+                    // 中程度のズレ：再生速度で調整
+                    if (timeDiff > 0) {
+                        // 動画が先行：少し遅くする
+                        bgVideo.playbackRate = Math.max(0.9, 1 - absTimeDiff * 0.2);
+                    } else {
+                        // 動画が遅れ：少し速くする
+                        bgVideo.playbackRate = Math.min(1.1, 1 + absTimeDiff * 0.2);
+                    }
+                    videoSyncCooldown = 0.5;
+                } else if (absTimeDiff < 0.1) {
+                    // 同期OK：通常速度に戻す
+                    if (bgVideo.playbackRate !== 1.0) {
+                        bgVideo.playbackRate = 1.0;
+                    }
+                }
             }
         }
     }

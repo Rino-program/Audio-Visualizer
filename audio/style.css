@@ -18,7 +18,7 @@
     
     --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
-    /* Layout helpers */
+    /* Safe Area対応 */
     --safe-top: env(safe-area-inset-top, 0px);
     --safe-right: env(safe-area-inset-right, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -26,6 +26,21 @@
 
     --ui-pad: 20px;
     --ui-pad-mobile: 12px;
+}
+
+/* Safari/iOS特有の対応 */
+@supports (-webkit-touch-callout: none) {
+    :root {
+        /* Safariで100vh問題を回避 */
+        /* デバイスの実際の表示領域を使用 */
+        --app-height: 100vh;
+    }
+    
+    body {
+        /* Safari用の高さ調整 */
+        height: -webkit-fill-available;
+        min-height: -webkit-fill-available;
+    }
 }
 
 * {
@@ -43,7 +58,9 @@ body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     overflow: hidden;
     width: 100vw;
+    /* Safariでの100vh問題に対応 */
     height: 100vh;
+    height: var(--app-height, 100vh);
     font-size: 14px;
     line-height: 1.5;
 }
@@ -272,7 +289,8 @@ body.drag-over::after {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    padding: calc(var(--ui-pad) + var(--safe-top)) calc(var(--ui-pad) + var(--safe-right)) calc(var(--ui-pad) + var(--safe-bottom)) calc(var(--ui-pad) + var(--safe-left));
+    /* Safe Area対応 - maxを使って適切な余白を確保 */
+    padding: max(var(--ui-pad), var(--safe-top)) max(var(--ui-pad), var(--safe-right)) max(var(--ui-pad), var(--safe-bottom)) max(var(--ui-pad), var(--safe-left));
 }
 
 #uiLayer.hidden {
@@ -293,8 +311,8 @@ body.drag-over::after {
 /* Persistent Controls */
 #persistentControls {
     position: fixed;
-    top: calc(20px + var(--safe-top));
-    right: calc(20px + var(--safe-right));
+    top: max(20px, var(--safe-top));
+    right: max(20px, var(--safe-right));
     display: flex;
     gap: 12px;
     z-index: 1001;
@@ -616,11 +634,12 @@ select option {
 /* Playlist Panel */
 .playlist-panel {
     position: absolute;
-    top: 80px;
-    left: 20px;
+    top: max(80px, calc(var(--safe-top) + 60px));
+    left: max(20px, var(--safe-left));
     width: 400px;
-    max-width: calc(100vw - 40px);
-    max-height: calc(100vh - 240px);
+    max-width: calc(100vw - 40px - var(--safe-left) - var(--safe-right));
+    max-height: calc(100vh - 240px - var(--safe-top) - var(--safe-bottom));
+    max-height: calc(var(--app-height, 100vh) - 240px - var(--safe-top) - var(--safe-bottom));
     border-radius: var(--radius-lg);
     display: flex;
     flex-direction: column;
