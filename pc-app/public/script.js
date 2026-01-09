@@ -2311,8 +2311,8 @@ function draw(ts = 0) {
 						// 動画が遅れ：少し速くする
 						bgVideo.playbackRate = Math.min(1.1, 1 + absTimeDiff * 0.2);
 					}
-				} else if (absTimeDiff < 0.1) {
-					// 同期OK：通常速度に戻す
+				} else if (timeDiff > 0) {
+					// ずれが0秒を超えた後は通常速度に戻す（ずれが正の値を超すまで待つ）
 					if (bgVideo.playbackRate !== 1.0) {
 						bgVideo.playbackRate = 1.0;
 					}
@@ -2541,4 +2541,5 @@ document.addEventListener('DOMContentLoaded', () => {
 		console.error('Init failed:', err);
 	});
 });
+
 

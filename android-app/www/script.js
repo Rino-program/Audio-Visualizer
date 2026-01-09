@@ -373,6 +373,11 @@ async function init() {
 
     resize();
     window.addEventListener('resize', resize);
+    window.addEventListener('orientationchange', () => {
+        requestAnimationFrame(() => {
+            calculateUIHeights();
+        });
+    });
     // Calculate UI heights after initial render
     requestAnimationFrame(() => {
         calculateUIHeights();
@@ -895,11 +900,35 @@ function resize() {
     });
 }
 
+function updatePlaylistTopOffset() {
+    const isPortraitMobile = window.matchMedia('(max-width: 768px) and (orientation: portrait)').matches;
+    if (!isPortraitMobile) {
+        document.documentElement.style.removeProperty('--playlist-top');
+        return;
+    }
+
+    const playlistPanel = document.querySelector('.playlist-panel');
+    if (!playlistPanel) return;
+
+    const topBar = document.querySelector('.top-bar');
+    const persistentControls = document.querySelector('#persistentControls');
+
+    let bottomY = 0;
+    if (topBar) bottomY = Math.max(bottomY, topBar.getBoundingClientRect().bottom);
+    if (persistentControls) bottomY = Math.max(bottomY, persistentControls.getBoundingClientRect().bottom);
+
+    const topPx = Math.ceil(bottomY + 8);
+    document.documentElement.style.setProperty('--playlist-top', `${topPx}px`);
+}
+
 function calculateUIHeights() {
     const topBar = document.querySelector('.top-bar');
     const controlsBar = document.querySelector('.controls-bar');
     if (topBar) topBarH = topBar.getBoundingClientRect().height;
     if (controlsBar) bottomBarH = controlsBar.getBoundingClientRect().height;
+
+    // Keep playlist panel below the actual top UI in portrait
+    updatePlaylistTopOffset();
 }
 
 // ============== SETTINGS ==============
@@ -2578,8 +2607,8 @@ function draw(ts = 0) {
                         bgVideo.playbackRate = Math.min(1.1, 1 + absTimeDiff * 0.2);
                     }
                     videoSyncCooldown = 0.5;
-                } else if (absTimeDiff < 0.1) {
-                    // 同期OK：通常速度に戻す
+                } else if (timeDiff > 0) {
+                    // ずれが0秒を超えた後は通常速度に戻す（ずれが正の値を超すまで待つ）
                     if (bgVideo.playbackRate !== 1.0) {
                         bgVideo.playbackRate = 1.0;
                     }

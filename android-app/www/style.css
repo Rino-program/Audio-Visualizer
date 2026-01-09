@@ -1292,6 +1292,21 @@ select option {
         border-radius: var(--radius-lg);
         z-index: 1005;
     }
+}
+
+/* Portrait mode: move playlist to top (below UI) to avoid overlapping controls */
+@media (max-width: 768px) and (orientation: portrait) {
+    .playlist-panel {
+        position: fixed;
+        left: 12px;
+        right: 12px;
+        top: var(--playlist-top, calc(100px + var(--safe-top)));
+        bottom: auto;
+        width: auto;
+        max-height: min(60vh, calc(100vh - 360px));
+        border-radius: var(--radius-lg);
+        z-index: 1005;
+    }
 
     .playlist-items {
         padding: 4px;
