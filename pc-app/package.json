@@ -1,6 +1,6 @@
 {
   "name": "audio-visualizer-desktop",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "description": "Desktop app for the Audio Visualizer (Electron).",
   "main": "main.js",
   "author": "",

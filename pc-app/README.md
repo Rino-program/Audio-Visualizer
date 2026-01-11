@@ -1,96 +1,214 @@
-# Audio Visualizer - PC版（Electron）
+# 🎵 Audio Visualizer - PC版（Windows デスクトップアプリ）
 
-## 概要
+[![Platform](https://img.shields.io/badge/Platform-Windows-blue)]()
+[![Electron](https://img.shields.io/badge/Electron-28-47848F)]()
+[![License](https://img.shields.io/badge/License-MIT-yellow)]()
 
-Web版のAudio VisualizerをElectronでラップしたWindows向けデスクトップアプリです。インストール不要のポータブル形式で配布できます。
+> **Note:** このプロジェクトは人間とAI（GitHub Copilot/Claude）の共同開発によって作成されました。
 
-## 機能
+---
 
-- 🎵 MP3・WAV・AAC・OGG等の音声ファイル再生
-- 🎤 マイク入力でのリアルタイムビジュアライザー
-- 🎨 9種類のビジュアライザーモード（Bars, Wave, Digital, Circle, Spectrum, Galaxy, Monitor, Hexagon, Mirror）
-- 🔧 10段階のイコライザー（EQ）
-- 📂 プレイリスト管理
-- 💾 ビジュアライザーを動画として記録・書き出し
-- ☁️ Google Driveから曲をインポート
-- ⚙️ 細かな設定（スムージング、感度、品質、色彩）
-- 💤 スリープタイマー
-- 🌐 Web版と同一機能
+## 📋 概要
 
-## セットアップ
+Web版のAudio VisualizerをElectronでラップしたWindows向けデスクトップアプリケーションです。
+**インストール不要のポータブル形式**で配布でき、USBメモリなどに入れて持ち運ぶことも可能です。
 
-### 開発環境での実行
+---
+
+## ✨ 機能
+
+- 🎵 **多形式対応** - MP3・WAV・AAC・OGG・FLAC等の音声ファイル再生
+- 🎤 **マイク入力** - リアルタイムでマイク音声を可視化
+- 🎨 **9種類のビジュアライザー** - Bars, Wave, Digital, Circle, Spectrum, Galaxy, Monitor, Hexagon, Mirror
+- 🎚️ **10バンドイコライザー** - 細かな音質調整
+- 📂 **プレイリスト管理** - 複数曲の管理・再生
+- 📹 **動画書き出し** - ビジュアライザーを動画ファイルとして保存
+- ☁️ **Google Drive統合** - クラウドから音楽を直接インポート
+- ⚙️ **詳細設定** - スムージング、感度、品質、色彩のカスタマイズ
+- 💤 **スリープタイマー** - 指定時間後に自動停止
+- 💾 **設定の永続化** - アプリを閉じても設定を保存
+- 🌐 **完全オフライン動作** - インターネット接続不要（Google Drive機能を除く）
+
+---
+
+## 🚀 セットアップ
+
+### 開発者向け - 開発環境での実行
+
+**前提条件**: Node.js v18以上
 
 ```bash
+# 依存関係のインストール
 npm install
+
+# 開発モードで起動
 npm run dev
 ```
 
-Electronウィンドウが起動します。
+Electronウィンドウが起動し、アプリが実行されます。
 
-### ビルド（配布用）
+### 開発者向け - ビルド（配布用パッケージの作成）
 
 ```bash
 npm run build
 ```
 
-生成ファイル: `release/Audio-Visualizer-Portable.zip`
+**生成される成果物**: `release/Audio-Visualizer-Portable.zip`
 
-## 配布・インストール
+このZipファイルにはポータブル版のアプリケーションが含まれており、そのままユーザーに配布できます。
 
-### ユーザーの視点
+---
 
-1. GitHub Releasesから `Audio-Visualizer-Portable.zip` をダウンロード
-2. 任意のフォルダに解凍
-3. `Audio-Visualizer-Portable/audio-visualizer-desktop.exe` を実行
+## 💾 エンドユーザー向け - インストール・使用方法
 
-## プロジェクト構成
+### ダウンロード
+
+1. [GitHub Releases](../../releases) から最新版の `Audio-Visualizer-Portable.zip` をダウンロード
+2. 任意のフォルダに解凍（例：デスクトップ、ドキュメント、USBメモリ等）
+3. 解凍したフォルダ内の `audio-visualizer-desktop.exe` をダブルクリック
+
+### 使い方
+
+1. **音楽ファイルを追加**
+   - 画面下部の「📂」ボタンをクリックして音楽ファイルを選択
+   - または、ファイルを直接ドラッグ&ドロップ
+
+2. **マイク入力に切り替え**
+   - 画面上部の「🎤 Mic」ボタンをクリック
+   - マイクの許可を求められたら「許可」をクリック
+
+3. **ビジュアライザーモードの変更**
+   - スペースキーを押すか、画面をクリックしてモードを切り替え
+
+4. **設定のカスタマイズ**
+   - 画面上部の「⚙️」ボタンから詳細設定を開く
+
+---
+
+## 📁 プロジェクト構成
 
 ```
 pc-app/
-├── public/
-│   ├── index.html         # UI構造
-│   ├── script.js          # 動作ロジック（元のWebアプリと同一）
-│   └── style.css          # スタイル
-├── main.js                # Electron main プロセス
-├── preload.js             # セキュアなpreload
-├── package.json           # 設定・依存関係
-├── README.md              # このファイル
-└── release/
+├── 📂 public/              # フロントエンド（レンダラープロセス）
+│   ├── index.html          # UI構造
+│   ├── script.js           # メインロジック（Web Audio API、Canvas描画）
+│   └── style.css           # スタイルシート
+│
+├── 📄 main.js              # Electronメインプロセス（ウィンドウ管理）
+├── 📄 preload.js           # セキュアなpreloadスクリプト（IPC通信）
+├── 📄 package.json         # プロジェクト設定・依存関係
+├── 📄 README.md            # このファイル
+│
+├── 📂 scripts/             # ビルドスクリプト
+│   └── build-portable-win.js
+│
+└── 📂 release/             # ビルド成果物（gitignore）
     └── Audio-Visualizer-Portable.zip
 ```
 
-## 技術スタック
+---
 
-- **Electron 28**: Chromium ベースのデスクトップアプリ環境
-- **electron-builder**: Windows向けバイナリ生成
-- **Web Audio API**: 音声処理・周波数分析
-- **Canvas 2D**: リアルタイムビジュアライザー描画
+## 🛠️ 技術スタック
 
-## トラブルシューティング
+| 技術 | 用途 |
+|-----|------|
+| **Electron 28** | Chromiumベースのデスクトップアプリ環境 |
+| **electron-packager** | Windows向けポータブルパッケージ生成 |
+| **Web Audio API** | 音声処理・周波数分析・イコライザー |
+| **Canvas 2D** | リアルタイムビジュアライザー描画 |
+| **MediaRecorder API** | 動画書き出し機能 |
+| **LocalStorage** | 設定・プレイリストの永続化 |
 
-### "This app can't run on your PC"
-- Windows Defender や他のセキュリティソフトが署名なしEXEをブロック
-- 一時的に無効化するか、ウイルススキャン後に「実行」を選択
+---
 
-### 音声が出ない
-- Windows オーディオ設定を確認
-- 別のアプリで同時再生していないか確認
+## 🔧 トラブルシューティング
 
-### 設定が保存されない
-- Electron内でLocalStorageが有効になっているか確認
+### ❌ "This app can't run on your PC" エラー
 
-## 開発メモ
+**原因**: Windows Defenderやセキュリティソフトが署名なしEXEをブロックしています。
 
-- `main.js` で `public/index.html` をロード
-- メディア権限は自動許可（ブラウザプロンプト不要）
-- `npm run build` で `release/Audio-Visualizer-Portable.zip` を生成
-- electron-builder 25.1.8 を使用
+**対処法**:
+1. ダウンロードしたZipファイルを右クリック → プロパティ
+2. 「ブロックを解除」にチェックを入れてOK
+3. 解凍し直してから実行
 
-## ライセンス
+または、SmartScreen警告が出た場合は「詳細情報」→「実行」をクリック。
 
-MIT
+### 🔇 音声が出ない
 
-## 注意点
-- マイクはOSの許可が必要です。Electron側はメディア権限要求を許可しています。
-- Google Drive連携はElectron環境ではOAuthの挙動に制限が出る場合があります。APIキー/Client IDを設定してからお試しください。
+**確認事項**:
+- Windowsの音量設定を確認
+- 別のアプリで音楽ファイルが正常に再生できるか確認
+- 他のアプリがオーディオデバイスを占有していないか確認
+- アプリ内の音量スライダーを確認
+
+### 🎤 マイクが認識されない
+
+**確認事項**:
+- Windowsの「設定」→「プライバシー」→「マイク」でアプリの許可を確認
+- 設定タブでマイクデバイスを選択
+- 他のアプリがマイクを使用していないか確認
+
+### 💾 設定が保存されない
+
+**原因**: LocalStorageが正しく動作していない可能性があります。
+
+**対処法**:
+- アプリを完全に終了してから再起動
+- `%APPDATA%\audio-visualizer-desktop\` フォルダを削除して初期化
+
+### 🐛 アプリがクラッシュする
+
+**対処法**:
+1. アプリを完全に終了
+2. `npm install` で依存関係を再インストール
+3. `npm run dev` で開発モードで起動してコンソールのエラーを確認
+
+---
+
+## 🔒 セキュリティとプライバシー
+
+- **完全ローカル処理**: 音楽ファイルとマイク入力はすべてローカルで処理され、外部に送信されることはありません
+- **Google Drive統合**: 使用する場合は自身のAPIキーとClient IDを設定してください（オプション）
+- **オープンソース**: コードはすべて公開されており、透明性が保証されています
+
+**⚠️ 重要**: APIキーやkeystoreファイルを絶対にリポジトリにコミットしないでください。
+
+---
+
+## 🤝 開発について
+
+**このプロジェクトは人間とAI（GitHub Copilot/Claude）の共同作業によって開発されました。**
+
+### 貢献方法
+
+バグ報告、機能リクエスト、プルリクエストを歓迎します！
+
+### 開発メモ
+
+- `main.js`でElectronウィンドウを作成し、`public/index.html`をロード
+- メディア権限（マイク・カメラ）は自動許可
+- `preload.js`でセキュアなIPC通信を実装
+- ビルドには`electron-packager`を使用
+
+---
+
+## 📜 ライセンス
+
+MIT License
+
+---
+
+## 📞 サポート
+
+問題が発生した場合は、[Issues](../../issues)で報告してください。
+
+---
+
+<div align="center">
+
+**🎵 音楽を美しく可視化しよう！ 🎨**
+
+Made with ❤️ by Human & AI collaboration
+
+</div>

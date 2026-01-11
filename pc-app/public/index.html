@@ -135,9 +135,9 @@
                 <button class="tab-btn" data-tab="audio">音声/入力</button>
                 <button class="tab-btn" data-tab="player">プレーヤー</button>
                 <button class="tab-btn" data-tab="presets">プリセット</button>
-                <button class="tab-btn" data-tab="storage">ストレージ</button>
                 <button class="tab-btn" data-tab="gdrive">Drive連携</button>
                 <button class="tab-btn" data-tab="help">ヘルプ</button>
+                <button class="tab-btn" data-tab="developer">開発者より</button>
             </div>
 
             <div class="tab-content active" id="tab-display">
@@ -379,30 +379,7 @@
                 </div>
             </div>
 
-            <div class="tab-content" id="tab-storage">
-                <div class="setting-item">
-                    <label>
-                        <input type="checkbox" id="storeLocalFilesCheckbox"> ファイルをアプリ内に保存する (PC)
-                    </label>
-                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 5px;">
-                        ONにすると、追加したファイルをアプリのデータフォルダにコピーします。元のファイルを移動・削除しても再生可能です。
-                    </p>
-                </div>
-                <hr style="border-color: var(--glass-border); margin: 20px 0;">
-                <div class="storage-management">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <h3>保存済みファイル</h3>
-                        <div style="display: flex; gap: 5px;">
-                            <button id="storageRefreshBtn" class="mini-btn">🔄 更新</button>
-                            <button id="storageDeleteAllBtn" class="mini-btn danger">🗑️ 全削除</button>
-                        </div>
-                    </div>
-                    <div id="storageSummary" style="font-size: 0.8rem; color: var(--primary); margin-bottom: 10px;"></div>
-                    <div id="storageList" class="storage-list">
-                        <!-- JSで生成 -->
-                    </div>
-                </div>
-            </div>
+            <!-- Storage management removed in PC build v1.0.3 (feature disabled) -->
 
             <div class="tab-content" id="tab-gdrive">
                 <div class="setting-item">
@@ -415,6 +392,10 @@
                 <div class="setting-item">
                     <label>API Key</label>
                     <input type="text" id="apiKeyInput" placeholder="YOUR_API_KEY" style="width: 100%; padding: 8px; background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); color: #fff; border-radius: 4px;">
+                </div>
+                <div class="setting-item" id="driveDownloadStatus" style="display: none;">
+                    <label>ダウンロード中</label>
+                    <div id="driveDownloadList" style="max-height: 150px; overflow-y: auto; font-size: 0.85rem;"></div>
                 </div>
             </div>
 
@@ -436,6 +417,12 @@
                         <li>虹色モード切替 <span>R</span></li>
                         <li>左右反転切替 <span>X</span></li>
                     </ul>
+                </div>
+            </div>
+
+            <div class="tab-content" id="tab-developer">
+                <div id="developerMessageContent" style="padding: 10px; line-height: 1.35; white-space: pre-line; font-size: 0.9rem; color: var(--text-muted);">
+                    読み込み中...
                 </div>
             </div>
 

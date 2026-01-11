@@ -516,11 +516,18 @@ input[type=range]:hover::-webkit-slider-thumb {
     align-items: center;
     gap: 16px;
     flex: 1;
+    min-width: 0; /* allow shrinking so center stays centered */
+}
+
+.control-group.left,
+.control-group.right {
+    flex: 1 1 0;
 }
 
 .control-group.center {
     justify-content: center;
     gap: 24px;
+    flex: 0 0 auto; /* keep playback group visually centered */
 }
 
 .control-group.right {
@@ -613,6 +620,11 @@ select:hover {
 select option {
     background-color: var(--bg-color);
     color: var(--text-main);
+}
+
+.mode-select {
+    min-width: 0;
+    max-width: 100%;
 }
 
 /* Playlist Panel */
@@ -1013,6 +1025,14 @@ select option {
 }
 .tab-content.active { display: block; }
 
+    /* Compact spacing for Developer message (tighter) */
+    #developerMessageContent { padding: 6px; line-height: 1.2; font-size: 0.9rem; }
+    #developerMessageContent p { margin: 0 0 6px 0; }
+    #developerMessageContent h2, #developerMessageContent h3, #developerMessageContent h4 { margin: 6px 0 4px; }
+    #developerMessageContent ul, #developerMessageContent ol { margin: 4px 0; padding-left: 18px; }
+    #developerMessageContent li { margin-bottom: 2px; }
+    #developerMessageContent pre { margin: 6px 0; padding: 6px; border-radius: 3px; }
+
 .setting-item {
     margin-bottom: 20px;
     width: 100%;
@@ -1179,6 +1199,23 @@ select option {
         width: min(220px, 45vw);
     }
     
+    .modal-content {
+        width: 95%;
+        max-height: 90vh;
+    }
+
+    .modal-header, .modal-footer {
+        padding: 12px 16px;
+    }
+
+    .tab-content {
+        padding: 16px;
+    }
+
+    .setting-item {
+        margin-bottom: 16px;
+    }
+}
 
 @media (max-width: 520px) {
     #uiLayer {
@@ -1216,23 +1253,6 @@ select option {
         max-width: none;
         max-height: none;
         border-radius: 0;
-    }
-}
-    .modal-content {
-        width: 95%;
-        max-height: 90vh;
-    }
-
-    .modal-header, .modal-footer {
-        padding: 12px 16px;
-    }
-
-    .tab-content {
-        padding: 16px;
-    }
-
-    .setting-item {
-        margin-bottom: 16px;
     }
 }
 

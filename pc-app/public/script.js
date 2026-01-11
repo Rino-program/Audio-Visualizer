@@ -208,15 +208,12 @@ const COLOR_PRESETS = [
 	{ name: 'Flame', color: '#eb4d4b' }
 ];
 
-const LIBRARY_STORAGE_KEY = 'audioVisualizerLibraryV7';
-let library = {};
+// PC build: force-disable storing imported files inside the app. Hiding the tab alone isn't sufficient
+// because an old saved setting could still enable saving. This flag ensures the feature is inert.
+const PC_DISABLE_LOCAL_STORE = true;
 
-// ============== DOM ELEMENTS ==============
+// Helper: shorthand for document.getElementById
 const $ = id => document.getElementById(id);
-const cv = $('cv');
-const ctx = cv.getContext('2d');
-const audio = new Audio();
-const bgVideo = $('bgVideo');
 
 const els = {
 	uiLayer: $('uiLayer'),
@@ -272,6 +269,15 @@ const els = {
 	storageRefreshBtn: $('storageRefreshBtn'),
 	storageDeleteAllBtn: $('storageDeleteAllBtn')
 };
+
+// Canvas, audio and video elements
+const cv = $('cv');
+const ctx = cv ? cv.getContext('2d') : null;
+const audio = new Audio();
+const bgVideo = $('bgVideo');
+
+// Ensure audio cross origin for fetch/visualizer
+try { audio.crossOrigin = 'anonymous'; } catch (e) {}
 
 function loadLibraryFromStorage() {
 	try {
@@ -497,6 +503,7 @@ let bottomBarH = 0;
 // ============== INITIALIZATION ==============
 async function init() {
 	loadSettings();
+	if (PC_DISABLE_LOCAL_STORE) state.settings.storeLocalFiles = false;
 	library = loadLibraryFromStorage();
 	await loadPlaylistFromStorage();
 	rebuildLibraryFromPlaylist();
@@ -508,6 +515,9 @@ async function init() {
 	requestAnimationFrame(() => {
 		calculateUIHeights();
 	});
+	
+	// 開発者メッセージを読み込み
+	loadDeveloperMessage();
     
 	// Audio setup
 	audio.crossOrigin = 'anonymous';
@@ -1450,8 +1460,20 @@ function applySettingsToUI() {
 	});
 }
 
-function openSettings() { els.settingsModal.classList.add('open'); state.settingsOpen = true; }
-function closeSettings() { els.settingsModal.classList.remove('open'); state.settingsOpen = false; }
+function openSettings() { 
+	els.settingsModal.classList.add('open'); 
+	state.settingsOpen = true; 
+	// 設定タブ中はUI非表示ボタンを隠す
+	const persistentControls = document.getElementById('persistentControls');
+	if (persistentControls) persistentControls.style.display = 'none';
+}
+function closeSettings() { 
+	els.settingsModal.classList.remove('open'); 
+	state.settingsOpen = false; 
+	// 設定タブを閉じたらUI非表示ボタンを復元
+	const persistentControls = document.getElementById('persistentControls');
+	if (persistentControls) persistentControls.style.display = '';
+}
 function saveSettings() { 
 	saveSettingsToStorage(); 
 	closeSettings(); 
@@ -1468,6 +1490,73 @@ function switchTab(tabId) {
 	if (tabId === 'audio') {
 		enumerateMicDevices();
 	}
+}
+
+// 開発者メッセージを読み込み・表示
+async function loadDeveloperMessage() {
+	try {
+		const response = await fetch('DEVELOPER_MESSAGE.md');
+		if (!response.ok) throw new Error('Failed to load developer message');
+		const markdown = await response.text();
+		const html = simpleMarkdownToHtml(markdown);
+		const contentEl = document.getElementById('developerMessageContent');
+		if (contentEl) contentEl.innerHTML = html;
+	} catch (error) {
+		console.warn('Failed to load developer message:', error);
+		const contentEl = document.getElementById('developerMessageContent');
+		if (contentEl) contentEl.textContent = '開発者メッセージを読み込めませんでした。';
+	}
+}
+
+// 簡易Markdown→HTML変換
+function simpleMarkdownToHtml(markdown) {
+	let html = markdown;
+	
+	// コードブロック（```）を保護
+	const codeBlocks = [];
+	html = html.replace(/```([\s\S]*?)```/g, (match, code) => {
+		codeBlocks.push(code);
+		return `%%%CODE_BLOCK_${codeBlocks.length - 1}%%%`;
+	});
+	
+	// 見出し
+html = html.replace(/^### (.+)$/gm, '<h4 style="margin-top: 12px; margin-bottom: 6px; color: var(--accent-color);">$1</h4>');
+    html = html.replace(/^## (.+)$/gm, '<h3 style="margin-top: 14px; margin-bottom: 6px; color: var(--accent-color);">$1</h3>');
+    html = html.replace(/^# (.+)$/gm, '<h2 style="margin-top: 14px; margin-bottom: 6px; color: var(--accent-color);">$1</h2>');
+	
+	// リスト
+	html = html.replace(/^- (.+)$/gm, '<li style="margin-left: 18px; margin-bottom: 2px;">$1</li>');
+	html = html.replace(/(<li.*<\/li>\n?)+/g, '<ul style="margin: 4px 0; padding-left: 18px;">$&</ul>');
+	
+	// 太字
+	html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+	
+	// 斜体
+	html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+	
+	// リンク
+	html = html.replace(/\[([^\]]+)\]\(([^\)]+)\)/g, '<a href="$2" target="_blank" style="color: var(--accent-color); text-decoration: underline;">$1</a>');
+	
+	// 水平線
+    html = html.replace(/^---$/gm, '<hr style="margin: 12px 0; border: none; border-top: 1px solid var(--glass-border);">');
+    
+    // 段落（空行）を<p>でラップして、過度な空白を防止
+    const blocks = html.split(/\n{2,}/);
+    html = blocks.map(block => {
+        const b = block.trim();
+        if (!b) return '';
+        // 既にHTMLタグになっているブロックはそのまま
+        if (/^<(h2|h3|h4|ul|ol|pre|hr)/.test(b)) return b;
+        // 段内の改行は< br>に変換
+        return `<p style="margin: 0 0 8px 0;">${b.replace(/\n/g, '<br>')}</p>`;
+    }).join('');
+    
+    // コードブロックを復元
+    codeBlocks.forEach((code, i) => {
+        html = html.replace(`%%%CODE_BLOCK_${i}%%%`, `<pre style="background: rgba(0,0,0,0.3); padding: 6px; border-radius: 3px; overflow-x: auto;"><code>${code.trim()}</code></pre>`);
+    });
+
+    return html;
 }
 
 // ============== AUDIO ENGINE ==============
@@ -1776,7 +1865,7 @@ async function handleFiles(files) {
 		let fileBlob = null;
 		let url = undefined;
 
-		if (state.settings.storeLocalFiles && window.electronAPI) {
+		if (!PC_DISABLE_LOCAL_STORE && state.settings.storeLocalFiles && window.electronAPI) {
 			try {
 				const arrayBuffer = await file.arrayBuffer();
 				const savedUrl = await window.electronAPI.saveFile({ name: file.name, arrayBuffer });
@@ -1991,8 +2080,15 @@ function performPlaylistReorder(draggedIdx, targetIdx) {
 async function removeFromPlaylist(index) {
 	if (index < 0 || index >= state.playlist.length) return;
 	const track = state.playlist[index];
-	if (track.source === 'local') {
+	// ローカルファイルとDriveファイルのBlob URLを解放（メモリリーク防止）
+	if (track.source === 'local' || track.source === 'drive') {
 		if (isBlobUrl(track.url)) URL.revokeObjectURL(track.url);
+	}
+	// fileBlobがあれば参照を削除してGC対象に
+	if (track.fileBlob) {
+		track.fileBlob = null;
+	}
+	if (track.source === 'local') {
 		if (typeof track.localRef === 'string') {
 			if (track.localRef.startsWith('idb:')) {
 				try {
@@ -2084,25 +2180,91 @@ async function pickerCallback(data) {
 		await Promise.all(promises);
 	} 
 }
-async function fetchDriveFile(fileId, fileName) { 
-	try { 
+
+// Driveダウンロード状況管理（進捗%表示対応）
+const driveDownloads = new Map(); // fileId -> { fileName, status, progress }
+
+function updateDriveDownloadUI() {
+	const statusEl = document.getElementById('driveDownloadStatus');
+	const listEl = document.getElementById('driveDownloadList');
+	if (!statusEl || !listEl) return;
+
+	const downloading = Array.from(driveDownloads.entries()).filter(([_, v]) => v.status === 'downloading');
+	if (downloading.length === 0) {
+		statusEl.style.display = 'none';
+		driveDownloads.clear();
+		return;
+	}
+
+	statusEl.style.display = 'block';
+	listEl.innerHTML = downloading.map(([id, info]) => {
+		const pct = (typeof info.progress === 'number') ? ` <strong>${info.progress}%</strong>` : '';
+		const kb = info.received ? ` (${Math.round(info.received/1024)} KB)` : '';
+		return `<div style="padding:4px 0; color:var(--text-muted);">📥 ${info.fileName}${pct}${kb}</div>`;
+	}).join('');
+}
+
+async function fetchDriveFile(fileId, fileName) {
+	driveDownloads.set(fileId, { fileName, status: 'downloading', progress: 0, received: 0 });
+	updateDriveDownloadUI();
+
+	try {
 		showOverlay(`☁️ Google Driveから取得中...`);
-		const r = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, { headers: { 'Authorization': 'Bearer ' + accessToken } }); 
+		const r = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, { headers: { 'Authorization': 'Bearer ' + accessToken } });
 		if (!r.ok) {
+			driveDownloads.set(fileId, { fileName, status: 'error' });
+			updateDriveDownloadUI();
 			showOverlay('❌ 取得に失敗しました');
-			return; 
+			return;
 		}
-		const blob = await r.blob(); 
+
+		const contentLength = r.headers.get('Content-Length');
+		const total = contentLength ? parseInt(contentLength, 10) : null;
+		const reader = r.body && r.body.getReader ? r.body.getReader() : null;
+		let chunks = [];
+		let received = 0;
+
+		if (reader) {
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				chunks.push(value);
+				received += value.length || value.byteLength || 0;
+				const progress = total ? Math.min(100, Math.round((received / total) * 100)) : null;
+				driveDownloads.set(fileId, { fileName, status: 'downloading', progress, received });
+				updateDriveDownloadUI();
+			}
+			const blob = new Blob(chunks);
+			const ext = fileName.toLowerCase().split('.').pop();
+			const videoExt = new Set(['mp4', 'webm', 'mkv', 'mov']);
+			const isVideo = videoExt.has(ext);
+			state.playlist.push({ name: fileName, url: URL.createObjectURL(blob), source: 'drive', isVideo: isVideo, fileId: fileId });
+			renderPlaylist();
+			if (state.currentIndex === -1) playTrack(state.playlist.length - 1);
+
+			driveDownloads.set(fileId, { fileName, status: 'completed', progress: 100 });
+			updateDriveDownloadUI();
+			showOverlay(`✅ ${fileName} を追加しました`);
+			return;
+		}
+
+		// フォールバック（ストリーム未対応環境）
+		const blob = await r.blob();
 		const ext = fileName.toLowerCase().split('.').pop();
 		const videoExt = new Set(['mp4', 'webm', 'mkv', 'mov']);
 		const isVideo = videoExt.has(ext);
-		state.playlist.push({ name: fileName, url: URL.createObjectURL(blob), source: 'drive', isVideo: isVideo }); 
-		renderPlaylist(); 
-		if (state.currentIndex === -1) playTrack(state.playlist.length - 1); 
+		state.playlist.push({ name: fileName, url: URL.createObjectURL(blob), source: 'drive', isVideo: isVideo, fileId: fileId });
+		renderPlaylist();
+		if (state.currentIndex === -1) playTrack(state.playlist.length - 1);
+
+		driveDownloads.set(fileId, { fileName, status: 'completed', progress: 100 });
+		updateDriveDownloadUI();
 		showOverlay(`✅ ${fileName} を追加しました`);
 	} catch (e) {
+		driveDownloads.set(fileId, { fileName, status: 'error' });
+		updateDriveDownloadUI();
 		showOverlay('❌ エラーが発生しました');
-	} 
+	}
 }
 
 // ============== UI CONTROLS ==============
