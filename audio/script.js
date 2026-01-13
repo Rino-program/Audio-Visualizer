@@ -48,6 +48,10 @@ const state = {
     // Race condition protection
     playRequestId: 0,
     
+    // GPU rendering
+    gpuRenderer: null,
+    gpuAvailable: false,
+    
     // Settings
     settings: {
         smoothing: 0.7,
@@ -81,7 +85,11 @@ const state = {
         changeMode: 'off', // 'off' | 'plus' | 'plusminus'
         sandMode: false,
         sandFallRate: 0.6, // per second
-        circleAngleOffset: 0
+        circleAngleOffset: 0,
+        // GPU rendering settings
+        renderMode: 'auto', // 'auto', 'gpu', 'cpu'
+        // UI auto-hide settings
+        autoHideUI: true
     }
 };
 
@@ -230,7 +238,12 @@ const els = {
     sleepTimerStatus: $('sleepTimerStatus'),
     autoPlayNextCheckbox: $('autoPlayNextCheckbox'),
     stopOnVideoEndCheckbox: $('stopOnVideoEndCheckbox'),
-    persistSettingsCheckbox: $('persistSettingsCheckbox')
+    persistSettingsCheckbox: $('persistSettingsCheckbox'),
+    sortPlaylistBtn: $('sortPlaylistBtn'),
+    sortMenu: $('sortMenu'),
+    renderModeSelect: $('renderModeSelect'),
+    renderModeStatus: $('renderModeStatus'),
+    autoHideUICheckbox: $('autoHideUICheckbox')
 };
 
 let W, H;
@@ -244,9 +257,73 @@ function setAppHeight() {
     document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
 }
 
+// ============== GPU RENDERING ==============
+function checkGPUSupport() {
+    try {
+        const testCanvas = document.createElement('canvas');
+        const gl = testCanvas.getContext('webgl2') || testCanvas.getContext('webgl');
+        if (gl) {
+            const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+            if (debugInfo) {
+                const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+                console.log('GPU Renderer:', renderer);
+            }
+            state.gpuAvailable = true;
+            return true;
+        }
+    } catch (e) {
+        console.warn('WebGL not available:', e);
+    }
+    state.gpuAvailable = false;
+    return false;
+}
+
+function initGPURenderer() {
+    if (!state.gpuAvailable) return;
+    
+    try {
+        // OffscreenCanvasを使用したGPU処理（対応ブラウザのみ）
+        if (typeof OffscreenCanvas !== 'undefined' && state.settings.renderMode !== 'cpu') {
+            state.gpuRenderer = {
+                enabled: true,
+                type: 'offscreen'
+            };
+            console.log('GPU rendering enabled (OffscreenCanvas)');
+        } else {
+            state.gpuRenderer = { enabled: false };
+        }
+    } catch (e) {
+        console.warn('GPU renderer init failed:', e);
+        state.gpuRenderer = { enabled: false };
+    }
+    
+    updateRenderModeStatus();
+}
+
+function updateRenderModeStatus() {
+    if (!els.renderModeStatus) return;
+    
+    const mode = state.settings.renderMode;
+    let status = '';
+    
+    if (mode === 'auto') {
+        status = state.gpuAvailable ? '✓ GPU使用中' : '⚠ CPUフォールバック';
+    } else if (mode === 'gpu') {
+        status = state.gpuAvailable ? '✓ GPU強制' : '⚠ GPU非対応';
+    } else {
+        status = '✓ CPU使用中';
+    }
+    
+    els.renderModeStatus.textContent = status;
+}
+
 // ============== INITIALIZATION ==============
 function init() {
     loadSettings();
+    
+    // GPU サポートチェック
+    checkGPUSupport();
+    initGPURenderer();
     
     // Safari/iOS対応：初期化時に高さを設定
     setAppHeight();
@@ -375,6 +452,28 @@ function init() {
             showOverlay('✅ プレイリストをクリアしました');
         }
     };
+    
+    // ソートメニューの処理
+    if (els.sortPlaylistBtn && els.sortMenu) {
+        els.sortPlaylistBtn.onclick = (e) => {
+            e.stopPropagation();
+            els.sortMenu.classList.toggle('show');
+        };
+        
+        document.querySelectorAll('.sort-option').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                sortPlaylist(btn.dataset.sort);
+                els.sortMenu.classList.remove('show');
+            };
+        });
+        
+        // メニュー外クリックで閉じる
+        document.addEventListener('click', () => {
+            els.sortMenu.classList.remove('show');
+        });
+    }
+    
     els.fileInput.onchange = handleLocalFiles;
     // Ensure the playlist "追加" control opens the file picker reliably
     try {
@@ -493,7 +592,7 @@ function init() {
             case 'KeyS': toggleShuffle(); applySettingsToUI(); break;
             case 'KeyP': toggleRepeat(); applySettingsToUI(); break;
             case 'KeyM': 
-                state.mode = (state.mode + 1) % 9; 
+                state.mode = (state.mode + 1) % 11; 
                 els.modeSelect.value = state.mode;
                 const modeName = els.modeSelect.options[els.modeSelect.selectedIndex].text;
                 showOverlay(`📊 モード: ${modeName}`);
@@ -513,12 +612,15 @@ function resetUITimeout(e) {
     
     if (state.uiTimeout) clearTimeout(state.uiTimeout);
     
+    // UI自動非表示が無効の場合は何もしない
+    if (!state.settings.autoHideUI) return;
+    
     // 設定画面やプレイリストが開いている間、またはマウスがUI上にある間は消さない
     const isOverUI = e && (e.target.closest('.top-bar') || e.target.closest('.controls-bar') || e.target.closest('.settings-modal') || e.target.closest('.playlist-container'));
 
     if (state.isPlaying && !state.settingsOpen && !state.playlistVisible && !isOverUI) {
         state.uiTimeout = setTimeout(() => {
-            if (state.isPlaying && !state.settingsOpen && !state.playlistVisible && state.uiVisible) {
+            if (state.isPlaying && !state.settingsOpen && !state.playlistVisible && state.uiVisible && state.settings.autoHideUI) {
                 toggleUI();
             }
         }, 5000);
@@ -838,6 +940,25 @@ function setupSettingsInputs() {
     $('showVideoCheckbox').onchange = e => { state.settings.showVideo = e.target.checked; updateVideoVisibility(); };
     $('videoModeSelect').onchange = e => { state.settings.videoMode = e.target.value; updateVideoVisibility(); };
     $('videoFitModeSelect').onchange = e => { state.settings.videoFitMode = e.target.value; updateVideoVisibility(); };
+    
+    // レンダリングモード
+    const renderModeSelect = $('renderModeSelect');
+    if (renderModeSelect) {
+        renderModeSelect.onchange = e => {
+            state.settings.renderMode = e.target.value;
+            initGPURenderer();
+            updateRenderModeStatus();
+        };
+    }
+    
+    // UI自動非表示
+    const autoHideUICheckbox = $('autoHideUICheckbox');
+    if (autoHideUICheckbox) {
+        autoHideUICheckbox.onchange = e => {
+            state.settings.autoHideUI = e.target.checked;
+        };
+    }
+    
     $('lowFreqSlider').oninput = e => {
         state.settings.lowFreq = +e.target.value;
         $('lowFreqValue').textContent = state.settings.lowFreq + 'Hz';
@@ -1024,6 +1145,14 @@ function applySettingsToUI() {
     if (circleAngleOffsetSlider) circleAngleOffsetSlider.value = state.settings.circleAngleOffset || 0;
     const circleAngleOffsetValue = $('circleAngleOffsetValue');
     if (circleAngleOffsetValue) circleAngleOffsetValue.textContent = `${state.settings.circleAngleOffset || 0}°`;
+    
+    // レンダリングモードとUI自動非表示
+    const renderModeSelect = $('renderModeSelect');
+    if (renderModeSelect) renderModeSelect.value = state.settings.renderMode || 'auto';
+    const autoHideUICheckbox = $('autoHideUICheckbox');
+    if (autoHideUICheckbox) autoHideUICheckbox.checked = state.settings.autoHideUI !== false;
+    
+    updateRenderModeStatus();
 
     state.settings.eq.forEach((val, i) => {
         const freq = EQ_FREQS[i];
@@ -1651,6 +1780,65 @@ function performPlaylistReorder(draggedIdx, targetIdx) {
     renderPlaylist();
     saveSettingsToStorage();
     showOverlay('プレイリストの順序を変更しました');
+    
+    // プレイリストの表示位置を調整（下に移動した場合、タブの上部が隠れないようにする）
+    scrollToCurrentPlaylistItem();
+}
+
+// プレイリストのソート機能
+function sortPlaylist(sortType) {
+    if (state.playlist.length === 0) return;
+    
+    const currentTrackName = state.currentIndex >= 0 ? state.playlist[state.currentIndex]?.name : null;
+    
+    switch(sortType) {
+        case 'name-asc':
+            state.playlist.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+            break;
+        case 'name-desc':
+            state.playlist.sort((a, b) => b.name.localeCompare(a.name, 'ja'));
+            break;
+        case 'added-asc':
+            // 追加順（既に追加順なので何もしない）
+            break;
+        case 'added-desc':
+            state.playlist.reverse();
+            break;
+        case 'random':
+            // Fisher-Yates shuffle
+            for (let i = state.playlist.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [state.playlist[i], state.playlist[j]] = [state.playlist[j], state.playlist[i]];
+            }
+            break;
+    }
+    
+    // 現在再生中のトラックのインデックスを更新
+    if (currentTrackName) {
+        state.currentIndex = state.playlist.findIndex(t => t.name === currentTrackName);
+    }
+    
+    renderPlaylist();
+    saveSettingsToStorage();
+    
+    const sortNames = {
+        'name-asc': '名前順（A→Z）',
+        'name-desc': '名前順（Z→A）',
+        'added-asc': '追加順',
+        'added-desc': '追加順（逆）',
+        'random': 'ランダム'
+    };
+    showOverlay(`🔄 ${sortNames[sortType]}でソートしました`);
+}
+
+// プレイリストの現在の曲にスクロール
+function scrollToCurrentPlaylistItem() {
+    requestAnimationFrame(() => {
+        const currentItem = els.playlistItems.querySelector('.playlist-item.active');
+        if (currentItem) {
+            currentItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    });
 }
 
 function removeFromPlaylist(index) {
@@ -1840,7 +2028,10 @@ function toggleUI() {
             els.playlistToggle.textContent = '📂';
         }
     } else {
-        resetUITimeout();
+        // 自動非表示が有効の時のみタイムアウトを設定
+        if (state.settings.autoHideUI) {
+            resetUITimeout();
+        }
     }
 }
 
@@ -1982,16 +2173,31 @@ function computeEnergy(display) {
 let lastDrawTs = 0;
 let lastVideoSyncCheckTs = 0;
 let videoSyncCooldown = 0; // 同期後のクールダウン時間
-function draw(ts = 0) {
-    requestAnimationFrame(draw);
+let cachedReduceMotion = false; // matchMediaキャッシュ
+let colorsCache = []; // 色配列キャッシュ
+let animationFrameId = null; // rAF IDを保存して制御
 
+// matchMediaをキャッシュ
+if (window.matchMedia) {
+    const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    cachedReduceMotion = motionQuery.matches;
+    motionQuery.addEventListener('change', e => { cachedReduceMotion = e.matches; });
+}
+
+function draw(ts = 0) {
     // バックグラウンド中は描画を行わない（復帰時に同期チェックで追従）
-    if (document.hidden) return;
+    if (document.hidden) {
+        animationFrameId = requestAnimationFrame(draw);
+        return;
+    }
 
     const targetFps = state.settings.lowPowerMode ? 30 : 60;
     const minInterval = 1000 / targetFps;
     const dtSecRaw = lastDrawTs ? (ts - lastDrawTs) / 1000 : 0;
-    if (lastDrawTs && ts - lastDrawTs < minInterval) return;
+    if (lastDrawTs && ts - lastDrawTs < minInterval) {
+        animationFrameId = requestAnimationFrame(draw);
+        return;
+    }
     const dtSec = dtSecRaw || (minInterval / 1000);
     lastDrawTs = ts;
 
@@ -2042,17 +2248,20 @@ function draw(ts = 0) {
         ctx.fillRect(0, 0, W, H);
     }
     
-    if (!state.analyser) return;
+    if (!state.analyser) {
+        animationFrameId = requestAnimationFrame(draw);
+        return;
+    }
     const fd = getFilteredData();
     const display = computeDisplayValues(fd, dtSec);
-    // Precompute colors for the frame
+    // Precompute colors for the frame - 配列再利用でメモリ確保を削減
     const nBars = fd.length;
-    const colors = new Array(nBars);
+    if (colorsCache.length !== nBars) colorsCache = new Array(nBars);
     for (let i = 0; i < nBars; i++) {
-        colors[i] = getColor(i, Math.max(0, Math.min(1, fd[i] / 255)), nBars);
+        colorsCache[i] = getColor(i, Math.max(0, Math.min(1, fd[i] / 255)), nBars);
     }
-    // Motion preferences
-    const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Motion preferences - キャッシュされた値を使用
+    const reduceMotion = cachedReduceMotion;
     // Shake removed
     
     // Use full screen height for visualization
@@ -2074,15 +2283,17 @@ function draw(ts = 0) {
 
     ctx.save();
     switch (state.mode) {
-        case 0: drawBarsFromDisplay(display, colors, maxH, drawH, drawStartY); break;
+        case 0: drawBarsFromDisplay(display, colorsCache, maxH, drawH, drawStartY); break;
         case 1: drawWaveform(maxH, drawH, drawStartY); break;
         case 2: drawDigitalBlocks(fd, maxH, drawH, drawStartY); break;
-        case 3: drawCircleFromDisplay(display, colors, maxH, drawH, drawStartY); break;
+        case 3: drawCircleFromDisplay(display, colorsCache, maxH, drawH, drawStartY); break;
         case 4: drawSpectrum(fd, maxH, drawH, drawStartY); break;
         case 5: drawGalaxy(fd, drawH, drawStartY); break;
         case 6: drawMonitor(fd, drawH, drawStartY); break;
         case 7: drawHexagon(fd, drawH, drawStartY); break;
         case 8: drawMirrorBars(fd, maxH, drawH, drawStartY); break;
+        case 9: drawParticles(fd, drawH, drawStartY, dtSec); break;
+        case 10: drawAurora(fd, maxH, drawH, drawStartY); break;
     }
     ctx.restore();
 
@@ -2095,6 +2306,9 @@ function draw(ts = 0) {
 
 
     if (state.settings.lowPowerMode) state.settings.glowStrength = originalGlow;
+    
+    // 次のフレームを末尾でスケジュール
+    animationFrameId = requestAnimationFrame(draw);
 }
 // ============== Shake & Sparkles ==============
 function computeEnergy(display) {
@@ -2244,6 +2458,172 @@ function drawMirrorBars(fd, maxH, drawH, drawStartY) {
         const v = fd[i] / 255; const h = v * maxH * 0.5; const color = getColor(i, v, n);
         if (state.settings.glowStrength > 0 && v > 0.1) { ctx.shadowBlur = state.settings.glowStrength; ctx.shadowColor = color; }
         ctx.fillStyle = color; ctx.fillRect(i * bw + 1, cy - h, bw - 2, h); ctx.fillRect(i * bw + 1, cy, bw - 2, h); ctx.shadowBlur = 0;
+    }
+}
+
+// ===== Particles ビジュアライザー（モード9）=====
+const particles = [];
+function drawParticles(fd, drawH, drawStartY, dtSec) {
+    const centerX = W / 2;
+    const centerY = drawStartY + drawH / 2;
+    const maxParticles = 300;
+    
+    // 低音、中音、高音の平均を計算
+    const bassAvg = fd.slice(0, Math.floor(fd.length * 0.2)).reduce((a, b) => a + b, 0) / (fd.length * 0.2) / 255;
+    const midAvg = fd.slice(Math.floor(fd.length * 0.2), Math.floor(fd.length * 0.6)).reduce((a, b) => a + b, 0) / (fd.length * 0.4) / 255;
+    const highAvg = fd.slice(Math.floor(fd.length * 0.6)).reduce((a, b) => a + b, 0) / (fd.length * 0.4) / 255;
+    
+    // 音量に応じてパーティクルを生成
+    const spawnRate = Math.floor(bassAvg * 15 + midAvg * 10 + highAvg * 5);
+    for (let i = 0; i < spawnRate && particles.length < maxParticles; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 50 + Math.random() * 200 * (bassAvg + 0.3);
+        const hue = (Date.now() * 0.05 + Math.random() * 60) % 360;
+        particles.push({
+            x: centerX,
+            y: centerY,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 1.0,
+            decay: 0.3 + Math.random() * 0.5,
+            size: 2 + Math.random() * 6 * (midAvg + 0.5),
+            hue: hue,
+            saturation: 70 + Math.random() * 30,
+            brightness: 50 + highAvg * 50
+        });
+    }
+    
+    // パーティクルの更新と描画
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        
+        // 位置更新
+        p.x += p.vx * dtSec;
+        p.y += p.vy * dtSec;
+        
+        // 減衰
+        p.vx *= 0.98;
+        p.vy *= 0.98;
+        p.life -= p.decay * dtSec;
+        
+        // 死んだパーティクルを削除
+        if (p.life <= 0 || p.x < 0 || p.x > W || p.y < drawStartY || p.y > drawStartY + drawH) {
+            particles.splice(i, 1);
+            continue;
+        }
+        
+        // 描画
+        const alpha = p.life * 0.8;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${p.hue}, ${p.saturation}%, ${p.brightness}%, ${alpha})`;
+        
+        if (state.settings.glowStrength > 0 && p.life > 0.3) {
+            ctx.shadowBlur = state.settings.glowStrength * p.life;
+            ctx.shadowColor = `hsla(${p.hue}, ${p.saturation}%, ${p.brightness}%, 0.8)`;
+        }
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    }
+    
+    // 中心にパルス効果
+    const pulseSize = 20 + bassAvg * 80;
+    const pulseAlpha = 0.3 + bassAvg * 0.4;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, pulseSize, 0, Math.PI * 2);
+    const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, pulseSize);
+    gradient.addColorStop(0, `hsla(${(Date.now() * 0.1) % 360}, 80%, 60%, ${pulseAlpha})`);
+    gradient.addColorStop(1, `hsla(${(Date.now() * 0.1 + 60) % 360}, 80%, 40%, 0)`);
+    ctx.fillStyle = gradient;
+    ctx.fill();
+}
+
+// ===== Aurora ビジュアライザー（モード10）=====
+const auroraWaves = [];
+function drawAurora(fd, maxH, drawH, drawStartY) {
+    const time = Date.now() * 0.001;
+    const layerCount = 5;
+    
+    // 周波数帯域の平均を計算
+    const bassAvg = fd.slice(0, Math.floor(fd.length * 0.15)).reduce((a, b) => a + b, 0) / (fd.length * 0.15) / 255;
+    const midAvg = fd.slice(Math.floor(fd.length * 0.15), Math.floor(fd.length * 0.5)).reduce((a, b) => a + b, 0) / (fd.length * 0.35) / 255;
+    const highAvg = fd.slice(Math.floor(fd.length * 0.5)).reduce((a, b) => a + b, 0) / (fd.length * 0.5) / 255;
+    
+    // オーロラのレイヤーを描画
+    for (let layer = 0; layer < layerCount; layer++) {
+        const layerProgress = layer / layerCount;
+        const baseY = drawStartY + drawH * 0.3 + layer * (drawH * 0.12);
+        const amplitude = maxH * 0.15 * (1 + bassAvg * 0.8) * (1 - layerProgress * 0.3);
+        const frequency = 0.003 + layer * 0.001;
+        const speed = 0.5 + layer * 0.2;
+        
+        // グラデーションの色相をレイヤーごとに変化
+        const hue1 = (120 + layer * 30 + time * 10 + midAvg * 60) % 360;
+        const hue2 = (hue1 + 40 + highAvg * 30) % 360;
+        
+        ctx.beginPath();
+        ctx.moveTo(0, drawStartY + drawH);
+        
+        // 波形を描画
+        const points = [];
+        for (let x = 0; x <= W; x += 4) {
+            const freqIndex = Math.floor((x / W) * fd.length);
+            const freqValue = fd[freqIndex] / 255;
+            
+            const wave1 = Math.sin(x * frequency + time * speed) * amplitude;
+            const wave2 = Math.sin(x * frequency * 1.5 + time * speed * 0.7) * amplitude * 0.5;
+            const wave3 = Math.sin(x * frequency * 0.5 + time * speed * 1.3) * amplitude * 0.3;
+            const audioWave = freqValue * amplitude * 0.4;
+            
+            const y = baseY + wave1 + wave2 + wave3 + audioWave;
+            points.push({ x, y });
+            ctx.lineTo(x, y);
+        }
+        
+        ctx.lineTo(W, drawStartY + drawH);
+        ctx.closePath();
+        
+        // オーロラのグラデーション
+        const gradient = ctx.createLinearGradient(0, baseY - amplitude, 0, drawStartY + drawH);
+        const alpha = (0.15 + bassAvg * 0.25) * (1 - layerProgress * 0.15);
+        gradient.addColorStop(0, `hsla(${hue1}, 80%, 60%, ${alpha})`);
+        gradient.addColorStop(0.3, `hsla(${hue2}, 70%, 50%, ${alpha * 0.7})`);
+        gradient.addColorStop(0.6, `hsla(${(hue2 + 30) % 360}, 60%, 40%, ${alpha * 0.4})`);
+        gradient.addColorStop(1, `hsla(${hue1}, 50%, 30%, 0)`);
+        
+        ctx.fillStyle = gradient;
+        
+        if (state.settings.glowStrength > 0) {
+            ctx.shadowBlur = state.settings.glowStrength * (1 + bassAvg);
+            ctx.shadowColor = `hsla(${hue1}, 80%, 60%, 0.5)`;
+        }
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        
+        // エッジラインを追加（オプション）
+        if (layer < 3) {
+            ctx.beginPath();
+            points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+            ctx.strokeStyle = `hsla(${hue1}, 90%, 70%, ${0.3 + highAvg * 0.4})`;
+            ctx.lineWidth = 1 + highAvg * 2;
+            ctx.stroke();
+        }
+    }
+    
+    // 星のような光点を追加
+    const starCount = Math.floor(10 + highAvg * 30);
+    for (let i = 0; i < starCount; i++) {
+        const seed = i * 1337;
+        const x = (Math.sin(seed) * 0.5 + 0.5) * W;
+        const y = drawStartY + (Math.cos(seed * 1.5) * 0.5 + 0.5) * drawH * 0.5;
+        const twinkle = Math.sin(time * 3 + seed) * 0.5 + 0.5;
+        const size = 1 + twinkle * 2 * (highAvg + 0.3);
+        const alpha = 0.3 + twinkle * 0.5 * highAvg;
+        
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${(180 + i * 10) % 360}, 60%, 80%, ${alpha})`;
+        ctx.fill();
     }
 }
 

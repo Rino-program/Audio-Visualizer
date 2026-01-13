@@ -1310,3 +1310,46 @@ select option {
 .storage-item .delete-btn:hover {
     color: #f87171;
 }
+/* Sort Dropdown */
+.sort-dropdown {
+    position: relative;
+    display: inline-block;
+}
+.sort-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: var(--glass-bg);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-sm);
+    min-width: 150px;
+    z-index: 1000;
+    box-shadow: var(--glass-shadow);
+}
+.sort-menu.show {
+    display: block;
+}
+.sort-option {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    background: none;
+    border: none;
+    color: var(--text-main);
+    text-align: left;
+    cursor: pointer;
+    transition: var(--transition);
+    font-size: 0.85rem;
+}
+.sort-option:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Hint text for settings */
+.hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-left: 8px;
+}
