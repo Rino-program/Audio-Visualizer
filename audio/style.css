@@ -1290,9 +1290,10 @@ select option {
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-md);
     min-width: 160px;
-    z-index: 1000;
+    z-index: 10000;
     box-shadow: var(--glass-shadow);
     overflow: hidden;
+    margin-top: 5px;
 }
 
 .sort-menu.show {

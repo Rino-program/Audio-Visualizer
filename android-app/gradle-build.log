@@ -1,0 +1,169 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.2.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+
+> Configure project :app
+WARNING: Using flatDir should be avoided because it doesn't support any meta-data formats.
+
+> Configure project :capacitor-cordova-android-plugins
+WARNING: Using flatDir should be avoided because it doesn't support any meta-data formats.
+
+> Task :clean UP-TO-DATE
+> Task :app:clean
+> Task :capacitor-android:clean
+> Task :capacitor-cordova-android-plugins:clean UP-TO-DATE
+> Task :capawesome-capacitor-file-picker:clean
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :capacitor-android:preBuild UP-TO-DATE
+> Task :capacitor-android:preDebugBuild UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:preBuild UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:preDebugBuild UP-TO-DATE
+> Task :capawesome-capacitor-file-picker:preBuild UP-TO-DATE
+> Task :capawesome-capacitor-file-picker:preDebugBuild UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:writeDebugAarMetadata
+> Task :capawesome-capacitor-file-picker:writeDebugAarMetadata
+> Task :capacitor-android:writeDebugAarMetadata
+> Task :app:javaPreCompileDebug
+> Task :app:generateDebugResValues
+> Task :capacitor-android:generateDebugResValues
+> Task :capacitor-android:generateDebugResources
+> Task :app:checkDebugAarMetadata
+> Task :capacitor-android:packageDebugResources
+> Task :capacitor-cordova-android-plugins:generateDebugResValues
+> Task :capacitor-cordova-android-plugins:generateDebugResources
+> Task :capacitor-cordova-android-plugins:packageDebugResources
+> Task :capawesome-capacitor-file-picker:generateDebugResValues
+> Task :capawesome-capacitor-file-picker:generateDebugResources
+> Task :capawesome-capacitor-file-picker:packageDebugResources
+> Task :app:mapDebugSourceSetPaths
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :capacitor-android:extractDeepLinksDebug
+> Task :capacitor-cordova-android-plugins:extractDeepLinksDebug
+> Task :app:parseDebugLocalResources
+> Task :capawesome-capacitor-file-picker:extractDeepLinksDebug
+> Task :capawesome-capacitor-file-picker:processDebugManifest
+> Task :capacitor-cordova-android-plugins:processDebugManifest
+> Task :capacitor-android:processDebugManifest
+> Task :capacitor-android:compileDebugLibraryResources
+> Task :app:mergeDebugResources
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :capacitor-android:parseDebugLocalResources
+> Task :app:processDebugManifestForPackage
+> Task :capacitor-cordova-android-plugins:compileDebugLibraryResources
+> Task :capacitor-cordova-android-plugins:parseDebugLocalResources
+> Task :capawesome-capacitor-file-picker:compileDebugLibraryResources
+> Task :capawesome-capacitor-file-picker:parseDebugLocalResources
+> Task :capacitor-android:javaPreCompileDebug
+> Task :capacitor-cordova-android-plugins:javaPreCompileDebug
+> Task :capawesome-capacitor-file-picker:javaPreCompileDebug
+> Task :capacitor-cordova-android-plugins:generateDebugRFile
+> Task :capawesome-capacitor-file-picker:generateDebugRFile
+> Task :capacitor-android:generateDebugRFile
+> Task :app:mergeDebugShaders
+> Task :app:processDebugResources
+
+> Task :capacitor-android:compileDebugJavaWithJavac
+
+> Task :capacitor-cordova-android-plugins:compileDebugJavaWithJavac NO-SOURCE
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:bundleLibCompileToJarDebug
+> Task :capacitor-android:mergeDebugShaders
+> Task :capacitor-android:compileDebugShaders NO-SOURCE
+> Task :capacitor-android:generateDebugAssets UP-TO-DATE
+> Task :capacitor-android:packageDebugAssets
+> Task :capacitor-android:bundleLibCompileToJarDebug
+> Task :capacitor-cordova-android-plugins:mergeDebugShaders
+
+> Task :capawesome-capacitor-file-picker:compileDebugJavaWithJavac
+
+> Task :capawesome-capacitor-file-picker:bundleLibCompileToJarDebug
+> Task :capacitor-cordova-android-plugins:compileDebugShaders NO-SOURCE
+
+> Task :app:compileDebugJavaWithJavac
+
+> Task :capacitor-cordova-android-plugins:generateDebugAssets UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:packageDebugAssets
+> Task :capawesome-capacitor-file-picker:mergeDebugShaders
+> Task :capawesome-capacitor-file-picker:compileDebugShaders NO-SOURCE
+> Task :capawesome-capacitor-file-picker:generateDebugAssets UP-TO-DATE
+> Task :capawesome-capacitor-file-picker:packageDebugAssets
+> Task :app:mergeDebugAssets
+> Task :capawesome-capacitor-file-picker:bundleLibRuntimeToJarDebug
+> Task :capacitor-cordova-android-plugins:bundleLibRuntimeToJarDebug
+> Task :app:compressDebugAssets
+> Task :capacitor-android:bundleLibRuntimeToJarDebug
+> Task :app:desugarDebugFileDependencies
+> Task :app:dexBuilderDebug
+> Task :app:processDebugJavaRes NO-SOURCE
+> Task :capacitor-android:processDebugJavaRes NO-SOURCE
+> Task :capacitor-cordova-android-plugins:processDebugJavaRes NO-SOURCE
+> Task :capawesome-capacitor-file-picker:processDebugJavaRes NO-SOURCE
+> Task :app:mergeDebugJniLibFolders
+> Task :capacitor-android:mergeDebugJniLibFolders
+> Task :capacitor-android:mergeDebugNativeLibs NO-SOURCE
+> Task :capacitor-android:copyDebugJniLibsProjectOnly
+> Task :app:checkDebugDuplicateClasses
+> Task :capacitor-cordova-android-plugins:mergeDebugJniLibFolders
+> Task :app:mergeProjectDexDebug
+> Task :capacitor-cordova-android-plugins:mergeDebugNativeLibs NO-SOURCE
+> Task :capacitor-cordova-android-plugins:copyDebugJniLibsProjectOnly
+> Task :capawesome-capacitor-file-picker:mergeDebugJniLibFolders
+> Task :capawesome-capacitor-file-picker:mergeDebugNativeLibs NO-SOURCE
+> Task :capawesome-capacitor-file-picker:copyDebugJniLibsProjectOnly
+> Task :app:mergeDebugNativeLibs NO-SOURCE
+> Task :app:stripDebugDebugSymbols NO-SOURCE
+> Task :app:validateSigningDebug
+> Task :app:writeDebugAppMetadata
+> Task :app:writeDebugSigningConfigVersions
+> Task :capacitor-android:stripDebugDebugSymbols NO-SOURCE
+> Task :capacitor-android:copyDebugJniLibsProjectAndLocalJars
+> Task :capacitor-android:extractDebugAnnotations
+> Task :capacitor-android:extractDeepLinksForAarDebug UP-TO-DATE
+> Task :capacitor-android:mergeDebugGeneratedProguardFiles UP-TO-DATE
+> Task :capacitor-android:mergeDebugConsumerProguardFiles
+> Task :capacitor-android:prepareDebugArtProfile UP-TO-DATE
+> Task :capacitor-android:prepareLintJarForPublish UP-TO-DATE
+> Task :capacitor-android:mergeDebugJavaResource
+> Task :capacitor-android:syncDebugLibJars
+> Task :capacitor-android:bundleDebugAar
+> Task :capacitor-android:assembleDebug
+> Task :capacitor-cordova-android-plugins:stripDebugDebugSymbols NO-SOURCE
+> Task :capacitor-cordova-android-plugins:copyDebugJniLibsProjectAndLocalJars
+> Task :app:mergeDebugJavaResource
+> Task :capacitor-cordova-android-plugins:extractDebugAnnotations
+> Task :capacitor-cordova-android-plugins:extractDeepLinksForAarDebug UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:mergeDebugGeneratedProguardFiles UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:mergeDebugConsumerProguardFiles UP-TO-DATE
+> Task :capacitor-cordova-android-plugins:prepareDebugArtProfile UP-TO-DATE
+> Task :app:mergeDebugGlobalSynthetics
+> Task :capacitor-cordova-android-plugins:prepareLintJarForPublish UP-TO-DATE
+> Task :capawesome-capacitor-file-picker:stripDebugDebugSymbols NO-SOURCE
+> Task :capawesome-capacitor-file-picker:copyDebugJniLibsProjectAndLocalJars
+> Task :capacitor-cordova-android-plugins:mergeDebugJavaResource
+> Task :capawesome-capacitor-file-picker:extractDebugAnnotations
+> Task :capacitor-cordova-android-plugins:syncDebugLibJars
+> Task :capacitor-cordova-android-plugins:bundleDebugAar
+> Task :capacitor-cordova-android-plugins:assembleDebug
+> Task :capawesome-capacitor-file-picker:extractDeepLinksForAarDebug UP-TO-DATE
+> Task :capawesome-capacitor-file-picker:mergeDebugGeneratedProguardFiles UP-TO-DATE
+> Task :capawesome-capacitor-file-picker:mergeDebugConsumerProguardFiles UP-TO-DATE
+> Task :capawesome-capacitor-file-picker:prepareDebugArtProfile UP-TO-DATE
+> Task :capawesome-capacitor-file-picker:prepareLintJarForPublish UP-TO-DATE
+> Task :app:mergeLibDexDebug
+> Task :capawesome-capacitor-file-picker:mergeDebugJavaResource
+> Task :capawesome-capacitor-file-picker:syncDebugLibJars
+> Task :capawesome-capacitor-file-picker:bundleDebugAar
+> Task :capawesome-capacitor-file-picker:assembleDebug
+> Task :app:mergeExtDexDebug
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :app:assembleDebug
+
+BUILD SUCCESSFUL in 2m 11s
+113 actionable tasks: 97 executed, 16 up-to-date

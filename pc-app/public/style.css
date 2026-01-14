@@ -1322,11 +1322,14 @@ select option {
     left: 0;
     background: var(--glass-bg);
     backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     border: 1px solid var(--glass-border);
-    border-radius: var(--radius-sm);
-    min-width: 150px;
-    z-index: 1000;
+    border-radius: var(--radius-md);
+    min-width: 160px;
+    z-index: 10000;
     box-shadow: var(--glass-shadow);
+    overflow: hidden;
+    margin-top: 5px;
 }
 .sort-menu.show {
     display: block;

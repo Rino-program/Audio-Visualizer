@@ -85,8 +85,6 @@
                         <option value="6">Monitor</option>
                         <option value="7">Hexagon</option>
                         <option value="8">Mirror</option>
-                        <option value="9">Particles</option>
-                        <option value="10">Aurora</option>
                     </select>
                     <button id="exportBtn" class="icon-btn" title="動画書き出し" aria-label="動画を書き出す">🎬</button>
                 </div>
@@ -103,7 +101,8 @@
                         <div class="sort-menu" id="sortMenu">
                             <button class="sort-option" data-sort="name-asc">名前順 (A→Z)</button>
                             <button class="sort-option" data-sort="name-desc">名前順 (Z→A)</button>
-                            <button class="sort-option" data-sort="added-desc">追加順 (新しい順)</button>
+                            <button class="sort-option" data-sort="added-asc">追加順</button>
+                            <button class="sort-option" data-sort="added-desc">追加順 (逆)</button>
                             <button class="sort-option" data-sort="random">ランダム</button>
                         </div>
                     </div>
@@ -351,18 +350,23 @@
             </div>
 
             <div class="tab-content" id="tab-player">
-                <div class="setting-item">
-                    <label>スリープタイマー</label>
-                    <select id="sleepTimerSelect">
-                        <option value="0">OFF</option>
-                        <option value="15">15分</option>
-                        <option value="30">30分</option>
-                        <option value="60">60分</option>
-                        <option value="90">90分</option>
-                    </select>
-                    <div id="sleepTimerStatus" style="font-size: 0.8rem; color: var(--primary); margin-top: 5px; display: none;"></div>
+                <div class="setting-item resource-monitor">
+                    <label>📊 リソースモニター</label>
+                    <div id="resourceMonitor" style="font-size: 0.8rem; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 6px; margin-top: 8px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                            <span>FPS:</span>
+                            <span id="fpsValue">-- fps</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                            <span>メモリ:</span>
+                            <span id="memoryValue">-- MB</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>レンダリング:</span>
+                            <span id="gpuValue">--</span>
+                        </div>
+                    </div>
                 </div>
-                <hr style="border-color: var(--glass-border); margin: 20px 0;">
                 <div class="setting-item">
                     <label>
                         <input type="checkbox" id="autoPlayNextCheckbox" checked> 自動で次の曲を再生
@@ -474,13 +478,18 @@
     <script>
         // Capacitor.jsは実際のAndroidビルドでのみ利用可能
         // ローカル開発時は404エラーを回避
-        if (window.location.protocol !== 'file:' || document.querySelector('script[src*="capacitor"]')) {
+        // capacitor:// または file:// プロトコルの場合のみ読み込む
+        const isCapacitorEnv = window.location.protocol === 'capacitor:' || 
+                               (window.location.protocol === 'file:' && navigator.userAgent.includes('Android'));
+        if (isCapacitorEnv) {
             const script = document.createElement('script');
             script.src = 'capacitor.js';
             script.onerror = function() {
-                console.log('Capacitor.js not available (local development mode)');
+                console.log('Capacitor.js not available');
             };
             document.head.appendChild(script);
+        } else {
+            console.log('Running in browser mode - Capacitor.js skipped');
         }
     </script>
     <script src="script.js"></script>

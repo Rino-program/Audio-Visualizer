@@ -1,0 +1,7 @@
+Warning: SDK processing. This version only understands SDK XML versions up to 3 but an SDK XML file of version 4 was encountered. This can happen if you use versions of Android Studio and the command-line tools that were released at different times.
+ノート:入力ファイルの操作のうち、未チェックまたは安全ではないものがあります。
+ノート:詳細は、-Xlint:uncheckedオプションを指定して再コンパイルしてください。
+ノート:C:\VSCode_program\Audio Visualizer\android-app\node_modules\@capawesome\capacitor-file-picker\android\src\main\java\io\capawesome\capacitorjs\plugins\filepicker\FilePickerPlugin.javaは推奨されないAPIを使用またはオーバーライドしています。
+ノート:詳細は、-Xlint:deprecationオプションを指定して再コンパイルしてください。
+ノート:C:\VSCode_program\Audio Visualizer\android-app\android\app\src\main\java\com\audiovisualizer\app\LocalFolderImportPlugin.javaは推奨されないAPIを使用またはオーバーライドしています。
+ノート:詳細は、-Xlint:deprecationオプションを指定して再コンパイルしてください。

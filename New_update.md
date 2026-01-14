@@ -31,3 +31,38 @@
   - Aurora (オーロラ) ビジュアライザー追加
 - ✅ バグや不具合など見つけたら修正する。
   - 各種バグ修正済み
+
+## パフォーマンス最適化 ✅ 完了
+
+### 3種すべて ✅ 実装完了
+- ✅ CSS非推奨警告の修正
+  - EQスライダーの `appearance: slider-vertical` を `writing-mode: vertical-lr; direction: rtl` に変更
+  
+- ✅ draw()関数の最適化
+  - `requestAnimationFrame` を関数末尾に移動（次フレーム予約を最後に実行）
+  - `matchMedia('(prefers-reduced-motion: reduce)')` の結果をキャッシュし、change イベントで更新
+  - カラー配列 `colors` を毎フレーム生成せず、グローバル変数 `colorsCache` で再利用
+  
+- ✅ UI自動非表示の挙動修正
+  - `autoHideUI` がオフの時、自動表示も無効化（設定と動作の一貫性向上）
+  
+- ✅ URL/URI生成の遅延最適化
+  - ファイル追加時にURL生成を遅延し、再生時に `ensureUrlForTrack()` で生成
+  - メモリ使用量を削減
+  
+- ✅ URI/URL変換のキャッシュ化
+  - `toCapacitorFileUrl()` と `fileUrlFromPath()` に Map ベースのキャッシュを実装
+  - `uriConversionCache`, `pathToFileUrlCache` でリピート変換を高速化
+  
+- ✅ MV（ミュージックビデオ）再生の軽量化
+  - 同期チェック間隔を 300ms → 500ms に延長（チェック頻度を削減）
+  - 再生速度調整範囲を 0.9-1.1 → 0.95-1.05 に緩和（デコーダ負荷を軽減）
+  - 同期閾値を調整：大きなズレ 2.0s → 3.0s、中程度のズレ 0.5s → 1.0s
+  - 1.0秒以下の小さなズレは無視（不要な調整を削減）
+  - クールダウン時間を延長：大きなズレ 1.5s → 2.0s
+  
+- ✅ 動画同期方法の改善
+  - 不要な `bgVideo.load()` 呼び出しを削除（明示的なロードは重い処理）
+  - ビデオオフセットを統一：0.15秒 → 0.05秒（一貫性向上）
+  - 動画切り替え時に `playbackRate` を 1.0 にリセット（前の曲の調整が残らない）
+  - 動画オフ時の不要な `load()` を削除
