@@ -692,30 +692,6 @@ async function init() {
 		btn.onclick = () => switchTab(btn.dataset.tab);
 	});
 	
-	// Sort menu events
-	const sortBtn = document.getElementById('sortBtn');
-	const sortMenu = document.getElementById('sortMenu');
-	if (sortBtn && sortMenu) {
-		sortBtn.addEventListener('click', (e) => {
-			e.stopPropagation();
-			sortMenu.classList.toggle('show');
-		});
-		sortMenu.querySelectorAll('.sort-option').forEach(opt => {
-			opt.addEventListener('click', () => {
-				sortPlaylist(opt.dataset.sort);
-				sortMenu.classList.remove('show');
-			});
-		});
-		// Close sort menu when clicking outside（キャプチャフェーズで実行）
-		document.addEventListener('click', (e) => {
-			if (sortMenu && sortBtn && 
-				!sortMenu.contains(e.target) && 
-				e.target !== sortBtn) {
-				sortMenu.classList.remove('show');
-			}
-		}, true);
-	}
-	
 	// GPU サポートチェックと初期化
 	checkGPUSupport();
 	if (state.gpuAvailable && state.settings.renderMode !== 'cpu') {
@@ -2132,55 +2108,6 @@ function performPlaylistReorder(draggedIdx, targetIdx) {
 }
 
 // プレイリストのソート機能
-function sortPlaylist(sortType) {
-	if (state.playlist.length === 0) return;
-	
-	const currentTrackName = state.currentIndex >= 0 ? state.playlist[state.currentIndex]?.name : null;
-	
-	switch(sortType) {
-		case 'name-asc':
-			state.playlist.sort((a, b) => a.name.localeCompare(b.name, 'ja', { numeric: true, sensitivity: 'base' }));
-			break;
-		case 'name-desc':
-			state.playlist.sort((a, b) => b.name.localeCompare(a.name, 'ja', { numeric: true, sensitivity: 'base' }));
-			break;
-		case 'added-asc':
-			// 追加順（addedOrder でソート、なければ元の順序を保つ）
-			state.playlist.sort((a, b) => (a.addedOrder ?? Infinity) - (b.addedOrder ?? Infinity));
-			break;
-		case 'added-desc':
-			// 追加順逆順
-			state.playlist.sort((a, b) => (b.addedOrder ?? -Infinity) - (a.addedOrder ?? -Infinity));
-			break;
-		case 'random':
-			// Fisher-Yates シャッフル
-			for (let i = state.playlist.length - 1; i > 0; i--) {
-				const j = Math.floor(Math.random() * (i + 1));
-				[state.playlist[i], state.playlist[j]] = [state.playlist[j], state.playlist[i]];
-			}
-			break;
-	}
-	
-	// 現在再生中の曲のインデックスを更新
-	if (currentTrackName) {
-		const newIndex = state.playlist.findIndex(t => t.name === currentTrackName);
-		if (newIndex !== -1) {
-			state.currentIndex = newIndex;
-		}
-	}
-	
-	renderPlaylist();
-	saveSettingsToStorage();
-	
-	const sortNames = {
-		'name-asc': '名前順 (A→Z)',
-		'name-desc': '名前順 (Z→A)',
-		'added-desc': '追加順',
-		'random': 'ランダム'
-	};
-	showOverlay(`プレイリストを${sortNames[sortType] || sortType}でソートしました`);
-}
-
 // プレイリストの現在の曲にスクロール
 function scrollToCurrentPlaylistItem() {
 	const container = els.playlistItems;
@@ -3034,7 +2961,6 @@ let maxRaw = 0, maxRawIdx = startIdx, sumRaw = 0, rmsSumRaw = 0, spectralSum = 0
 	for (let i = 0; i < fd.length; i++) { if (fd[i] > maxDisp) maxDisp = fd[i]; }
 
 	const renderLabel = state.gpuRenderer?.enabled ? 'GPU' : 'CPU';
-	const sysLine = `SYS: FFT ${analyser ? analyser.fftSize : 'N/A'} | BAR ${state.settings.barCount} | ${renderLabel} | SM ${state.settings.smoothing.toFixed(2)} | S ${state.settings.sensitivity.toFixed(1)}`;
 
 	const bands = compact
 		? [
@@ -3059,7 +2985,7 @@ let maxRaw = 0, maxRawIdx = startIdx, sumRaw = 0, rmsSumRaw = 0, spectralSum = 0
 	let showBands = drawH >= (isPortraitPhone ? 200 : (compact ? 260 : 380));
 	const bandHeightTotal = showBands ? (bands.length * (bandHeight + bandGap) - bandGap) : 0;
 	const textH = (headerLines + audioLines) * lineH;
-	const bandsH = showBands ? (lineH + bandHeightTotal + lineH) : 0;  // バンド + SYS テキスト行
+	const bandsH = showBands ? (lineH + bandHeightTotal) : 0;
 
 	const isLandscapePhone = (W > H && Math.min(W, H) <= 520);
 	// 常に sideLayout（数値左 + バンド右）を使用
@@ -3095,11 +3021,6 @@ let maxRaw = 0, maxRawIdx = startIdx, sumRaw = 0, rmsSumRaw = 0, spectralSum = 0
 	ctx.fillText(`RMS: ${(rms * 100).toFixed(1)}%  Crest: ${crestFactor}`, boxX + padding, y); y += lineH;
 	ctx.fillText(`Spectrum: ${spectralCentroid}Hz`, boxX + padding, y); y += lineH;
 	ctx.fillText(`PEAK freq: ${peakFreq || 'N/A'}Hz`, boxX + padding, y); y += lineH;
-	// useSideLayout 時は SYS テキストを下で表示（バンド下）なので、ここはスキップ
-	if (!useSideLayout) {
-		if (!compact) { ctx.fillText(sysLine, boxX + padding, y); y += lineH; }
-		else { ctx.fillStyle = '#bbb'; ctx.fillText(sysLine, boxX + padding, y); y += lineH; ctx.fillStyle = '#fff'; }
-	}
 
 	if (showBands) {
 		if (useSideLayout) {
@@ -3131,12 +3052,6 @@ let maxRaw = 0, maxRawIdx = startIdx, sumRaw = 0, rmsSumRaw = 0, spectralSum = 0
 				ctx.fillStyle = bandColor;
 				ctx.fillRect(barX, yB, w, bandHeight);
 				yB += bandHeight + bandGap;
-			}
-			// SYS テキストをバンドの下に配置（重なり防止）
-			if (!compact) { 
-				ctx.fillStyle = '#999'; 
-				ctx.font = `10px monospace`;
-				ctx.fillText(sysLine, boxX + padding, yB); 
 			}
 		} else {
 			ctx.fillStyle = '#4fc3f7';

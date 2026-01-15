@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="color-scheme" content="dark">
     <meta name="theme-color" content="#0f172a">
-    <title>Audio Visualizer</title>
+    <title>Audio Visualizer v1.0.4</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Roboto+Mono:wght@400&display=swap" rel="stylesheet">
 </head>
@@ -97,16 +97,6 @@
                 <h3>プレイリスト</h3>
                 <div class="playlist-actions">
                     <button id="clearPlaylistBtn" class="icon-btn sm" title="すべて削除" aria-label="プレイリストをすべて削除">🗑️</button>
-                    <div class="sort-dropdown">
-                        <button id="sortPlaylistBtn" class="icon-btn sm" title="ソート" aria-label="プレイリストをソート">🔄</button>
-                        <div class="sort-menu" id="sortMenu">
-                            <button class="sort-option" data-sort="name-asc">名前順 (A→Z)</button>
-                            <button class="sort-option" data-sort="name-desc">名前順 (Z→A)</button>
-                            <button class="sort-option" data-sort="added-asc">追加順</button>
-                            <button class="sort-option" data-sort="added-desc">追加順 (逆)</button>
-                            <button class="sort-option" data-sort="random">ランダム</button>
-                        </div>
-                    </div>
                     <label class="file-btn">
                         📁 追加
                         <input type="file" id="fileInput" multiple hidden>

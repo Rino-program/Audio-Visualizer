@@ -3486,7 +3486,6 @@ function drawMonitor(fd, maxH, drawH, drawStartY) {
     for (let i = 0; i < fd.length; i++) { if (fd[i] > maxDisp) maxDisp = fd[i]; }
 
     const renderLabel = state.gpuRenderer?.enabled ? 'GPU' : 'CPU';
-    const sysLine = `SYS: FFT ${analyser ? analyser.fftSize : 'N/A'} | BAR ${state.settings.barCount} | ${renderLabel} | SM ${state.settings.smoothing.toFixed(2)} | S ${state.settings.sensitivity.toFixed(1)}`;
 
     const bands = compact
         ? [
@@ -3511,7 +3510,7 @@ function drawMonitor(fd, maxH, drawH, drawStartY) {
     let showBands = drawH >= (isPortraitPhone ? 200 : (compact ? 260 : 380));
     const bandHeightTotal = showBands ? (bands.length * (bandHeight + bandGap) - bandGap) : 0;
     const textH = (headerLines + audioLines) * lineH;
-    const bandsH = showBands ? (lineH + bandHeightTotal + lineH) : 0;  // バンド + SYS テキスト行
+    const bandsH = showBands ? (lineH + bandHeightTotal) : 0;
 
     // 常にsideLayout（数値左 + バンド右）を使用
     const useSideLayout = true;
@@ -3547,11 +3546,6 @@ function drawMonitor(fd, maxH, drawH, drawStartY) {
     ctx.fillText(`RMS: ${(rms * 100).toFixed(1)}%  Crest: ${crestFactor}`, boxX + padding, y); y += lineH;
     ctx.fillText(`Spectrum: ${spectralCentroid}Hz`, boxX + padding, y); y += lineH;
     ctx.fillText(`PEAK freq: ${peakFreq || 'N/A'}Hz`, boxX + padding, y); y += lineH;
-    // useSideLayout 時は SYS テキストを後で表示（バンドの下）なので、ここではスキップ
-    if (!useSideLayout) {
-        if (!compact) { ctx.fillText(sysLine, boxX + padding, y); y += lineH; }
-        else { ctx.fillStyle = '#bbb'; ctx.fillText(sysLine, boxX + padding, y); y += lineH; ctx.fillStyle = '#fff'; }
-    }
 
     if (showBands) {
         if (useSideLayout) {
@@ -3583,12 +3577,6 @@ function drawMonitor(fd, maxH, drawH, drawStartY) {
                 ctx.fillStyle = bandColor;
                 ctx.fillRect(barX, yB, w, bandHeight);
                 yB += bandHeight + bandGap;
-            }
-            // SYS テキストをバンドの下に配置（重なり防止）
-            if (!compact) { 
-                ctx.fillStyle = '#999'; 
-                ctx.font = `10px monospace`;
-                ctx.fillText(sysLine, boxX + padding, yB); 
             }
         } else {
             ctx.fillStyle = '#4fc3f7';
