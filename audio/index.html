@@ -30,7 +30,13 @@
         <!-- Top Bar -->
         <div class="top-bar glass">
             <div class="status-display">
-                <span id="statusText">🎵 待機中...</span>
+                <div class="now-playing-badge">
+                    <div id="nowPlayingArtSm" class="now-playing-art-sm">♪</div>
+                    <div class="now-playing-meta">
+                        <span id="statusText">🎵 待機中...</span>
+                        <span id="nextUpText" class="next-up-text">次: --</span>
+                    </div>
+                </div>
                 <span id="timeDisplay">0:00 / 0:00</span>
             </div>
             <div class="top-controls">
@@ -50,6 +56,10 @@
         <div id="controlsBar" class="controls-bar glass">
             <!-- Progress -->
             <div class="progress-container" id="progressContainer">
+                <div class="seek-track">
+                    <div id="seekBuffer" class="seek-buffer"></div>
+                    <div id="seekFill" class="seek-fill"></div>
+                </div>
                 <input type="range" id="seekBar" value="0" min="0" step="0.1">
             </div>
 
@@ -94,7 +104,7 @@
         <!-- Playlist Panel -->
         <div id="playlistPanel" class="playlist-panel glass collapsed">
             <div class="playlist-header">
-                <h3>プレイリスト</h3>
+                <h3>プレイリスト <span id="playlistCount" style="font-size:0.8rem; color:var(--text-muted); font-weight:400;"></span></h3>
                 <div class="playlist-actions">
                     <button id="clearPlaylistBtn" class="icon-btn sm" title="すべて削除" aria-label="プレイリストをすべて削除">🗑️</button>
                     <label class="file-btn">
@@ -139,6 +149,7 @@
             </div>
 
             <div class="tab-content active" id="tab-display">
+                <div class="settings-section-title">表示チューニング</div>
                 <div class="setting-item">
                     <label>スムージング (滑らかさ)</label>
                     <div class="range-wrapper">
@@ -169,6 +180,7 @@
                         <option value="64">64</option>
                         <option value="128">128</option>
                         <option value="256">256</option>
+                        <option value="512">512</option>
                     </select>
                 </div>
                 <div class="setting-item">
@@ -180,15 +192,20 @@
                     </select>
                     <span id="renderModeStatus" class="hint"></span>
                 </div>
+                <div class="settings-section-title">クイック設定</div>
                 <div class="setting-item">
                     <label>
                         <input type="checkbox" id="autoHideUICheckbox" checked> UI自動非表示
                     </label>
                 </div>
                 <div class="setting-item">
-                    <label>
-                        <input type="checkbox" id="lowPowerModeCheckbox"> 軽量化モード (Low Power)
-                    </label>
+                    <label>フレームレート (FPS)</label>
+                    <select id="fpsSelect">
+                        <option value="30">30 FPS (省電力)</option>
+                        <option value="60" selected>60 FPS (標準)</option>
+                        <option value="120">120 FPS (高品質)</option>
+                        <option value="0">無制限 (MAX)</option>
+                    </select>
                 </div>
                 <div class="setting-item">
                     <label>
@@ -298,6 +315,16 @@
                         <span id="highFreqValue">16kHz</span>
                     </div>
                 </div>
+                <div class="setting-item">
+                    <label>音域プリセット</label>
+                    <select id="freqRangeSelect">
+                        <option value="standard">標準 (20-16kHz)</option>
+                        <option value="full">フル (20-20kHz)</option>
+                        <option value="voice">ボイス (100-8kHz)</option>
+                        <option value="bass">バス (20-4kHz)</option>
+                        <option value="custom">カスタム</option>
+                    </select>
+                </div>
                 <hr style="border-color: var(--glass-border); margin: 20px 0;">
                 <div class="setting-item">
                     <label>イコライザー (EQ)</label>
@@ -336,7 +363,17 @@
                             <span style="font-size:0.6rem; margin-top:4px;">14k</span>
                         </div>
                     </div>
-                    <button id="resetEqBtn" style="margin-top: 10px; width: 100%; padding: 6px; background: rgba(255,255,255,0.1); border:none; color:#fff; border-radius:4px; cursor:pointer;">EQリセット</button>
+                    <div style="margin-top: 8px; display: flex; gap: 4px; flex-wrap: wrap;">
+                        <button class="eq-preset-btn" data-preset="flat" style="flex:1; min-width: 60px; padding: 4px 6px; background: rgba(255,255,255,0.1); border:none; color:#fff; border-radius:4px; cursor:pointer; font-size:0.7rem;">フラット</button>
+                        <button class="eq-preset-btn" data-preset="rock" style="flex:1; min-width: 60px; padding: 4px 6px; background: rgba(255,255,255,0.1); border:none; color:#fff; border-radius:4px; cursor:pointer; font-size:0.7rem;">Rock</button>
+                        <button class="eq-preset-btn" data-preset="pop" style="flex:1; min-width: 60px; padding: 4px 6px; background: rgba(255,255,255,0.1); border:none; color:#fff; border-radius:4px; cursor:pointer; font-size:0.7rem;">Pop</button>
+                        <button class="eq-preset-btn" data-preset="jazz" style="flex:1; min-width: 60px; padding: 4px 6px; background: rgba(255,255,255,0.1); border:none; color:#fff; border-radius:4px; cursor:pointer; font-size:0.7rem;">Jazz</button>
+                        <button class="eq-preset-btn" data-preset="classical" style="flex:1; min-width: 60px; padding: 4px 6px; background: rgba(255,255,255,0.1); border:none; color:#fff; border-radius:4px; cursor:pointer; font-size:0.7rem;">Classical</button>
+                        <button class="eq-preset-btn" data-preset="bass" style="flex:1; min-width: 60px; padding: 4px 6px; background: rgba(255,255,255,0.1); border:none; color:#fff; border-radius:4px; cursor:pointer; font-size:0.7rem;">Bass+</button>
+                        <button class="eq-preset-btn" data-preset="vocal" style="flex:1; min-width: 60px; padding: 4px 6px; background: rgba(255,255,255,0.1); border:none; color:#fff; border-radius:4px; cursor:pointer; font-size:0.7rem;">Vocal</button>
+                        <button class="eq-preset-btn" data-preset="electronic" style="flex:1; min-width: 60px; padding: 4px 6px; background: rgba(255,255,255,0.1); border:none; color:#fff; border-radius:4px; cursor:pointer; font-size:0.7rem;">EDM</button>
+                    </div>
+                    <button id="resetEqBtn" style="margin-top: 6px; width: 100%; padding: 6px; background: rgba(255,255,255,0.1); border:none; color:#fff; border-radius:4px; cursor:pointer;">EQリセット</button>
                 </div>
             </div>
 
@@ -359,6 +396,14 @@
                     </div>
                 </div>
                 <div class="setting-item">
+                    <label>音楽の重心 (L/R)</label>
+                    <div class="range-wrapper">
+                        <input type="range" id="balanceSlider" min="-100" max="100" step="1" value="0" style="background: linear-gradient(90deg,#4facfe,#ffffff,#f5576c);">
+                        <span id="balanceValue">C</span>
+                    </div>
+                    <button type="button" class="mini-btn" id="resetBalanceBtn">中央にリセット</button>
+                </div>
+                <div class="setting-item">
                     <label>
                         <input type="checkbox" id="autoPlayNextCheckbox" checked> 自動で次の曲を再生
                     </label>
@@ -367,6 +412,31 @@
                     <label>
                         <input type="checkbox" id="stopOnVideoEndCheckbox"> 動画終了時に停止 (動画優先)
                     </label>
+                </div>
+                <div class="setting-item">
+                    <label>再生速度</label>
+                    <select id="speedSelect">
+                        <option value="0.25">0.25x</option>
+                        <option value="0.5">0.5x</option>
+                        <option value="0.75">0.75x</option>
+                        <option value="1" selected>1.0x (標準)</option>
+                        <option value="1.25">1.25x</option>
+                        <option value="1.5">1.5x</option>
+                        <option value="1.75">1.75x</option>
+                        <option value="2">2.0x</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <label>スリープタイマー</label>
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;">
+                        <button class="action-btn sleep-btn" data-minutes="0">オフ</button>
+                        <button class="action-btn sleep-btn" data-minutes="15">15分</button>
+                        <button class="action-btn sleep-btn" data-minutes="30">30分</button>
+                        <button class="action-btn sleep-btn" data-minutes="45">45分</button>
+                        <button class="action-btn sleep-btn" data-minutes="60">1時間</button>
+                        <button class="action-btn sleep-btn" data-minutes="90">1.5時間</button>
+                    </div>
+                    <span id="sleepTimerStatus" class="hint" style="margin-top: 6px;"></span>
                 </div>
                 <div class="setting-item">
                     <label>

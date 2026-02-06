@@ -24,6 +24,7 @@ const state = {
 	playTimeout: null,
 	uiTimeout: null,
 	sleepTimerId: null,
+	sleepTimerEnd: 0,
 	lastSyncTime: 0,
 	lastAudioTime: 0,  // シーク検出用
     
@@ -40,6 +41,8 @@ const state = {
 	micSource: null,   // MediaStreamSource
 	eqFilters: [],
 	gainNode: null,
+	panNode: null,
+	balanceNodes: null,
     
 	// Visualization data
 	freqData: null,
@@ -74,6 +77,7 @@ const state = {
 		showLabels: true,
 		persistSettings: true,
 		lowPowerMode: false,
+		targetFps: 60,
 		showVideo: true,
 		videoMode: 'window', // 'window' or 'background'
 		videoFitMode: 'cover',
@@ -83,6 +87,7 @@ const state = {
 		gDriveApiKey: '',
 		eq: [0, 0, 0, 0, 0, 0, 0, 0],
 		playbackRate: 1.0,
+		balance: 0,
 		autoPlayNext: true,
 		stopOnVideoEnd: false,
 		storeLocalFiles: false,
@@ -94,9 +99,20 @@ const state = {
 		// GPU rendering settings
 		renderMode: 'auto', // 'auto', 'gpu', 'cpu'
 		// UI auto-hide settings
-		autoHideUI: true
+		autoHideUI: true,
+		// Volume persistence
+		volume: 1.0
 	}
 };
+
+// ============== UTILITY ==============
+function debounce(fn, ms) {
+    let timer;
+    return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), ms);
+    };
+}
 
 // ============== BLOB URL CACHE ==============
 function isBlobUrl(url) { return typeof url === 'string' && url.startsWith('blob:'); }
@@ -205,6 +221,12 @@ function releaseObjectUrlForTrack(track) {
 }
 
 const EQ_FREQS = [60, 170, 350, 1000, 3000, 6000, 12000, 14000];
+const FREQ_RANGE_PRESETS = {
+	standard: { low: 20, high: 16000 },
+	full: { low: 20, high: 20000 },
+	voice: { low: 100, high: 8000 },
+	bass: { low: 20, high: 4000 }
+};
 
 const COLOR_PRESETS = [
 	{ name: 'Cyber', color: '#00f2ff' },
@@ -239,6 +261,14 @@ const els = {
 	volIcon: $('volIcon'),
 	modeSelect: $('modeSelect'),
 	statusText: $('statusText'),
+	nowPlayingArtSm: $('nowPlayingArtSm'),
+	nextUpText: $('nextUpText'),
+	nowPlaying: $('nowPlaying'),
+	nowPlayingArt: $('nowPlayingArt'),
+	nowPlayingIcon: $('nowPlayingIcon'),
+	nowPlayingTitle: $('nowPlayingTitle'),
+	nowPlayingArtist: $('nowPlayingArtist'),
+	nowPlayingIndex: $('nowPlayingIndex'),
 	playlistPanel: $('playlistPanel'),
 	playlistToggle: $('playlistToggle'),
 	closePlaylistBtn: $('closePlaylistBtn'),
@@ -261,11 +291,13 @@ const els = {
 	controlsBar: $('controlsBar'),
 	overlayMsg: $('overlayMsg'),
 	progressContainer: $('progressContainer'),
+	seekFill: $('seekFill'),
+	seekBuffer: $('seekBuffer'),
 	playbackControls: $('playbackControls'),
 	videoContainer: $('videoContainer'),
 	closeVideoBtn: $('closeVideoBtn'),
 	toggleVideoModeBtn: $('toggleVideoModeBtn'),
-	lowPowerModeCheckbox: $('lowPowerModeCheckbox'),
+	// lowPowerModeCheckbox removed - replaced by fpsSelect
 	showVideoCheckbox: $('showVideoCheckbox'),
 	videoModeSelect: $('videoModeSelect'),
 	autoPlayNextCheckbox: $('autoPlayNextCheckbox'),
@@ -517,7 +549,20 @@ async function init() {
 	renderStorageList();
 
 	resize();
-	window.addEventListener('resize', resize);
+	window.addEventListener('resize', debounce(resize, 150));
+
+	// バックグラウンド/フォアグラウンド切り替え処理
+	document.addEventListener('visibilitychange', () => {
+		if (!document.hidden) {
+			lastDrawTs = 0;
+			// 動画を音声と再同期
+			if (bgVideo.src && state.isPlaying && state.settings.showVideo) {
+				bgVideo.currentTime = audio.currentTime + (typeof getVideoSyncOffset === 'function' ? getVideoSyncOffset() : 0);
+				bgVideo.playbackRate = audio.playbackRate || 1.0;
+				if (bgVideo.paused) bgVideo.play().catch(() => {});
+			}
+		}
+	});
 	// Calculate UI heights after initial render
 	requestAnimationFrame(() => {
 		calculateUIHeights();
@@ -543,11 +588,14 @@ async function init() {
 	audio.addEventListener('playing', () => {
 		if (bgVideo.src && state.settings.showVideo) {
 			// 音声が実際に再生開始された瞬間に動画の時間を同期
-			bgVideo.currentTime = audio.currentTime + 0.2;
+			bgVideo.currentTime = audio.currentTime + getVideoStartOffset();
 			bgVideo.play().catch(() => {});
 		}
 		const track = state.playlist[state.currentIndex];
-		if (track) els.statusText.textContent = `🎵 ${track.name}`;
+		if (track) {
+			els.statusText.textContent = `🎵 [${state.currentIndex + 1}/${state.playlist.length}] ${track.name}`;
+			updateTopBadge(track, state.currentIndex);
+		}
 	});
 	audio.addEventListener('waiting', () => {
 		if (bgVideo.src) bgVideo.pause();
@@ -578,8 +626,8 @@ async function init() {
 		}
 	});
 	audio.addEventListener('error', handleAudioError);
-	audio.addEventListener('seeking', () => { if (bgVideo.src) bgVideo.currentTime = audio.currentTime + 0.2; });
-	audio.addEventListener('seeked', () => { if (bgVideo.src) bgVideo.currentTime = audio.currentTime + 0.2; });
+	audio.addEventListener('seeking', () => { if (bgVideo.src) bgVideo.currentTime = audio.currentTime + getVideoStartOffset(); });
+	audio.addEventListener('seeked', () => { if (bgVideo.src) bgVideo.currentTime = audio.currentTime + getVideoStartOffset(); });
 
 	bgVideo.addEventListener('error', () => {
 		console.warn('Video load failed');
@@ -646,6 +694,8 @@ async function init() {
 			updateVideoVisibility();
 			renderPlaylist();
 			els.statusText.textContent = '待機中...';
+			updateTopBadge(null, -1);
+			updateNowPlayingCustom('未再生', '--', '🎵', '0/0');
 			saveSettingsToStorage();
 			showOverlay('✅ プレイリストをクリアしました');
 		}
@@ -704,12 +754,13 @@ async function init() {
 	initDraggablePlaylist();
 	applySettingsToUI();
 	updateShuffleRepeatUI();
+	updateTopBadge(null, -1);
+	updateNowPlayingCustom('未再生', '--', '🎵', `0/${state.playlist.length}`);
     
-	// Drag & Drop
-	document.body.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
 	// Drag & Drop
 	document.body.addEventListener('dragover', e => {
 		e.preventDefault();
+		e.dataTransfer.dropEffect = 'copy';
 		document.body.classList.add('drag-over');
 	});
 	document.body.addEventListener('dragleave', e => {
@@ -734,9 +785,11 @@ async function init() {
 	document.addEventListener('touchstart', resetUITimeout);
 	document.addEventListener('keydown', e => {
 		resetUITimeout();
-		if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+		const tag = e.target.tagName;
+		if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable) return;
+		const keyId = (e.key === ']' ? 'BracketRight' : (e.key === '[' ? 'BracketLeft' : e.code));
 
-		switch(e.code) {
+		switch(keyId) {
 			case 'Space': e.preventDefault(); togglePlay(); break;
 			case 'ArrowLeft': prevTrack(); break;
 			case 'ArrowRight': nextTrack(); break;
@@ -760,11 +813,18 @@ async function init() {
 				applySettingsToUI(); 
 				showOverlay(state.settings.showVideo ? '📺 動画表示: ON' : '📺 動画表示: OFF');
 				break;
-			case 'KeyL': 
-				state.settings.lowPowerMode = !state.settings.lowPowerMode; 
-				applySettingsToUI(); 
-				showOverlay(state.settings.lowPowerMode ? '🔋 低電力モード: ON' : '⚡ 低電力モード: OFF'); 
+			case 'KeyL': {
+				// FPSサイクル: 30 → 60 → 120 → 無制限 → 30
+				const fpsSteps = [30, 60, 120, 0];
+				const curFps = state.settings.targetFps || 60;
+				const ci = fpsSteps.indexOf(curFps);
+				const nextFps = fpsSteps[(ci + 1) % fpsSteps.length];
+				state.settings.targetFps = nextFps;
+				state.settings.lowPowerMode = (nextFps <= 30);
+				applySettingsToUI();
+				showOverlay(`🎬 FPS: ${nextFps === 0 ? '無制限' : nextFps}`);
 				break;
+			}
 			case 'KeyR': 
 				state.settings.rainbow = !state.settings.rainbow; 
 				applySettingsToUI(); 
@@ -777,8 +837,32 @@ async function init() {
 				break;
 			case 'KeyS': toggleShuffle(); applySettingsToUI(); break;
 			case 'KeyP': toggleRepeat(); applySettingsToUI(); break;
+			case 'BracketLeft': {
+				const rates = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+				const ci = rates.indexOf(audio.playbackRate);
+				const ni = Math.max(0, ci - 1);
+				audio.playbackRate = rates[ni];
+				state.settings.playbackRate = rates[ni];
+				if (bgVideo.src) bgVideo.playbackRate = rates[ni];
+				syncVideoRateAfterChange();
+				const sel = $('speedSelect'); if (sel) sel.value = rates[ni];
+				showOverlay(`⏪ 再生速度: ${rates[ni]}x`);
+				break;
+			}
+			case 'BracketRight': {
+				const rates = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+				const ci = rates.indexOf(audio.playbackRate);
+				const ni = Math.min(rates.length - 1, ci + 1);
+				audio.playbackRate = rates[ni];
+				state.settings.playbackRate = rates[ni];
+				if (bgVideo.src) bgVideo.playbackRate = rates[ni];
+				syncVideoRateAfterChange();
+				const sel = $('speedSelect'); if (sel) sel.value = rates[ni];
+				showOverlay(`⏩ 再生速度: ${rates[ni]}x`);
+				break;
+			}
 			case 'KeyM': 
-				state.mode = (state.mode + 1) % 11; 
+				state.mode = (state.mode + 1) % 9; 
 				els.modeSelect.value = state.mode;
 				const modeName = els.modeSelect.options[els.modeSelect.selectedIndex].text;
 				showOverlay(`📊 モード: ${modeName}`);
@@ -992,6 +1076,17 @@ function initDraggablePlaylist() {
 	document.addEventListener('touchend', endDrag);
 }
 
+function getVideoSyncOffset() {
+	if (state.settings.videoMode === 'background' && state.settings.bgBlur > 0 && state.settings.showVideo) {
+		return 0.12;
+	}
+	return 0.05;
+}
+
+function getVideoStartOffset() {
+	return Math.max(0.2, getVideoSyncOffset());
+}
+
 function updateVideoVisibility() {
 	const track = state.playlist[state.currentIndex];
 	const isVideo = track && track.isVideo;
@@ -1037,11 +1132,11 @@ function updateVideoVisibility() {
 	if (isVideo && state.settings.showVideo) {
 		if (bgVideo.src !== track.url) {
 			bgVideo.src = track.url;
-			bgVideo.playbackRate = 1.0; // 再生速度をリセット
+			bgVideo.playbackRate = audio.playbackRate || 1.0; // 現在の再生速度に合わせる
             
-			// ロード完了後に時間を合わせる（MVを0.05秒先に）
+			// ロード完了後に時間を合わせる（MVを少しだけ先に）
 			const onLoaded = () => {
-				bgVideo.currentTime = audio.currentTime + 0.05;
+				bgVideo.currentTime = audio.currentTime + getVideoSyncOffset();
 				if (state.isPlaying) bgVideo.play().catch(() => {});
 				bgVideo.removeEventListener('loadedmetadata', onLoaded);
 			};
@@ -1053,9 +1148,21 @@ function updateVideoVisibility() {
 	}
 }
 
+function applyCanvasResolution() {
+	if (!cv) return;
+	const dpr = Math.min(2, window.devicePixelRatio || 1); // ビジュアライザーは高解像度
+	const targetW = Math.max(1, Math.floor(window.innerWidth * dpr));
+	const targetH = Math.max(1, Math.floor(window.innerHeight * dpr));
+	cv.width = targetW;
+	cv.height = targetH;
+	cv.style.width = `${window.innerWidth}px`;
+	cv.style.height = `${window.innerHeight}px`;
+	W = targetW;
+	H = targetH;
+}
+
 function resize() {
-	W = cv.width = window.innerWidth;
-	H = cv.height = window.innerHeight;
+	applyCanvasResolution();
 	// Recalculate UI heights on resize
 	requestAnimationFrame(() => {
 		calculateUIHeights();
@@ -1278,6 +1385,7 @@ function setupSettingsInputs() {
 	$('sensitivitySlider').oninput = e => {
 		state.settings.sensitivity = +e.target.value;
 		$('sensitivityValue').textContent = state.settings.sensitivity.toFixed(1);
+		applySensitivityToAnalyser();
 	};
 	$('qualitySelect').onchange = e => {
 		state.settings.fftSize = +e.target.value;
@@ -1288,19 +1396,47 @@ function setupSettingsInputs() {
 			state.timeData = new Uint8Array(state.bufLen);
 		}
 	};
-	$('barCountSelect').onchange = e => { state.settings.barCount = +e.target.value; };
+	$('barCountSelect').onchange = e => { 
+		state.settings.barCount = +e.target.value; 
+		updateNumBars();
+	};
 	$('showLabelsCheckbox').onchange = e => { state.settings.showLabels = e.target.checked; };
-	$('lowPowerModeCheckbox').onchange = e => { state.settings.lowPowerMode = e.target.checked; };
+	const fpsSelect = $('fpsSelect');
+	if (fpsSelect) {
+		fpsSelect.onchange = e => {
+			const fps = +e.target.value;
+			state.settings.targetFps = fps;
+			state.settings.lowPowerMode = (fps <= 30);
+			showOverlay(`🎬 FPS: ${fps === 0 ? '無制限' : fps}`);
+		};
+	}
 	$('showVideoCheckbox').onchange = e => { state.settings.showVideo = e.target.checked; updateVideoVisibility(); };
 	$('videoModeSelect').onchange = e => { state.settings.videoMode = e.target.value; updateVideoVisibility(); };
 	$('videoFitModeSelect').onchange = e => { state.settings.videoFitMode = e.target.value; updateVideoVisibility(); };
+	const freqRangeSelect = $('freqRangeSelect');
+	if (freqRangeSelect) {
+		freqRangeSelect.onchange = e => {
+			const presetKey = e.target.value;
+			if (presetKey === 'custom') return;
+			const preset = FREQ_RANGE_PRESETS[presetKey];
+			if (!preset) return;
+			state.settings.lowFreq = preset.low;
+			state.settings.highFreq = preset.high;
+			$('lowFreqSlider').value = preset.low;
+			$('lowFreqValue').textContent = preset.low + 'Hz';
+			$('highFreqSlider').value = preset.high;
+			$('highFreqValue').textContent = (preset.high >= 1000 ? (preset.high/1000) + 'kHz' : preset.high + 'Hz');
+		};
+	}
 	$('lowFreqSlider').oninput = e => {
 		state.settings.lowFreq = +e.target.value;
 		$('lowFreqValue').textContent = state.settings.lowFreq + 'Hz';
+		if (freqRangeSelect) freqRangeSelect.value = 'custom';
 	};
 	$('highFreqSlider').oninput = e => {
 		state.settings.highFreq = +e.target.value;
 		$('highFreqValue').textContent = (state.settings.highFreq >= 1000 ? (state.settings.highFreq/1000) + 'kHz' : state.settings.highFreq + 'Hz');
+		if (freqRangeSelect) freqRangeSelect.value = 'custom';
 	};
 	EQ_FREQS.forEach((freq, i) => {
 		const id = freq >= 1000 ? `eq${freq/1000}k` : `eq${freq}`;
@@ -1308,6 +1444,34 @@ function setupSettingsInputs() {
 		if (el) el.oninput = e => { state.settings.eq[i] = +e.target.value; updateEQ(i, +e.target.value); };
 	});
 	$('resetEqBtn').onclick = resetEQ;
+
+	// EQプリセットボタン
+	const EQ_PRESETS = {
+		flat:       [0, 0, 0, 0, 0, 0, 0, 0],
+		rock:       [5, 4, -2, -3, 2, 5, 7, 6],
+		pop:        [-1, 2, 5, 4, 1, -1, -2, -1],
+		jazz:       [3, 2, -2, -1, 2, 4, 5, 3],
+		classical:  [4, 3, -1, 1, -1, 2, 3, 4],
+		bass:       [8, 6, 4, 1, 0, 0, 0, 0],
+		vocal:      [-2, -1, 3, 5, 4, 2, 0, -1],
+		electronic: [5, 4, 1, -2, 0, 3, 5, 7]
+	};
+	document.querySelectorAll('.eq-preset-btn').forEach(btn => {
+		btn.addEventListener('click', () => {
+			const preset = btn.dataset.preset;
+			const values = EQ_PRESETS[preset];
+			if (!values) return;
+			state.settings.eq = [...values];
+			state.eqFilters.forEach((f, i) => {
+				f.gain.value = values[i];
+				const freq = EQ_FREQS[i];
+				const id = freq >= 1000 ? `eq${freq/1000}k` : `eq${freq}`;
+				const el = $(id);
+				if (el) el.value = values[i];
+			});
+			showOverlay(`🎵 EQ: ${btn.textContent}`);
+		});
+	});
 	$('glowSlider').oninput = e => { 
 		state.settings.glowStrength = +e.target.value; 
 		$('glowValue').textContent = state.settings.glowStrength > 30 ? '強' : state.settings.glowStrength > 10 ? '中' : '弱';
@@ -1323,6 +1487,26 @@ function setupSettingsInputs() {
 		state.settings.opacity = +e.target.value;
 		$('opacityValue').textContent = state.settings.opacity.toFixed(1);
 	};
+	const balanceSlider = $('balanceSlider');
+	if (balanceSlider) {
+		balanceSlider.oninput = e => {
+			state.settings.balance = +e.target.value;
+			const label = $('balanceValue');
+			if (label) label.textContent = formatBalanceValue(state.settings.balance);
+			applyBalanceToPan();
+		};
+	}
+	const resetBalanceBtn = $('resetBalanceBtn');
+	if (resetBalanceBtn) {
+		resetBalanceBtn.onclick = () => {
+			state.settings.balance = 0;
+			if (balanceSlider) balanceSlider.value = 0;
+			const label = $('balanceValue');
+			if (label) label.textContent = 'C';
+			applyBalanceToPan();
+			showOverlay('音楽の重心を中央にリセット');
+		};
+	}
 	$('fixedColorPicker').oninput = e => { state.settings.fixedColor = e.target.value; };
 	$('clientIdInput').onchange = e => { state.settings.gDriveClientId = e.target.value.trim(); };
 	$('apiKeyInput').onchange = e => { state.settings.gDriveApiKey = e.target.value.trim(); };
@@ -1363,6 +1547,7 @@ function setupSettingsInputs() {
 	// Auto-hide UI settings
 	const autoHideUICheckbox = $('autoHideUICheckbox');
 	if (autoHideUICheckbox) {
+		autoHideUICheckbox.checked = state.settings.autoHideUI !== false;
 		autoHideUICheckbox.onchange = e => { 
 			state.settings.autoHideUI = e.target.checked;
 			if (!state.settings.autoHideUI && state.uiTimeout) {
@@ -1373,6 +1558,30 @@ function setupSettingsInputs() {
 	}
 
 	// persistSettingsCheckboxは既に上で処理済みなので重複を避ける
+
+	// Speed select
+	const speedSelect = $('speedSelect');
+	if (speedSelect) {
+		speedSelect.onchange = e => {
+			const rate = +e.target.value;
+			audio.playbackRate = rate;
+			state.settings.playbackRate = rate;
+			if (bgVideo.src) bgVideo.playbackRate = rate;
+			syncVideoRateAfterChange();
+			showOverlay(`⏩ 再生速度: ${rate}x`);
+		};
+	}
+
+	// Sleep timer buttons
+	document.querySelectorAll('.sleep-btn').forEach(btn => {
+		btn.addEventListener('click', () => {
+			const min = +btn.dataset.minutes;
+			document.querySelectorAll('.sleep-btn').forEach(b => b.classList.remove('active'));
+			if (min === 0) { stopSleepTimer(); showOverlay('⏰ スリープタイマーOFF'); }
+			else { startSleepTimer(min); btn.classList.add('active'); }
+		});
+	});
+
 	setupPresets();
 }
 
@@ -1414,9 +1623,11 @@ function loadPreset(slot) {
 			Object.assign(state.settings, parsed);
 			applySettingsToUI();
 			updateVideoVisibility();
+			applyCanvasResolution();
 			if (state.analyser) {
 				state.analyser.smoothingTimeConstant = state.settings.smoothing;
 				state.analyser.fftSize = state.settings.fftSize;
+				applySensitivityToAnalyser();
 			}
 			showOverlay(`📂 プリセット ${slot} を読み込みました`);
 		} catch (e) {
@@ -1435,7 +1646,8 @@ function applySettingsToUI() {
 	$('qualitySelect').value = state.settings.fftSize;
 	$('barCountSelect').value = state.settings.barCount;
 	$('showLabelsCheckbox').checked = state.settings.showLabels;
-	$('lowPowerModeCheckbox').checked = state.settings.lowPowerMode;
+	const fpsSelectUI = $('fpsSelect');
+	if (fpsSelectUI) fpsSelectUI.value = state.settings.targetFps || 60;
 	$('showVideoCheckbox').checked = state.settings.showVideo;
 	$('videoModeSelect').value = state.settings.videoMode;
 	$('videoFitModeSelect').value = state.settings.videoFitMode || 'cover';
@@ -1443,6 +1655,17 @@ function applySettingsToUI() {
 	$('lowFreqValue').textContent = state.settings.lowFreq + 'Hz';
 	$('highFreqSlider').value = state.settings.highFreq;
 	$('highFreqValue').textContent = (state.settings.highFreq >= 1000 ? (state.settings.highFreq/1000) + 'kHz' : state.settings.highFreq + 'Hz');
+	const freqRangeSelectUI = $('freqRangeSelect');
+	if (freqRangeSelectUI) {
+		let matched = 'custom';
+		Object.keys(FREQ_RANGE_PRESETS).forEach(key => {
+			const preset = FREQ_RANGE_PRESETS[key];
+			if (preset.low === state.settings.lowFreq && preset.high === state.settings.highFreq) {
+				matched = key;
+			}
+		});
+		freqRangeSelectUI.value = matched;
+	}
 	$('glowSlider').value = state.settings.glowStrength;
 	$('rainbowCheckbox').checked = state.settings.rainbow;
 	$('mirrorCheckbox').checked = state.settings.mirror;
@@ -1450,6 +1673,10 @@ function applySettingsToUI() {
 	$('bgBlurValue').textContent = state.settings.bgBlur + 'px';
 	$('opacitySlider').value = state.settings.opacity;
 	$('opacityValue').textContent = state.settings.opacity.toFixed(1);
+	const balanceSlider = $('balanceSlider');
+	if (balanceSlider) balanceSlider.value = state.settings.balance || 0;
+	const balanceValue = $('balanceValue');
+	if (balanceValue) balanceValue.textContent = formatBalanceValue(state.settings.balance || 0);
 	$('fixedColorPicker').value = state.settings.fixedColor;
 	$('clientIdInput').value = state.settings.gDriveClientId;
 	$('apiKeyInput').value = state.settings.gDriveApiKey;
@@ -1474,12 +1701,23 @@ function applySettingsToUI() {
 	const circleAngleOffsetValue = $('circleAngleOffsetValue');
 	if (circleAngleOffsetValue) circleAngleOffsetValue.textContent = `${state.settings.circleAngleOffset || 0}°`;
 	
-	// Render mode & auto-hide UI settings
+	// Render mode settings
 	const renderModeSelect = $('renderModeSelect');
 	if (renderModeSelect) renderModeSelect.value = state.settings.renderMode || 'auto';
-	const autoHideUICheckbox = $('autoHideUICheckbox');
-	if (autoHideUICheckbox) autoHideUICheckbox.checked = state.settings.autoHideUI !== false;
 	updateRenderModeStatus();
+	applyBalanceToPan();
+
+	// Volume restore
+	if (state.settings.volume !== undefined) {
+		els.volSlider.value = state.settings.volume;
+		updateVolume();
+	}
+	// Speed restore
+	if (state.settings.playbackRate) {
+		audio.playbackRate = state.settings.playbackRate;
+		const speedSel = $('speedSelect');
+		if (speedSel) speedSel.value = state.settings.playbackRate;
+	}
 
 	state.settings.eq.forEach((val, i) => {
 		const freq = EQ_FREQS[i];
@@ -1595,6 +1833,7 @@ function initAudioContext() {
 		state.analyser = state.audioCtx.createAnalyser();
 		state.analyser.fftSize = state.settings.fftSize;
 		state.analyser.smoothingTimeConstant = state.settings.smoothing;
+		applySensitivityToAnalyser();
 		state.gainNode = state.audioCtx.createGain();
 		state.gainNode.gain.value = 1.0;
 		state.eqFilters = EQ_FREQS.map((freq, i) => {
@@ -1612,12 +1851,85 @@ function initAudioContext() {
 		}
 		lastNode.connect(state.analyser);
 		state.analyser.connect(state.gainNode);
-		state.gainNode.connect(state.audioCtx.destination);
+		setupBalanceNodes();
 		state.bufLen = state.analyser.frequencyBinCount;
 		state.freqData = new Uint8Array(state.bufLen);
 		state.timeData = new Uint8Array(state.bufLen);
 	}
 	if (state.audioCtx.state === 'suspended') state.audioCtx.resume();
+}
+
+function applySensitivityToAnalyser() {
+	if (!state.analyser) return;
+	const sens = Math.max(0.1, Math.min(3.0, state.settings.sensitivity || 1));
+	const maxDb = -2 - ((sens - 0.1) / 2.9) * 30; // -2dB 〜 -32dB
+	const minDb = Math.max(-140, maxDb - 80);
+	state.analyser.maxDecibels = maxDb;
+	state.analyser.minDecibels = minDb;
+}
+
+function applyBalanceToPan() {
+	const v = Math.max(-100, Math.min(100, state.settings.balance || 0));
+	const p = v / 100;
+	if (state.balanceNodes) {
+		const monoMix = Math.abs(p);
+		const stereoMix = 1 - monoMix;
+		state.balanceNodes.stereoLeftGain.gain.value = stereoMix;
+		state.balanceNodes.stereoRightGain.gain.value = stereoMix;
+		state.balanceNodes.monoLeftGain.gain.value = monoMix * (1 - Math.max(0, p));
+		state.balanceNodes.monoRightGain.gain.value = monoMix * (1 + Math.min(0, p));
+		return;
+	}
+	if (state.panNode) state.panNode.pan.value = p;
+}
+
+function formatBalanceValue(v) {
+	if (!v) return 'C';
+	return v < 0 ? `L${Math.abs(v)}` : `R${v}`;
+}
+
+function setupBalanceNodes() {
+	if (!state.audioCtx || !state.gainNode) return;
+	try {
+		const splitter = state.audioCtx.createChannelSplitter(2);
+		const merger = state.audioCtx.createChannelMerger(2);
+		const monoGain = state.audioCtx.createGain();
+		monoGain.gain.value = 0.5;
+		const monoLeftGain = state.audioCtx.createGain();
+		const monoRightGain = state.audioCtx.createGain();
+		const stereoLeftGain = state.audioCtx.createGain();
+		const stereoRightGain = state.audioCtx.createGain();
+
+		state.balanceNodes = { splitter, merger, monoGain, monoLeftGain, monoRightGain, stereoLeftGain, stereoRightGain };
+
+		state.gainNode.connect(splitter);
+		splitter.connect(stereoLeftGain, 0);
+		splitter.connect(stereoRightGain, 1);
+		stereoLeftGain.connect(merger, 0, 0);
+		stereoRightGain.connect(merger, 0, 1);
+		splitter.connect(monoGain, 0);
+		splitter.connect(monoGain, 1);
+		monoGain.connect(monoLeftGain);
+		monoGain.connect(monoRightGain);
+		monoLeftGain.connect(merger, 0, 0);
+		monoRightGain.connect(merger, 0, 1);
+		merger.connect(state.audioCtx.destination);
+
+		applyBalanceToPan();
+		return;
+	} catch (e) {
+		console.warn('Balance node init failed:', e);
+		state.balanceNodes = null;
+	}
+
+	if (state.audioCtx.createStereoPanner) {
+		state.panNode = state.audioCtx.createStereoPanner();
+		state.gainNode.connect(state.panNode);
+		state.panNode.connect(state.audioCtx.destination);
+		applyBalanceToPan();
+	} else {
+		state.gainNode.connect(state.audioCtx.destination);
+	}
 }
 
 async function setInputSource(source) {
@@ -1634,10 +1946,18 @@ async function setInputSource(source) {
 		audio.pause();
 		await startMic();
 		els.statusText.textContent = '🎤 マイク入力中';
+		updateTopBadge(null, -1);
+		updateNowPlayingCustom('マイク入力', 'ライブ入力', '🎤', 'LIVE');
 	} else {
 		stopMic();
 		connectFileSource();
 		els.statusText.textContent = state.playlist[state.currentIndex] ? `🎵 ${state.playlist[state.currentIndex].name}` : '待機中...';
+		updateTopBadge(state.playlist[state.currentIndex], state.currentIndex);
+		if (state.playlist[state.currentIndex]) {
+			updateNowPlayingUI(state.playlist[state.currentIndex], state.currentIndex);
+		} else {
+			updateNowPlayingCustom('未再生', '--', '🎵', `0/${state.playlist.length}`);
+		}
 	}
 }
 
@@ -1702,6 +2022,14 @@ function resetEQ() {
 		const el = $(id);
 		if (el) el.value = 0;
 	});
+}
+
+function syncVideoRateAfterChange() {
+	state.lastAudioTime = audio.currentTime;
+	if (typeof videoSyncCooldown !== 'undefined') videoSyncCooldown = 0.6;
+	if (typeof lastVideoSyncCheckTs !== 'undefined') {
+		lastVideoSyncCheckTs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+	}
 }
 
 // ============== PLAYBACK ==============
@@ -1789,8 +2117,9 @@ function playTrack(index) {
 	if (index < 0 || index >= state.playlist.length) return;
 	state.currentIndex = index;
 	const track = state.playlist[index];
-	els.statusText.textContent = `🎵 ${track.name}`;
-	document.title = `${track.name} - Audio Visualizer`;
+	els.statusText.textContent = `🎵 [${index + 1}/${state.playlist.length}] ${track.name}`;
+	updateTopBadge(track, index);
+	updateNowPlayingUI(track, index);
 	renderPlaylist();
 	
 	// 再生中の曲をオーバーレイで表示
@@ -1845,6 +2174,7 @@ function updateVolume() {
 	audio.volume = volume;
 	if (state.inputSource === 'file' && state.gainNode) state.gainNode.gain.value = volume;
 	els.volIcon.textContent = v == 0 ? '🔇' : v < 0.5 ? '🔉' : '🔊';
+	state.settings.volume = +v;
 }
 function onMetadataLoaded() { els.seekBar.max = audio.duration || 0; updateTimeDisplay(); }
 function updateProgress() { 
@@ -1853,7 +2183,10 @@ function updateProgress() {
 		updateTimeDisplay(); 
 	} 
 }
-function updateTimeDisplay() { els.timeDisplay.textContent = `${formatTime(audio.currentTime)} / ${formatTime(audio.duration)}`; }
+function updateTimeDisplay() {
+	els.timeDisplay.textContent = `${formatTime(audio.currentTime)} / ${formatTime(audio.duration)}`;
+	updateSeekVisuals();
+}
 function updatePlayBtn() { els.playBtn.textContent = state.isPlaying ? '⏸' : '▶'; }
 function handleAudioError(e) { 
 	console.error('Audio error:', e); 
@@ -1863,6 +2196,85 @@ function handleAudioError(e) {
 	setTimeout(nextTrack, 3000);
 }
 function formatTime(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60); const sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
+
+function updateSeekVisuals() {
+	if (!els.seekFill || !els.seekBuffer) return;
+	const duration = audio.duration || 0;
+	const current = audio.currentTime || 0;
+	const playedPct = duration > 0 ? Math.min(100, Math.max(0, (current / duration) * 100)) : 0;
+	els.seekFill.style.width = `${playedPct}%`;
+	let bufferedEnd = 0;
+	try {
+		for (let i = 0; i < audio.buffered.length; i++) {
+			const start = audio.buffered.start(i);
+			const end = audio.buffered.end(i);
+			if (current + 0.2 >= start) bufferedEnd = Math.max(bufferedEnd, end);
+		}
+	} catch {}
+	const bufferedPct = duration > 0 ? Math.min(100, Math.max(0, (bufferedEnd / duration) * 100)) : 0;
+	els.seekBuffer.style.width = `${bufferedPct}%`;
+}
+
+function getTrackDisplayInfo(track) {
+	if (!track) return { title: '未再生', artist: '--', icon: '🎵' };
+	let title = track.name || 'Unknown';
+	title = title.replace(/\.(mp3|m4a|wav|aac|mp4|webm|mkv|mov|ogg|flac|opus)$/i, '');
+	let artist = 'Audio Visualizer';
+	if (title.includes(' - ')) {
+		const parts = title.split(' - ');
+		artist = parts[0].trim();
+		title = parts.slice(1).join(' - ').trim();
+	}
+	return { title, artist, icon: track.isVideo ? '🎬' : '🎵' };
+}
+
+function hashString(input) {
+	let hash = 0;
+	for (let i = 0; i < input.length; i++) {
+		hash = ((hash << 5) - hash) + input.charCodeAt(i);
+		hash |= 0;
+	}
+	return Math.abs(hash);
+}
+
+function updateTopBadge(track, index) {
+	if (!els.nowPlayingArtSm) return;
+	const info = getTrackDisplayInfo(track);
+	const base = info.title + info.artist;
+	const hue = hashString(base) % 360;
+	els.nowPlayingArtSm.style.background = `linear-gradient(135deg, hsla(${hue}, 85%, 55%, 0.7), hsla(${(hue + 40) % 360}, 85%, 45%, 0.7))`;
+	els.nowPlayingArtSm.textContent = info.icon;
+	updateNextUpText(index);
+}
+
+function updateNextUpText(currentIndex) {
+	if (!els.nextUpText) return;
+	if (!state.playlist.length || currentIndex < 0) {
+		els.nextUpText.textContent = '次: --';
+		return;
+	}
+	const nextIndex = (currentIndex + 1) % state.playlist.length;
+	const nextTrack = state.playlist[nextIndex];
+	if (!nextTrack) {
+		els.nextUpText.textContent = '次: --';
+		return;
+	}
+	els.nextUpText.textContent = `次: ${nextTrack.name}`;
+}
+
+function updateNowPlayingCustom(title, artist, icon, indexText) {
+	if (!els.nowPlayingTitle) return;
+	els.nowPlayingTitle.textContent = title;
+	els.nowPlayingArtist.textContent = artist;
+	if (els.nowPlayingIcon) els.nowPlayingIcon.textContent = icon;
+	if (els.nowPlayingIndex) els.nowPlayingIndex.textContent = indexText;
+}
+
+function updateNowPlayingUI(track, index) {
+	const info = getTrackDisplayInfo(track);
+	const indexText = index >= 0 ? `${index + 1}/${state.playlist.length}` : `0/${state.playlist.length}`;
+	updateNowPlayingCustom(info.title, info.artist, info.icon, indexText);
+}
 
 async function handleFiles(files) {
 	const allowedExt = new Set(['mp3', 'wav', 'm4a', 'aac', 'mp4', 'webm', 'mkv', 'mov', 'ogg', 'flac', 'opus']);
@@ -1965,6 +2377,7 @@ function renderPlaylist() {
     
 	// ドラッグ&ドロップ処理
 	setupPlaylistDragDrop();
+	updatePlaylistCount();
 }
 
 let draggedIndex = -1;
@@ -2477,7 +2890,53 @@ function toggleFullscreen() {
 	}
 }
 
-function showOverlay(msg, duration = 2000) { els.overlayMsg.textContent = msg; els.overlayMsg.classList.remove('hidden'); if (duration > 0) setTimeout(() => { els.overlayMsg.classList.add('hidden'); }, duration); }
+function showOverlay(msg, duration = 2000) {
+    els.overlayMsg.textContent = msg;
+    els.overlayMsg.classList.remove('hidden', 'fade-out');
+    if (duration > 0) {
+        setTimeout(() => {
+            els.overlayMsg.classList.add('fade-out');
+            setTimeout(() => { els.overlayMsg.classList.add('hidden'); els.overlayMsg.classList.remove('fade-out'); }, 400);
+        }, duration);
+    }
+}
+
+// ============== SLEEP TIMER ==============
+function startSleepTimer(minutes) {
+    stopSleepTimer();
+    state.sleepTimerEnd = Date.now() + minutes * 60000;
+    state.sleepTimerId = setInterval(() => {
+        if (Date.now() >= state.sleepTimerEnd) {
+            stopSleepTimer();
+            audio.pause();
+            state.isPlaying = false;
+            updatePlayBtn();
+            showOverlay('💤 スリープタイマーで停止しました');
+        }
+        updateSleepTimerStatus();
+    }, 1000);
+    showOverlay(`⏰ ${minutes}分後に停止します`);
+    updateSleepTimerStatus();
+}
+function stopSleepTimer() {
+    if (state.sleepTimerId) { clearInterval(state.sleepTimerId); state.sleepTimerId = null; }
+    state.sleepTimerEnd = 0;
+    updateSleepTimerStatus();
+}
+function getSleepTimerRemaining() {
+    if (!state.sleepTimerEnd) return 0;
+    return Math.max(0, Math.ceil((state.sleepTimerEnd - Date.now()) / 60000));
+}
+function updatePlaylistCount() {
+    const el = $('playlistCount');
+    if (el) el.textContent = `(${state.playlist.length}曲)`;
+}
+function updateSleepTimerStatus() {
+    const el = $('sleepTimerStatus');
+    if (!el) return;
+    const rem = getSleepTimerRemaining();
+    el.textContent = rem > 0 ? `残り ${rem}分` : '';
+}
 
 // ============== EXPORT ==============
 function startExport() {
@@ -2520,13 +2979,35 @@ function getFilteredData() {
 	const loIdx = freqToIdx(state.settings.lowFreq);
 	const hiIdx = Math.min(freqToIdx(state.settings.highFreq), state.bufLen);
 	const out = new Uint8Array(state.settings.barCount);
-	const step = (hiIdx - loIdx) / state.settings.barCount;
+	const range = hiIdx - loIdx;
+	if (range <= 0) return out;
+	
+	// 対数スケーリングで人間の聴覚に合わせた周波数マッピング
 	for (let i = 0; i < state.settings.barCount; i++) {
-		const idx = Math.min(loIdx + Math.floor(i * step), state.bufLen - 1);
-		// 感度をフリークエンシーデータに乗算 → グラフの高さに直接反映
-		out[i] = Math.min(255, state.freqData[idx] * state.settings.sensitivity);
+		const t0 = i / state.settings.barCount;
+		const t1 = (i + 1) / state.settings.barCount;
+		const startIdx = loIdx + Math.floor(Math.pow(t0, 0.6) * range);
+		const endIdx = Math.min(loIdx + Math.floor(Math.pow(t1, 0.6) * range), hiIdx - 1);
+		
+		if (endIdx >= startIdx) {
+			let sum = 0;
+			let maxVal = 0;
+			for (let j = startIdx; j <= endIdx; j++) {
+				const v = state.freqData[j];
+				sum += v;
+				if (v > maxVal) maxVal = v;
+			}
+			const avg = sum / (endIdx - startIdx + 1);
+			out[i] = Math.round(avg * 0.7 + maxVal * 0.3);
+		} else {
+			out[i] = state.freqData[Math.min(startIdx, state.bufLen - 1)];
+		}
 	}
 	return out;
+}
+function updateNumBars() {
+	const count = Math.max(16, Math.min(512, state.settings.barCount || 64));
+	state.settings.barCount = count;
 }
 function freqToIdx(f) { return state.audioCtx ? Math.round(f * state.analyser.fftSize / state.audioCtx.sampleRate) : 0; }
 function getColor(i, v = 1, total = state.settings.barCount) {
@@ -2589,6 +3070,7 @@ let lastVideoSyncCheckTs = 0;
 let cachedReduceMotion = false; // matchMediaキャッシュ
 let colorsCache = []; // 色配列キャッシュ
 let animationFrameId = null; // rAF IDを保存して制御
+let visualizerBaseAlpha = 1;
 
 // リソースモニター用
 let fpsFrameCount = 0;
@@ -2649,10 +3131,10 @@ function draw(ts = 0) {
 		return;
 	}
 
-	const targetFps = state.settings.lowPowerMode ? 30 : 60;
-	const minInterval = 1000 / targetFps;
+	const targetFps = state.settings.targetFps || 60;
+	const minInterval = targetFps > 0 ? (1000 / targetFps) : 0;
 	const dtSecRaw = lastDrawTs ? (ts - lastDrawTs) / 1000 : 0;
-	if (lastDrawTs && ts - lastDrawTs < minInterval) {
+	if (minInterval > 0 && lastDrawTs && ts - lastDrawTs < minInterval) {
 		animationFrameId = requestAnimationFrame(draw);
 		return;
 	}
@@ -2665,6 +3147,7 @@ function draw(ts = 0) {
 
 	// 動画と音声の同期チェック（改良版：シーク検出、速度リセット改善）
 	if (bgVideo.src && state.isPlaying && state.settings.showVideo && !bgVideo.paused && bgVideo.readyState >= 2) {
+		const baseRate = audio.playbackRate || 1.0;
 		// シーク検出：音声位置が大きく変化した場合
 		const audioTimeDelta = Math.abs(audio.currentTime - state.lastAudioTime);
 		const wasSeek = audioTimeDelta > 0.5 && state.lastAudioTime > 0;
@@ -2672,9 +3155,9 @@ function draw(ts = 0) {
 		
 		if (wasSeek) {
 			// シーク時は即座に動画位置を合わせてクールダウン
-			const targetTime = audio.currentTime + 0.05;
+			const targetTime = audio.currentTime + getVideoSyncOffset();
 			bgVideo.currentTime = targetTime;
-			bgVideo.playbackRate = 1.0;
+			bgVideo.playbackRate = baseRate;
 			videoSyncCooldown = 2.0; // シーク後は長めのクールダウン
 			lastVideoSyncCheckTs = ts;
 		} else if (videoSyncCooldown > 0) {
@@ -2682,7 +3165,7 @@ function draw(ts = 0) {
 			videoSyncCooldown -= dtSec;
 		} else if (!lastVideoSyncCheckTs || ts - lastVideoSyncCheckTs >= 500) { // 500msに延長
 			lastVideoSyncCheckTs = ts;
-			const videoOffset = 0.05; // MVを少しだけ先に進める（50ms）
+			const videoOffset = getVideoSyncOffset(); // MVを少しだけ先に進める
 			const targetTime = audio.currentTime + videoOffset;
 			const timeDiff = bgVideo.currentTime - targetTime;
 			const absTimeDiff = Math.abs(timeDiff);
@@ -2691,22 +3174,22 @@ function draw(ts = 0) {
 			if (absTimeDiff > 2.0) {
 				// 大きなズレ：直接シーク
 				bgVideo.currentTime = targetTime;
-				bgVideo.playbackRate = 1.0;
+				bgVideo.playbackRate = baseRate;
 				videoSyncCooldown = 1.5;
 			} else if (absTimeDiff > 0.1) {
 				// 中程度のズレ：再生速度で緊和に調整
 				if (timeDiff > 0) {
 					// 動画が先行：少し遅くする
-					bgVideo.playbackRate = Math.max(0.95, 1 - absTimeDiff * 0.1);
+					bgVideo.playbackRate = baseRate * Math.max(0.9, 1 - absTimeDiff * 0.1);
 				} else {
 					// 動画が遅れ：少し速くする
-					bgVideo.playbackRate = Math.min(1.05, 1 + absTimeDiff * 0.1);
+					bgVideo.playbackRate = baseRate * Math.min(1.1, 1 + absTimeDiff * 0.1);
 				}
 				videoSyncCooldown = 0.8;
 			} else {
 				// 0.1秒以下のズレは無視（即時通過）、通常速度に戻す
-				if (bgVideo.playbackRate !== 1.0) {
-					bgVideo.playbackRate = 1.0;
+				if (bgVideo.playbackRate !== baseRate) {
+					bgVideo.playbackRate = baseRate;
 				}
 			}
 		}
@@ -2726,6 +3209,10 @@ function draw(ts = 0) {
 		return;
 	}
 	const fd = getFilteredData();
+	if (!fd || fd.length === 0) {
+		animationFrameId = requestAnimationFrame(draw);
+		return;
+	}
 	const display = computeDisplayValues(fd, dtSec);
 	// Precompute colors for the frame - 配列再利用でメモリ確保を削減
 	const nBars = fd.length;
@@ -2747,7 +3234,8 @@ function draw(ts = 0) {
 	const originalGlow = state.settings.glowStrength;
 	if (state.settings.lowPowerMode) state.settings.glowStrength = 0;
 
-	ctx.globalAlpha = state.settings.opacity;
+	visualizerBaseAlpha = Math.max(0, Math.min(1, state.settings.opacity));
+	ctx.globalAlpha = visualizerBaseAlpha;
 
 	if (state.settings.mirror) {
 		ctx.save();
@@ -2791,18 +3279,11 @@ function draw(ts = 0) {
     animationFrameId = requestAnimationFrame(draw);
 }
 
-// ============== Shake & Sparkles ==============
-function computeEnergy(display) {
-	let sum = 0, peak = 0, n = display.length;
-	for (let i = 0; i < n; i++) { const v = Math.abs(display[i]); sum += v; if (v > peak) peak = v; }
-	const avg = sum / Math.max(1, n);
-	return Math.max(avg, peak);
-}
-// Shake and Sparkles features removed
-
 // Modes (updated bars/circle to use display & sand)
 function drawBarsFromDisplay(display, colors, maxH, drawH, drawStartY) {
 	const n = display.length; const bw = W / n;
+	// バー本数が多い場合は空白を減らす（128本以上で調整開始）
+	const gap = n >= 256 ? Math.max(0.5, 2 - (n - 256) / 256) : (n >= 128 ? 1.5 : 2);
 	// global glow based on max level
 	let peak = 0; for (let i = 0; i < n; i++) { peak = Math.max(peak, Math.abs(display[i])); }
 	if (state.settings.glowStrength > 0) {
@@ -2812,7 +3293,7 @@ function drawBarsFromDisplay(display, colors, maxH, drawH, drawStartY) {
 	for (let i = 0; i < n; i++) {
 		const v = Math.max(0, display[i]); const h = v * maxH; const color = colors[i];
 		ctx.fillStyle = color;
-		ctx.fillRect(i * bw + 1, drawStartY + drawH - h, bw - 2, h);
+		ctx.fillRect(i * bw + gap / 2, drawStartY + drawH - h, bw - gap, h);
 		// sand marker: use same color as bar
 		if (state.settings.sandMode) {
 			const sh = state.sandHeights ? state.sandHeights[i] * maxH : 0;
@@ -2820,8 +3301,8 @@ function drawBarsFromDisplay(display, colors, maxH, drawH, drawStartY) {
 				ctx.fillStyle = color; // use bar color, not white
 				ctx.globalAlpha = 0.6;
 				const y = drawStartY + drawH - sh;
-				ctx.fillRect(i * bw + 1, y - 2, bw - 2, 4);
-				ctx.globalAlpha = 1.0;
+				ctx.fillRect(i * bw + gap / 2, y - 2, bw - gap, 4);
+				ctx.globalAlpha = visualizerBaseAlpha;
 			}
 		}
 	}
@@ -2868,7 +3349,7 @@ function drawCircleFromDisplay(display, colors, maxH, drawH, drawStartY) {
 				ctx.fillStyle = color; // use bar color, not white
 				ctx.globalAlpha = 0.6;
 				ctx.beginPath(); ctx.arc(r + sh, 0, Math.max(1.5, barW * 0.3), 0, Math.PI * 2); ctx.fill();
-				ctx.globalAlpha = 1.0;
+				ctx.globalAlpha = visualizerBaseAlpha;
 				ctx.restore();
 			}
 		}

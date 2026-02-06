@@ -1,6 +1,7 @@
 package com.audiovisualizer.app;
 
 import android.os.Bundle;
+import android.webkit.WebView;
 
 import com.getcapacitor.BridgeActivity;
 
@@ -14,6 +15,12 @@ public class MainActivity extends BridgeActivity {
 		super.onCreate(savedInstanceState);
 		applyImmersiveFullscreen();
 		registerPlugin(LocalFolderImportPlugin.class);
+		
+		// WebView設定: バックグラウンド音声再生を有効化
+		WebView webView = getBridge().getWebView();
+		if (webView != null) {
+			webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
+		}
 	}
 
 	@Override
@@ -28,6 +35,23 @@ public class MainActivity extends BridgeActivity {
 		if (hasFocus) {
 			applyImmersiveFullscreen();
 		}
+	}
+
+	@Override
+	public void onPause() {
+		// バックグラウンド再生のため、WebViewのタイマーを停止しない
+		// デフォルトのsuper.onPause()はWebViewを一時停止するため、
+		// 音楽再生を維持するためにオーバーライド
+		try {
+			// Capacitorの基本処理は呼び出すが、WebViewの一時停止をスキップ
+			// WebViewのJavaScriptタイマーを維持
+			WebView webView = getBridge().getWebView();
+			if (webView != null) {
+				// resumeTimersでバックグラウンドでもJSタイマーを維持
+				webView.resumeTimers();
+			}
+		} catch (Exception ignored) {}
+		super.onPause();
 	}
 
 	private void applyImmersiveFullscreen() {
