@@ -1,0 +1,5 @@
+Audio Visualizer is an Android app for local audio and video playback with responsive visual effects and media controls.
+
+Google Drive integration is optional and treated as an extension for users who explicitly choose to enable it.
+
+The Android build is prepared for F-Droid packaging and does not require Google Services for core playback.

@@ -1,5 +1,5 @@
 {
-  "appId": "com.audiovisualizer.app",
+  "appId": "io.github.rinoprogram.audiovisualizer",
   "appName": "Audio Visualizer",
   "webDir": "www",
   "bundledWebRuntime": false,

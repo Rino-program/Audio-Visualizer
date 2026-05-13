@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">Audio Visualizer</string>
     <string name="title_activity_main">Audio Visualizer</string>
-    <string name="package_name">com.audiovisualizer.app</string>
-    <string name="custom_url_scheme">com.audiovisualizer.app</string>
+    <string name="package_name">io.github.rinoprogram.audiovisualizer</string>
+    <string name="custom_url_scheme">io.github.rinoprogram.audiovisualizer</string>
 </resources>

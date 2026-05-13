@@ -317,7 +317,7 @@ Made with ❤️ by Human & AI collaboration
 
 - [PC版 README](pc-app/README.md)
 - [Android版 README](android-app/README.md)
-- [Google API ガイド](audio/GOOGLE_API_GUIDE.md)（Google Drive連携用）
+- [Google API ガイド](audio/GOOGLE_API_GUIDE.md)（任意の Google Drive 連携用）
 
 ---
 
@@ -325,7 +325,6 @@ Made with ❤️ by Human & AI collaboration
 
 以下はリポジトリにコミットしないでください（`.gitignore` で除外しています）：
 - `android-app/android/keystore.properties`
-- `android-app/android/app/google-services.json`
 - `*.jks`, `*.keystore`, `.env*`
 
 ---

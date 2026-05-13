@@ -1,4 +1,4 @@
-package com.audiovisualizer.app;
+package io.github.rinoprogram.audiovisualizer;
 
 import android.os.Bundle;
 import android.webkit.WebView;

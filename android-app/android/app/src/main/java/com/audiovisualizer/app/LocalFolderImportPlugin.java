@@ -1,4 +1,4 @@
-package com.audiovisualizer.app;
+package io.github.rinoprogram.audiovisualizer;
 
 import android.app.Activity;
 import android.content.ContentResolver;
