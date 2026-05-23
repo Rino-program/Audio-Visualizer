@@ -110,6 +110,85 @@ function debounce(fn, ms) {
     };
 }
 
+// ============== ANDROID NATIVE NOTIFICATION (Capacitor plugin) ==============
+let nativeMediaPlugin = null;
+let nativeMediaListenerInstalled = false;
+let lastNativeMediaSync = { title: null, artist: null, isPlaying: null };
+
+function getNativeMediaPlugin() {
+    try {
+        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.MediaNotification) {
+            return window.Capacitor.Plugins.MediaNotification;
+        }
+    } catch (e) {}
+    return null;
+}
+
+async function ensureNativeMediaListener() {
+    if (nativeMediaListenerInstalled) return;
+    nativeMediaPlugin = getNativeMediaPlugin();
+    if (!nativeMediaPlugin || !nativeMediaPlugin.addListener) return;
+
+    try {
+        await nativeMediaPlugin.addListener('command', (ev) => {
+            const cmd = ev && ev.command;
+            if (!cmd) return;
+            if (cmd === 'play') {
+                if (!state.isPlaying) togglePlay();
+            } else if (cmd === 'pause') {
+                if (state.isPlaying) togglePlay();
+            } else if (cmd === 'next') {
+                nextTrack();
+            } else if (cmd === 'prev') {
+                prevTrack();
+            }
+        });
+        nativeMediaListenerInstalled = true;
+    } catch (e) {
+        // ignore
+    }
+}
+
+function getCurrentTrackTitleArtist() {
+    const track = state.playlist[state.currentIndex];
+    if (!track) return { title: 'Audio Visualizer', artist: '' };
+
+    let title = track.name || 'Unknown';
+    let artist = 'Audio Visualizer';
+    title = title.replace(/\.(mp3|m4a|wav|aac|mp4|webm|mkv|mov|ogg|flac|opus)$/i, '');
+    if (title.includes(' - ')) {
+        const parts = title.split(' - ');
+        artist = parts[0].trim();
+        title = parts.slice(1).join(' - ').trim();
+    }
+    return { title, artist };
+}
+
+async function syncNativeMediaNotification(force = false) {
+    nativeMediaPlugin = nativeMediaPlugin || getNativeMediaPlugin();
+    if (!nativeMediaPlugin || !nativeMediaPlugin.update) return;
+
+    await ensureNativeMediaListener();
+
+    const { title, artist } = getCurrentTrackTitleArtist();
+    const isPlaying = !!state.isPlaying;
+
+    if (!force
+        && lastNativeMediaSync.title === title
+        && lastNativeMediaSync.artist === artist
+        && lastNativeMediaSync.isPlaying === isPlaying) {
+        return;
+    }
+
+    lastNativeMediaSync = { title, artist, isPlaying };
+
+    try {
+        await nativeMediaPlugin.update({ title, artist, isPlaying });
+    } catch (e) {
+        // ignore
+    }
+}
+
 // ============== MEDIA SESSION API (Android通知コントロール) ==============
 function setupMediaSession() {
     if (!('mediaSession' in navigator)) {
@@ -193,6 +272,9 @@ function updateMediaSessionMetadata() {
             { src: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="%236366f1" width="100" height="100"/><text x="50" y="60" text-anchor="middle" font-size="40" fill="white">♫</text></svg>', sizes: '256x256', type: 'image/svg+xml' }
         ]
     });
+
+    // Native notification metadata (Android)
+    syncNativeMediaNotification(false);
 }
 
 function updateMediaSessionPlaybackState() {
@@ -208,6 +290,9 @@ function updateMediaSessionPlaybackState() {
             position: audio.currentTime
         });
     }
+
+    // Native notification state (Android)
+    syncNativeMediaNotification(false);
 }
 
 // --- Playlist action helpers (simplified, no more-menu) ---
