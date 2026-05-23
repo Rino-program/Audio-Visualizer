@@ -1,32 +1,40 @@
 Categories:
   - Multimedia
 AuthorName: Rino-program
+AuthorWebSite: https://rino-program.github.io/WEBHub/
 License: MIT
 AutoName: Audio Visualizer
-Summary: Audio visualizer for local media
+WebSite: https://rino-program.github.io/WEBHub/
+SourceCode: https://github.com/Rino-program/Audio-Visualizer
+Summary: ローカル再生向けオーディオビジュアライザー
 Description: |
-  Audio Visualizer is an Android app for local audio and video playback with
-  responsive visual effects and media controls.
+  Audio Visualizer は、端末内の音声/動画ファイルを再生しながら、ビジュアルエフェクトを表示する Android アプリです。
 
-  Google Drive integration is optional and treated as an extension for users
-  who explicitly choose to enable it.
+  特徴:
+  - ローカルファイルの再生（音声/動画）
+  - ビジュアライザー表示と基本的なメディア操作
+  - F-Droid 向けにローカル動作を重視（Google サービスや Google Drive 連携は不要）
 
-  The Android build is prepared to work with F-Droid packaging and does not
-  require Google Services for core playback.
+  プライバシー/権限（要約）:
+  - ネットワーク機能は不要（インターネット権限なし）。
+  - マイク権限は、任意の「Mic」可視化モードでのみ使用します。
+  - メディア読み取り権限は、端末内の音声/動画ファイルを開いて再生するために使用します。
+  - フォアグラウンドサービス/スリープ抑止は、バックグラウンド再生の安定性と通知上の再生コントロール表示のために使用します。
 RepoType: git
 Repo: https://github.com/Rino-program/Audio-Visualizer.git
 IssueTracker: https://github.com/Rino-program/Audio-Visualizer/issues
-UpdateCheckMode: Tags
-AutoUpdateMode: Version v%v
+UpdateCheckMode: Tags .*[0-9]$
+AutoUpdateMode: Version
 Builds:
   - versionName: 1.0.5
     versionCode: 5
     commit: e7122e324f3a01aafb1ba4611b643ef76804470a
-    subdir: android-app
-    scandelete: android/app/build
+    subdir: android-app/android
+    scandelete: android-app/android/app/build
     build: |
-      npm install
+      cd ..
+      npm ci
       npx cap sync
-      cd android
-      ./gradlew assembleRelease
-    output: android/app/build/outputs/apk/release/app-release.apk
+    gradle:
+      - yes
+    output: app/build/outputs/apk/release/app-release.apk

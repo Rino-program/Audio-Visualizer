@@ -7,7 +7,6 @@
     <meta name="theme-color" content="#0f172a">
     <title>Audio Visualizer</title>
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Roboto+Mono:wght@400&display=swap" rel="stylesheet">
 </head>
 <body>
     <!-- Canvas Layer -->
@@ -109,7 +108,6 @@
                     <button id="clearPlaylistBtn" class="icon-btn sm" title="すべて削除" aria-label="プレイリストをすべて削除">🗑️</button>
                     <button id="nativeFileBtn" class="icon-btn sm file-btn" title="ファイル追加" aria-label="ファイルを追加">➕</button>
                     <input type="file" id="fileInput" multiple hidden>
-                    <button id="gDriveBtn" class="icon-btn sm" title="Google Drive" aria-label="Google Driveから追加">☁️</button>
                 </div>
                 <button id="closePlaylistBtn" class="icon-btn sm" title="閉じる" aria-label="プレイリストを閉じる">✖</button>
             </div>
@@ -139,8 +137,6 @@
                 <button class="tab-btn active" data-tab="display">表示</button>
                 <button class="tab-btn" data-tab="audio">音声/入力</button>
                 <button class="tab-btn" data-tab="player">プレーヤー</button>
-
-                <button class="tab-btn" data-tab="gdrive">Drive連携</button>
                 <button class="tab-btn" data-tab="help">ヘルプ</button>
                 <button class="tab-btn" data-tab="developer">開発者より</button>
             </div>
@@ -462,24 +458,6 @@
                         <button class="action-btn" id="savePreset3">Slot 3 保存</button>
                         <button class="action-btn" id="loadPreset3">Slot 3 読込</button>
                     </div>
-                </div>
-            </div>
-
-            <div class="tab-content" id="tab-gdrive">
-                <div class="setting-item">
-                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">
-                        Google Driveから音楽ファイルを直接再生するには、Google Cloud ConsoleでAPIキーとクライアントIDを取得する必要があります。
-                    </p>
-                    <label>Client ID</label>
-                    <input type="text" id="clientIdInput" placeholder="YOUR_CLIENT_ID" style="width: 100%; padding: 8px; background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); color: #fff; border-radius: 4px;">
-                </div>
-                <div class="setting-item">
-                    <label>API Key</label>
-                    <input type="text" id="apiKeyInput" placeholder="YOUR_API_KEY" style="width: 100%; padding: 8px; background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); color: #fff; border-radius: 4px;">
-                </div>
-                <div class="setting-item" id="driveDownloadStatus" style="display: none;">
-                    <label>ダウンロード中</label>
-                    <div id="driveDownloadList" style="max-height: 150px; overflow-y: auto; font-size: 0.85rem;"></div>
                 </div>
             </div>
 
