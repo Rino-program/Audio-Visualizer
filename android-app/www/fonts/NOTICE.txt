@@ -1,0 +1,6 @@
+Bundled fonts:
+- Inter-Variable.ttf
+- RobotoMono-Variable.ttf
+
+Source: Google Fonts
+License: SIL Open Font License 1.1

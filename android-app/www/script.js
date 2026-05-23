@@ -5,6 +5,8 @@
  * - Microphone Device Selection
  */
 
+// Google Drive integration removed for F‑Droid packaging
+
 // ============== STATE ==============
 const state = {
     playlist: [],
@@ -77,8 +79,6 @@ const state = {
         videoFitMode: 'cover', // 'cover', 'contain', 'fill'
         repeatMode: 'none',  // 'none', 'one', 'all'
         shuffle: false,
-        gDriveClientId: '',
-        gDriveApiKey: '',
         eq: [0, 0, 0, 0, 0, 0, 0, 0],
         playbackRate: 1.0,
         balance: 0,
@@ -282,7 +282,6 @@ const els = {
     clearPlaylistBtn: $('clearPlaylistBtn'),
     fileInput: $('fileInput'),
     folderImportBtn: $('folderImportBtn'),
-    gDriveBtn: $('gDriveBtn'),
     toggleUIBtn: $('toggleUIBtn'),
     openSettingsBtn: $('openSettingsBtn'),
     resetAllSettingsBtn: $('resetAllSettingsBtn'),
@@ -484,14 +483,7 @@ async function ensureUrlForTrack(track) {
             return track.url;
         }
     }
-    // Drive blob
-    if (track.source === 'drive' && track.fileBlob instanceof Blob) {
-        const url = URL.createObjectURL(track.fileBlob);
-        track.url = url;
-        track.ephemeral = true;
-        blobCache.put(track, url);
-        return url;
-    }
+    // Drive support removed: no remote blob handling
     // Fallback
     throw new Error('Unable to ensure URL for track');
 }
@@ -759,7 +751,6 @@ async function init() {
     }
 
     els.fileInput.onchange = handleLocalFiles;
-    els.gDriveBtn.onclick = openGDrivePicker;
     els.closeVideoBtn.onclick = () => { state.settings.showVideo = false; updateVideoVisibility(); applySettingsToUI(); };
     els.toggleVideoModeBtn.onclick = () => {
         state.settings.videoMode = state.settings.videoMode === 'window' ? 'background' : 'window';
@@ -1259,7 +1250,7 @@ function saveSettingsToStorage() {
             source: track.source,
             isVideo: track.isVideo,
             localRef: track.localRef || null,
-            ...(track.source === 'drive' && { fileId: track.fileId })
+            
         };
     }).filter(Boolean);
     localStorage.setItem('audioVisualizerPlaylistV7', JSON.stringify(playlistData));
@@ -1680,11 +1671,7 @@ async function loadPlaylistFromStorage() {
             continue;
         }
 
-        if (source === 'drive') {
-            // Skip drive tracks if url is not available (no fileBlob) - avoid dangling references
-            if (!item.fileId) continue;
-            restored.push({ name, url: undefined, source: 'drive', isVideo, fileId: item.fileId });
-        }
+        // drive entries removed; skip
     }
 
     state.playlist = restored;
@@ -1958,14 +1945,6 @@ function setupSettingsInputs() {
             if (valEl) valEl.textContent = '0°';
         };
     }
-    const clientIdInput = $('clientIdInput');
-    if (clientIdInput) {
-        clientIdInput.onchange = e => { state.settings.gDriveClientId = e.target.value.trim(); };
-    }
-    const apiKeyInput = $('apiKeyInput');
-    if (apiKeyInput) {
-        apiKeyInput.onchange = e => { state.settings.gDriveApiKey = e.target.value.trim(); };
-    }
     const persistSettingsCheckbox = $('persistSettingsCheckbox');
     if (persistSettingsCheckbox) {
         persistSettingsCheckbox.onchange = e => { state.settings.persistSettings = e.target.checked; };
@@ -2174,8 +2153,6 @@ function applySettingsToUI() {
     $('sandFallRateValue').textContent = (state.settings.sandFallRate || 0.6).toFixed(1);
     $('circleAngleOffsetSlider').value = state.settings.circleAngleOffset || 0;
     $('circleAngleOffsetValue').textContent = `${state.settings.circleAngleOffset || 0}°`;
-    $('clientIdInput').value = state.settings.gDriveClientId;
-    $('apiKeyInput').value = state.settings.gDriveApiKey;
     $('persistSettingsCheckbox').checked = state.settings.persistSettings;
     const storeLocalFilesCheckbox = $('storeLocalFilesCheckbox');
     if (storeLocalFilesCheckbox) storeLocalFilesCheckbox.checked = !!state.settings.storeLocalFiles;
@@ -3294,8 +3271,8 @@ function updateRenderModeStatus() {
 async function removeFromPlaylist(index) {
     if (index < 0 || index >= state.playlist.length) return;
     const track = state.playlist[index];
-    // ローカルファイルとDriveファイルのBlob URLを解放（メモリリーク防止）
-    if (track.source === 'local' || track.source === 'drive') {
+    // ローカルファイルのBlob URLを解放（メモリリーク防止）
+    if (track.source === 'local') {
         if (isBlobUrl(track.url)) URL.revokeObjectURL(track.url);
     }
     // fileBlobがあれば参照を削除してGC対象に
@@ -3354,131 +3331,6 @@ function togglePlaylist() {
     // 両方のボタンの状態を同期
     if (els.closePlaylistBtn) {
         els.closePlaylistBtn.style.display = isCollapsed ? 'none' : 'block';
-    }
-}
-
-// Google Drive (Simplified)
-let accessToken = null;
-function openGDrivePicker() { if (!state.settings.gDriveClientId || !state.settings.gDriveApiKey) { openSettings(); switchTab('gdrive'); return; } if (accessToken) createPicker(); else initGoogleAuth(); }
-function initGoogleAuth() { if (typeof google === 'undefined' || !google.accounts) { const script = document.createElement('script'); script.src = 'https://accounts.google.com/gsi/client'; script.onload = requestGoogleToken; document.body.appendChild(script); } else requestGoogleToken(); }
-function requestGoogleToken() { const tokenClient = google.accounts.oauth2.initTokenClient({ client_id: state.settings.gDriveClientId, scope: 'https://www.googleapis.com/auth/drive.readonly', callback: r => { if (r.error) return; accessToken = r.access_token; loadPickerApi(); } }); tokenClient.requestAccessToken({ prompt: 'consent' }); }
-function loadPickerApi() { if (typeof gapi !== 'undefined' && gapi.picker) createPicker(); else { const script = document.createElement('script'); script.src = 'https://apis.google.com/js/api.js'; script.onload = () => gapi.load('picker', createPicker); document.body.appendChild(script); } }
-function createPicker() { 
-    // MIMEタイプフィルタを使用せず、すべてのファイルを表示可能にする
-    const docsView = new google.picker.DocsView()
-        .setIncludeFolders(true);
-    
-    new google.picker.PickerBuilder()
-        .addView(docsView)
-        .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
-        .setOAuthToken(accessToken)
-        .setDeveloperKey(state.settings.gDriveApiKey)
-        .setCallback(pickerCallback)
-        .build()
-        .setVisible(true);
-}
-async function pickerCallback(data) { 
-    if (data[google.picker.Response.ACTION] === google.picker.Action.PICKED) { 
-        const docs = data[google.picker.Response.DOCUMENTS]; 
-        const promises = docs.map(doc => {
-            const fileName = doc[google.picker.Document.NAME];
-            const ext = fileName.toLowerCase().split('.').pop();
-            const allowedExt = new Set(['mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac', 'mp4', 'webm', 'opus', 'mkv']);
-            
-            if (allowedExt.has(ext)) {
-                return fetchDriveFile(doc[google.picker.Document.ID], fileName);
-            } else {
-                console.warn(`非対応ファイル: ${fileName}`);
-                return Promise.resolve();
-            }
-        });
-        await Promise.all(promises);
-    } 
-}
-
-// Driveダウンロード状況管理（進捗%表示対応）
-const driveDownloads = new Map(); // fileId -> { fileName, status, progress }
-
-function updateDriveDownloadUI() {
-    const statusEl = document.getElementById('driveDownloadStatus');
-    const listEl = document.getElementById('driveDownloadList');
-    if (!statusEl || !listEl) return;
-
-    const downloading = Array.from(driveDownloads.entries()).filter(([_, v]) => v.status === 'downloading');
-    if (downloading.length === 0) {
-        statusEl.style.display = 'none';
-        driveDownloads.clear();
-        return;
-    }
-
-    statusEl.style.display = 'block';
-    listEl.innerHTML = downloading.map(([id, info]) => {
-        const pct = (typeof info.progress === 'number') ? ` <strong>${info.progress}%</strong>` : '';
-        const kb = info.received ? ` (${Math.round(info.received/1024)} KB)` : '';
-        return `<div style="padding:4px 0; color:var(--text-muted);">📥 ${info.fileName}${pct}${kb}</div>`;
-    }).join('');
-}
-
-async function fetchDriveFile(fileId, fileName) {
-    driveDownloads.set(fileId, { fileName, status: 'downloading', progress: 0, received: 0 });
-    updateDriveDownloadUI();
-
-    try {
-        showOverlay(`☁️ Google Driveから取得中...`);
-        const r = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, { headers: { 'Authorization': 'Bearer ' + accessToken } });
-        if (!r.ok) {
-            driveDownloads.set(fileId, { fileName, status: 'error' });
-            updateDriveDownloadUI();
-            showOverlay('❌ 取得に失敗しました');
-            return;
-        }
-
-        const contentLength = r.headers.get('Content-Length');
-        const total = contentLength ? parseInt(contentLength, 10) : null;
-        const reader = r.body && r.body.getReader ? r.body.getReader() : null;
-        let chunks = [];
-        let received = 0;
-
-        if (reader) {
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                chunks.push(value);
-                received += value.length || value.byteLength || 0;
-                const progress = total ? Math.min(100, Math.round((received / total) * 100)) : null;
-                driveDownloads.set(fileId, { fileName, status: 'downloading', progress, received });
-                updateDriveDownloadUI();
-            }
-            const blob = new Blob(chunks);
-            const ext = fileName.toLowerCase().split('.').pop();
-            const videoExt = new Set(['mp4', 'webm', 'mkv', 'mov']);
-            const isVideo = videoExt.has(ext);
-            state.playlist.push({ name: fileName, url: undefined, fileBlob: blob, source: 'drive', isVideo: isVideo, ephemeral: false, fileId: fileId, addedOrder: state.addedOrderCounter++ });
-            renderPlaylist();
-            if (state.currentIndex === -1) playTrack(state.playlist.length - 1);
-
-            driveDownloads.set(fileId, { fileName, status: 'completed', progress: 100 });
-            updateDriveDownloadUI();
-            showOverlay(`✅ ${fileName} を追加しました`);
-            return;
-        }
-
-        // フォールバック（ストリーム未対応環境）
-        const blob = await r.blob();
-        const ext = fileName.toLowerCase().split('.').pop();
-        const videoExt = new Set(['mp4', 'webm', 'mkv', 'mov']);
-        const isVideo = videoExt.has(ext);
-        state.playlist.push({ name: fileName, url: undefined, fileBlob: blob, source: 'drive', isVideo: isVideo, ephemeral: false, fileId: fileId, addedOrder: state.addedOrderCounter++ });
-        renderPlaylist();
-        if (state.currentIndex === -1) playTrack(state.playlist.length - 1);
-
-        driveDownloads.set(fileId, { fileName, status: 'completed', progress: 100 });
-        updateDriveDownloadUI();
-        showOverlay(`✅ ${fileName} を追加しました`);
-    } catch (e) {
-        driveDownloads.set(fileId, { fileName, status: 'error' });
-        updateDriveDownloadUI();
-        showOverlay('❌ エラーが発生しました');
     }
 }
 

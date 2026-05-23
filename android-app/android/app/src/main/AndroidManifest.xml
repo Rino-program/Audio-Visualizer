@@ -51,7 +51,6 @@
 
     <!-- Permissions -->
 
-    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Background audio playback permissions -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
