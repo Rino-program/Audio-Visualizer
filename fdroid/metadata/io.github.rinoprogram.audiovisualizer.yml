@@ -26,9 +26,9 @@ IssueTracker: https://github.com/Rino-program/Audio-Visualizer/issues
 UpdateCheckMode: Tags .*[0-9]$
 AutoUpdateMode: Version
 Builds:
-  - versionName: 1.0.5
-    versionCode: 5
-    commit: e7122e324f3a01aafb1ba4611b643ef76804470a
+  - versionName: 1.0.6
+    versionCode: 6
+    commit: ff4b61b0d2797d6d011632b8f776f989913eac90
     subdir: android-app/android
     scandelete: android-app/android/app/build
     build: |
