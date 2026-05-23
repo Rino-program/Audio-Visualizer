@@ -593,6 +593,27 @@ function setAppHeight() {
     document.documentElement.style.setProperty('--app-height', `${viewH}px`);
     document.documentElement.style.setProperty('--app-width', `${viewW}px`);
 }
+
+// On some mobile browsers the CSS 100vh and viewport units can change
+// when the address bar shows/hides or after orientation changes. Setting
+// the body's explicit height helps keep absolutely-positioned UI elements
+// anchored correctly instead of snapping to the top-left.
+function applyExplicitBodyHeight() {
+    const viewH = window.visualViewport?.height || window.innerHeight;
+    try {
+        document.body.style.height = `${viewH}px`;
+        document.body.style.minHeight = `${viewH}px`;
+    } catch (e) {
+        // ignore in non-browser or constrained environments
+    }
+}
+
+// Keep body height in sync whenever app height is updated
+const _orig_setAppHeight = setAppHeight;
+setAppHeight = function() {
+    _orig_setAppHeight();
+    applyExplicitBodyHeight();
+};
 function clearPlayTimeout() { if (state.playTimeout) { clearTimeout(state.playTimeout); state.playTimeout = null; } }
 
 // ============== INITIALIZATION ==============
