@@ -22,8 +22,10 @@ Description: |
 RepoType: git
 Repo: https://github.com/Rino-program/Audio-Visualizer.git
 IssueTracker: https://github.com/Rino-program/Audio-Visualizer/issues
-UpdateCheckMode: Tags .*[0-9]$
 AutoUpdateMode: Version
+UpdateCheckMode: Tags .*[0-9]$
+CurrentVersion: 1.0.6
+CurrentVersionCode: 6
 Builds:
   - versionName: 1.0.6
     versionCode: 6
