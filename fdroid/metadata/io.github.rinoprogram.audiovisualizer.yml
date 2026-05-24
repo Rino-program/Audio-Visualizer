@@ -28,7 +28,7 @@ AutoUpdateMode: Version
 Builds:
   - versionName: 1.0.6
     versionCode: 6
-    commit: bb5317948abb895f5825641f571e422b7d1dd158
+    commit: 43eeb1194bad31d484483527d70df58026036214
     subdir: android-app/android
     gradle:
       - yes
