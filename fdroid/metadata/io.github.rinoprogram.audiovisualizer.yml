@@ -6,7 +6,6 @@ License: MIT
 AutoName: Audio Visualizer
 WebSite: https://rino-program.github.io/WEBHub/
 SourceCode: https://github.com/Rino-program/Audio-Visualizer
-Summary: ローカル再生向けオーディオビジュアライザー
 Description: |
   Audio Visualizer は、端末内の音声/動画ファイルを再生しながら、ビジュアルエフェクトを表示する Android アプリです。
 
