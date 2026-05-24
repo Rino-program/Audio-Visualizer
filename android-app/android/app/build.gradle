@@ -51,6 +51,11 @@ android {
             signingConfig hasReleaseKeystore ? signingConfigs.release : signingConfigs.debug
         }
     }
+
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
 }
 
 repositories {

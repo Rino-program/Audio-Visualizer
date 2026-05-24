@@ -1,31 +1,16 @@
 Categories:
   - Multimedia
+License: MIT
 AuthorName: Rino-program
 AuthorWebSite: https://rino-program.github.io/WEBHub/
-License: MIT
-AutoName: Audio Visualizer
-WebSite: https://rino-program.github.io/WEBHub/
 SourceCode: https://github.com/Rino-program/Audio-Visualizer
-Description: |
-  Audio Visualizer は、端末内の音声/動画ファイルを再生しながら、ビジュアルエフェクトを表示する Android アプリです。
+IssueTracker: https://github.com/Rino-program/Audio-Visualizer/issues
 
-  特徴:
-  - ローカルファイルの再生（音声/動画）
-  - ビジュアライザー表示と基本的なメディア操作
-  - F-Droid 向けにローカル動作を重視（Google サービスや Google Drive 連携は不要）
+AutoName: Audio Visualizer
 
-  プライバシー/権限（要約）:
-  - ネットワーク機能は不要（インターネット権限なし）。
-  - マイク権限は、任意の「Mic」可視化モードでのみ使用します。
-  - メディア読み取り権限は、端末内の音声/動画ファイルを開いて再生するために使用します。
-  - フォアグラウンドサービス/スリープ抑止は、バックグラウンド再生の安定性と通知上の再生コントロール表示のために使用します。
 RepoType: git
 Repo: https://github.com/Rino-program/Audio-Visualizer.git
-IssueTracker: https://github.com/Rino-program/Audio-Visualizer/issues
-AutoUpdateMode: Version
-UpdateCheckMode: Tags .*[0-9]$
-CurrentVersion: 1.0.6
-CurrentVersionCode: 6
+
 Builds:
   - versionName: 1.0.6
     versionCode: 6
@@ -34,3 +19,8 @@ Builds:
     gradle:
       - yes
     output: app/build/outputs/apk/release/app-release.apk
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: 1.0.6
+CurrentVersionCode: 6
