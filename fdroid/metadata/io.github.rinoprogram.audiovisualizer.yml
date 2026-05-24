@@ -28,7 +28,7 @@ AutoUpdateMode: Version
 Builds:
   - versionName: 1.0.6
     versionCode: 6
-    commit: ff4b61b0d2797d6d011632b8f776f989913eac90
+    commit: ed4418c8f516aa9f8e469fc0b801a6ab7093f60a
     subdir: android-app/android
     scandelete: android-app/android/app/build
     build: |
