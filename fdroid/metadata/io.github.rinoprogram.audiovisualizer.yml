@@ -29,7 +29,7 @@ CurrentVersionCode: 6
 Builds:
   - versionName: 1.0.6
     versionCode: 6
-    commit: 43eeb1194bad31d484483527d70df58026036214
+    commit: f99b3c336309d7c9e732fcc6ad2ad222194f9970
     subdir: android-app/android
     gradle:
       - yes
