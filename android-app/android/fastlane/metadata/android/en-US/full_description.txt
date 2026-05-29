@@ -1,7 +1,7 @@
 Audio Visualizer is an Android app for playing local audio and video files while showing visual effects.
 
 Features:
-- Local playback of audio and video files
-- Visualizer display with basic media controls
-- Built for offline use without Google services
-- Focused on local media playback for F-Droid distribution
+ - Local playback of audio and video files
+ - Visualizer display with basic media controls
+ - Built for offline use without Google services
+ - Focused on local media playback for F-Droid distribution

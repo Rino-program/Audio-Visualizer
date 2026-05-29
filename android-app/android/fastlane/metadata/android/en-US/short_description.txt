@@ -1,1 +1,1 @@
-ローカル再生向けオーディオビジュアライザー
+Audio visualizer for local media playback.
