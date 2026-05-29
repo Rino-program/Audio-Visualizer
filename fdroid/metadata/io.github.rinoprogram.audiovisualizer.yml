@@ -14,7 +14,7 @@ Repo: https://github.com/Rino-program/Audio-Visualizer.git
 Builds:
   - versionName: 1.0.7
     versionCode: 7
-    commit: f99b3c336309d7c9e732fcc6ad2ad222194f9970
+    commit: b669ec058affcd9ae30bfd0330375995556f270f
     subdir: android-app/android
     gradle:
       - yes
