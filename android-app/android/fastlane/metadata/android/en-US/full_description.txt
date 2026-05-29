@@ -5,3 +5,6 @@ Features:
  - Visualizer display with basic media controls
  - Built for offline use without Google services
  - Focused on local media playback for F-Droid distribution
+
+Source code:
+https://github.com/Rino-program/Audio-Visualizer
