@@ -10,15 +10,17 @@ AutoName: Audio Visualizer
 
 RepoType: git
 Repo: https://github.com/Rino-program/Audio-Visualizer.git
+Binaries: https://github.com/Rino-program/Audio-Visualizer/releases/download/v%v/app-release.apk
+AllowedAPKSigningKeys:
+  - c9812e0591a0182fff8323dd045557b8d1bcc33f8e3fcd255567828608b76c58
 
 Builds:
   - versionName: 1.0.7
     versionCode: 7
-    commit: b669ec058affcd9ae30bfd0330375995556f270f
+    commit: d2f4cb57b2ba3af2b7f69cd4946f296ec899c9a1
     subdir: android-app/android
     gradle:
       - yes
-    output: app/build/outputs/apk/release/app-release.apk
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags

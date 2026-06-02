@@ -17,6 +17,7 @@ android-app/android/app/build/
 # Android signing / Firebase (never commit)
 /android-app/android/keystore.properties
 /android-app/android/app/google-services.json
+key/*
 *.jks
 *.keystore
 

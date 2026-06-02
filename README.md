@@ -34,6 +34,8 @@ cd android-app/android
 
 macOS / Linux では `./gradlew assembleRelease` を使います。
 
+ローカルで作成した release APK は [android-app/android/app/build/outputs/apk/release/app-release.apk](android-app/android/app/build/outputs/apk/release/app-release.apk) に出力されます。
+
 ## F-Droid 向けメモ
 
 このリポジトリは Android 配布物に範囲を絞っています。不要になった Web / PC 向けの説明や開発用設定は削除済みです。
