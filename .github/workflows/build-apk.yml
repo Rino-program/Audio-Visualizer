@@ -39,11 +39,13 @@ jobs:
           npx --package=@capacitor/cli cap sync
 
       - name: Gradle でリリースビルドを実行
-        # Androidのビルドディレクトリも偽装したF-Droid環境に変更
         working-directory: /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer/android-app/android
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease
+          # --no-daemon : バックグラウンドプロセスを使わない
+          # -Dorg.gradle.workers.max=1 : 全ての処理をシングルスレッド（1コア）に強制固定して順序を一定にする
+          # -Dkotlin.compiler.execution.strategy="in-process" : Kotlinのコンパイルもシングルプロセスで行う
+          ./gradlew assembleRelease --no-daemon -Dorg.gradle.workers.max=1 -Dkotlin.compiler.execution.strategy="in-process"
 
       - name: 出来上がった APK を保存（アーティファクト）
         uses: actions/upload-artifact@v4
