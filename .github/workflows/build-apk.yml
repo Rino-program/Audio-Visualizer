@@ -20,7 +20,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: '17'
-          distribution: 'jdkblueprint' # または 'adopt'。F-Droidの環境に合わせるため標準的なものに
+          distribution: 'temurin' # もしくは 'zulu'
 
       - name: F-Droidと完全に同じ絶対パスの環境を構築
         run: |
