@@ -1,11 +1,11 @@
-name: Build Android APK (Ubuntu)
+name: Build Android APK (Reproducible)
 
 on:
-  workflow_dispatch: # GitHubの画面から手動でボタンを押して実行できるようにする設定
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest # F-Droidと同じUbuntu環境を指定
+    runs-on: ubuntu-latest
 
     steps:
       - name: リポジトリのコードを取得
@@ -14,7 +14,7 @@ jobs:
       - name: Node.js のセットアップ
         uses: actions/setup-node@v4
         with:
-          node-version: '20' # 必要に応じてお使いのバージョンに合わせてください
+          node-version: '20'
 
       - name: Java (JDK 17) のセットアップ
         uses: actions/setup-java@v4
@@ -22,14 +22,25 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: F-Droidと完全に同じ絶対パスの環境を構築
+        run: |
+          # F-Droidと同じディレクトリ構造を強制的に作成
+          sudo mkdir -p /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer
+          # 権限を付与
+          sudo chown -R $USER:$USER /builds/
+          # 現在のコードを、作成したF-Droid環境のパスへすべて丸写しする（隠しファイル含む）
+          cp -a $GITHUB_WORKSPACE/. /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer/
+
       - name: 依存関係のインストールと Capacitor 同期
-        working-directory: ./android-app
+        # 作業ディレクトリを偽装したF-Droid環境に変更
+        working-directory: /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer/android-app
         run: |
           npm ci
           npx --package=@capacitor/cli cap sync
 
       - name: Gradle でリリースビルドを実行
-        working-directory: ./android-app/android
+        # Androidのビルドディレクトリも偽装したF-Droid環境に変更
+        working-directory: /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer/android-app/android
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease
@@ -38,4 +49,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ubuntu-release-unsigned-apk
-          path: android-app/android/app/build/outputs/apk/release/app-release.apk
+          # 偽装環境からAPKを拾い上げる
+          path: /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer/**/*.apk
