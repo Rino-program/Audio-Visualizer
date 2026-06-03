@@ -16,18 +16,18 @@ Binaries:
 Builds:
   - versionName: 1.0.7
     versionCode: 7
-    commit: 17c2c760e1c89e7b7184cd6369880f2a92730750
+    commit: 8944813f499d32ae2b29428f6e79c1abe636a0db
     subdir: android-app/android
     sudo:
       - apt-get update || true
       - apt-get install -y nodejs npm
     gradle:
       - yes
+    output: app/build/outputs/apk/release/app-release.apk
     build:
       - cd ..
       - npm ci
       - npx --package=@capacitor/cli cap sync
-    output: android-app/android/app/build/outputs/apk/release/app-release-unsigned.apk
 
 AllowedAPKSigningKeys: 228bbdf858e59ccaba795aa66016d717281281cae6a1f725b1b7660afc87c45b
 

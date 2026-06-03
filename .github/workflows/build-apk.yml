@@ -1,0 +1,41 @@
+name: Build Android APK (Ubuntu)
+
+on:
+  workflow_dispatch: # GitHubの画面から手動でボタンを押して実行できるようにする設定
+
+jobs:
+  build:
+    runs-on: ubuntu-latest # F-Droidと同じUbuntu環境を指定
+
+    steps:
+      - name: リポジトリのコードを取得
+        uses: actions/checkout@v4
+
+      - name: Node.js のセットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # 必要に応じてお使いのバージョンに合わせてください
+
+      - name: Java (JDK 17) のセットアップ
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: 依存関係のインストールと Capacitor 同期
+        working-directory: ./android-app
+        run: |
+          npm ci
+          npx --package=@capacitor/cli cap sync
+
+      - name: Gradle でリリースビルドを実行
+        working-directory: ./android-app/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease
+
+      - name: 出来上がった APK を保存（アーティファクト）
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu-release-unsigned-apk
+          path: android-app/android/app/build/outputs/apk/release/app-release-unsigned.apk
