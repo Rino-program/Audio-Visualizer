@@ -1,2 +1,4 @@
+* text=auto eol=lf
+
 fdroid/metadata/*.yml text eol=lf
 android-app/android/fastlane/metadata/android/**/*.txt text eol=lf
