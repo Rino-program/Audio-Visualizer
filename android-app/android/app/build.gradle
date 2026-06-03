@@ -37,6 +37,15 @@ android {
             }
         }
     }
+
+    packaging {
+        resources {
+            // 再現可能ビルドの妨げになるベースラインプロファイルを完全に除外
+            excludes += "/assets/dexopt/baseline.prof"
+            excludes += "/assets/dexopt/baseline.profm"
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
