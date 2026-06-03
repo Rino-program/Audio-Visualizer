@@ -28,7 +28,6 @@ task clean(type: Delete) {
 }
 
 android {
-    ...
     packaging {
         resources {
             // 再現可能ビルドの妨げになるベースラインプロファイルを完全に除外
