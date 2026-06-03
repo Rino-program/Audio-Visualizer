@@ -20,19 +20,15 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: '21'
-          distribution: 'temurin' # もしくは 'zulu'
+          distribution: 'temurin'
 
       - name: F-Droidと完全に同じ絶対パスの環境を構築
         run: |
-          # F-Droidと同じディレクトリ構造を強制的に作成
           sudo mkdir -p /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer
-          # 権限を付与
           sudo chown -R $USER:$USER /builds/
-          # 現在のコードを、作成したF-Droid環境のパスへすべて丸写しする（隠しファイル含む）
           cp -a $GITHUB_WORKSPACE/. /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer/
 
       - name: 依存関係のインストールと Capacitor 同期
-        # 作業ディレクトリを偽装したF-Droid環境に変更
         working-directory: /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer/android-app
         run: |
           npm ci
@@ -42,12 +38,22 @@ jobs:
         working-directory: /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer/android-app/android
         run: |
           chmod +x gradlew
-          # 引数は gradle.properties に移行したため、シンプルに assembleRelease のみでOK
           ./gradlew assembleRelease --no-daemon
+
+      - name: Android アプリに署名
+        uses: r0adkll/sign-android-release@v1
+        id: sign_app
+        with:
+          releaseDirectory: /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer/android-app/android/app/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          alias: ${{ secrets.ANDROID_KEY_ALIAS }}
+          keyStorePassword: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        env:
+          BUILD_TOOLS_VERSION: "34.0.0"
 
       - name: 出来上がった APK を保存（アーティファクト）
         uses: actions/upload-artifact@v4
         with:
-          name: ubuntu-release-unsigned-apk
-          # 偽装環境からAPKを拾い上げる
-          path: /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer/**/*.apk
+          name: ubuntu-release-signed-apk
+          path: ${{ steps.sign_app.outputs.signedReleaseFile }}

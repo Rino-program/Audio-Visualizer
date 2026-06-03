@@ -29,7 +29,7 @@ Builds:
       - npm ci
       - npx --package=@capacitor/cli cap sync
 
-AllowedAPKSigningKeys: 228bbdf858e59ccaba795aa66016d717281281cae6a1f725b1b7660afc87c45b
+AllowedAPKSigningKeys: c9812e0591a0182fff8323dd045557b8d1bcc33f8e3fcd255567828608b76c58
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
