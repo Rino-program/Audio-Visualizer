@@ -16,10 +16,10 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Java (JDK 17) のセットアップ
+      - name: Java (JDK 21) のセットアップ
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          java-version: '21'
           distribution: 'temurin' # もしくは 'zulu'
 
       - name: F-Droidと完全に同じ絶対パスの環境を構築

@@ -19,13 +19,13 @@ Builds:
     commit: c488fda0a40b3f36199f1a726120063098ccba4a
     subdir: android-app/android/app
     sudo:
-      - apt-get update || true
-      - apt-get install -y nodejs npm
+      - apt-get update
+      - apt-get install -y nodejs npm openjdk-21-jdk
     gradle:
       - yes
-    output: build/outputs/apk/release/app-release.apk
     build:
-      - cd ../../..
+      - export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+      - cd ../../
       - npm ci
       - npx --package=@capacitor/cli cap sync
 
