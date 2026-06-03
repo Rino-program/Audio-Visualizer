@@ -42,10 +42,8 @@ jobs:
         working-directory: /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer/android-app/android
         run: |
           chmod +x gradlew
-          # --no-daemon : バックグラウンドプロセスを使わない
-          # -Dorg.gradle.workers.max=1 : 全ての処理をシングルスレッド（1コア）に強制固定して順序を一定にする
-          # -Dkotlin.compiler.execution.strategy="in-process" : Kotlinのコンパイルもシングルプロセスで行う
-          ./gradlew assembleRelease --no-daemon -Dorg.gradle.workers.max=1 -Dkotlin.compiler.execution.strategy="in-process"
+          # 引数は gradle.properties に移行したため、シンプルに assembleRelease のみでOK
+          ./gradlew assembleRelease --no-daemon
 
       - name: 出来上がった APK を保存（アーティファクト）
         uses: actions/upload-artifact@v4
