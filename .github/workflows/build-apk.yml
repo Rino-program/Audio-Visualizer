@@ -52,8 +52,11 @@ jobs:
         env:
           BUILD_TOOLS_VERSION: "34.0.0"
 
+      - name: ファイル名を app-release.apk に戻す
+        run: mv ${{ steps.sign_app.outputs.signedReleaseFile }} /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer/android-app/android/app/build/outputs/apk/release/app-release.apk
+
       - name: 出来上がった APK を保存（アーティファクト）
         uses: actions/upload-artifact@v4
         with:
           name: ubuntu-release-signed-apk
-          path: ${{ steps.sign_app.outputs.signedReleaseFile }}
+          path: /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer/android-app/android/app/build/outputs/apk/release/app-release.apk
