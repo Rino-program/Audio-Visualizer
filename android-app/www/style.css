@@ -858,6 +858,7 @@ select option {
 .playlist-actions .icon-btn.sm {
     width: 36px;
     height: 36px;
+    text-align: right;
 }
 
 .playlist-header {
@@ -1348,6 +1349,19 @@ select option {
     border-color: #ef4444 !important;
 }
 
+#playlistToggle {
+    margin-left: auto;
+}
+
+.btn-icon {
+    width: 100%;       /* ボタンの横幅いっぱいに広げる */
+    height: 100%;      /* ボタンの縦幅いっぱいに広げる */
+    max-width: 24px;   /* 必要に応じて！元の四角と同じくらいの最大横幅（例: 16px〜24px） */
+    max-height: 24px;  /* 必要に応じて！元の四角と同じくらいの最大縦幅（例: 16px〜24px） */
+    object-fit: contain; /* 縦横比を崩さずに綺麗に収める */
+    vertical-align: middle; /* 文字の並びと同じ高さに揃える */
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     /* Keep the fixed buttons from overlapping the title/status on small screens */
@@ -1533,7 +1547,10 @@ select option {
     }
 
     .playlist-actions {
-        gap: 6px;
+        display: flex;
+        justify-content: flex-end; /* 要素をすべて右端に寄せる */
+        gap: 8px;                  /* 必要に応じてボタン同士の間隔を調整 */
+        flex-grow: 1;
     }
 
     .volume-controls {

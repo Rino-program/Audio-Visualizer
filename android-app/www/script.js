@@ -770,7 +770,10 @@ async function init() {
         toggleUI();
     });
     // Initialize toggle button label
-    els.toggleUIBtn.textContent = state.uiVisible ? '🔳' : '🔲';
+    els.toggleUIBtn.innerHTML = state.uiVisible 
+        ? '<img src="audio-visualizer-icon.png" alt="表示" class="btn-icon">' 
+        : '<img src="audio-visualizer-icon.png" alt="非表示" class="btn-icon">';
+
     els.openSettingsBtn.onclick = openSettings;
     els.closeSettingsBtn.onclick = closeSettings;
     els.saveSettingsBtn.onclick = saveSettings;
@@ -3448,7 +3451,11 @@ function toggleUI() {
     // DOM更新
     els.uiLayer.classList.toggle('hidden', !state.uiVisible); 
     if (els.toggleUIBtn) {
-        els.toggleUIBtn.textContent = state.uiVisible ? '🔳' : '🔲';
+        // Initialize toggle button label
+        els.toggleUIBtn.innerHTML = state.uiVisible 
+            ? '<img src="audio-visualizer-icon.png" alt="表示" class="btn-icon">' 
+            : '<img src="audio-visualizer-icon.png" alt="非表示" class="btn-icon">';
+
     }
 
     // UIを非表示にする時は開いているパネル/モーダルを閉じる
