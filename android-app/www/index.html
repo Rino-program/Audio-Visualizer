@@ -9,51 +9,43 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Canvas Layer -->
     <canvas id="cv"></canvas>
 
-    <!-- Video Layer -->
     <div id="videoContainer" class="video-container hidden">
         <video id="bgVideo" loop playsinline muted preload="auto"></video>
         <div class="video-controls">
             <div style="display: flex; gap: 5px;">
-                <button id="closeVideoBtn" class="mini-btn" title="閉じる" aria-label="動画を閉じる">✖</button>
-                <button id="toggleVideoModeBtn" class="mini-btn" title="背景切替" aria-label="動画表示モードを切り替える">🖼️</button>
+                <button id="closeVideoBtn" class="mini-btn" data-i18n-title="btn.close" data-i18n-aria="aria.closeVideo" title="閉じる" aria-label="動画を閉じる">✖</button>
+                <button id="toggleVideoModeBtn" class="mini-btn" data-i18n-title="btn.bgToggle" data-i18n-aria="aria.toggleVideo" title="背景切替" aria-label="動画表示モードを切り替える">🖼️</button>
             </div>
             <div class="video-handle">⠿</div>
         </div>
     </div>
 
-    <!-- UI Layer -->
     <div id="uiLayer">
-        <!-- Top Bar -->
         <div class="top-bar glass">
             <div class="status-display">
                 <div class="now-playing-badge">
                     <div class="now-playing-meta">
-                        <span id="statusText">🎵 待機中...</span>
-                        <span id="nextUpText" class="next-up-text">次: --</span>
+                        <span id="statusText" data-i18n="status.waiting">🎵 待機中...</span>
+                        <span id="nextUpText" class="next-up-text" data-i18n="status.nextUp">次: --</span>
                     </div>
                 </div>
                 <span id="timeDisplay">0:00 / 0:00</span>
             </div>
             <div class="top-controls">
-                <!-- Input Source Toggle -->
                 <div class="input-toggle-group">
-                    <button id="sourceFileBtn" class="toggle-btn active" title="ファイル再生モード" aria-label="ファイル再生モード">📁 File</button>
-                    <button id="sourceMicBtn" class="toggle-btn" title="マイク入力モード" aria-label="マイク入力モード">🎤 Mic</button>
+                    <button id="sourceFileBtn" class="toggle-btn active" data-i18n-title="tooltip.fileMode" data-i18n-aria="aria.fileMode" data-i18n="btn.modeFile" title="ファイル再生モード" aria-label="ファイル再生モード">📁 File</button>
+                    <button id="sourceMicBtn" class="toggle-btn" data-i18n-title="tooltip.micMode" data-i18n-aria="aria.micMode" data-i18n="btn.modeMic" title="マイク入力モード" aria-label="マイク入力モード">🎤 Mic</button>
                 </div>
-                <button id="playlistToggle" class="icon-btn" title="プレイリスト" aria-label="プレイリストを開く">📂</button>
-                <button id="openSettingsBtn" class="icon-btn" title="設定" aria-label="設定を開く">⚙️</button>
+                <button id="playlistToggle" class="icon-btn" data-i18n-title="btn.playlist" data-i18n-aria="aria.playlist" title="プレイリスト" aria-label="プレイリストを開く">📂</button>
+                <button id="openSettingsBtn" class="icon-btn" data-i18n-title="btn.settings" data-i18n-aria="aria.settings" title="設定" aria-label="設定を開く">⚙️</button>
             </div>
         </div>
 
-        <!-- Center Overlay -->
         <div id="overlayMsg" class="overlay-msg hidden"></div>
 
-        <!-- Bottom Controls -->
         <div id="controlsBar" class="controls-bar glass">
-            <!-- Progress -->
             <div class="progress-container" id="progressContainer">
                 <div class="seek-track">
                     <div id="seekBuffer" class="seek-buffer"></div>
@@ -62,26 +54,22 @@
                 <input type="range" id="seekBar" value="0" min="0" step="0.1">
             </div>
 
-            <!-- Main Controls Row -->
             <div class="main-controls">
-                <!-- Left: Volume -->
                 <div class="control-group left">
                     <div class="volume-controls">
                         <span id="volIcon">🔊</span>
-                        <input type="range" id="volSlider" min="0" max="1" step="0.05" value="1" aria-label="音量">
+                        <input type="range" id="volSlider" min="0" max="1" step="0.05" value="1" data-i18n-aria="aria.volume" aria-label="音量">
                     </div>
                 </div>
 
-                <!-- Center: Playback -->
                 <div class="control-group center" id="playbackControls">
-                    <button id="shuffleBtn" class="icon-btn sm" title="シャッフル" aria-label="シャッフル">🔀</button>
-                    <button id="prevBtn" class="ctrl-btn sm" aria-label="前の曲">⏮</button>
-                    <button id="playBtn" class="ctrl-btn play-btn" aria-label="再生/一時停止">▶</button>
-                    <button id="nextBtn" class="ctrl-btn sm" aria-label="次の曲">⏭</button>
-                    <button id="repeatBtn" class="icon-btn sm" title="リピート" aria-label="リピート">🔁</button>
+                    <button id="shuffleBtn" class="icon-btn sm" data-i18n-title="btn.shuffle" data-i18n-aria="aria.shuffle" title="シャッフル" aria-label="シャッフル">🔀</button>
+                    <button id="prevBtn" class="ctrl-btn sm" data-i18n-aria="aria.prev" aria-label="前の曲">⏮</button>
+                    <button id="playBtn" class="ctrl-btn play-btn" data-i18n-aria="aria.playPause" aria-label="再生/一時停止">▶</button>
+                    <button id="nextBtn" class="ctrl-btn sm" data-i18n-aria="aria.next" aria-label="次の曲">⏭</button>
+                    <button id="repeatBtn" class="icon-btn sm" data-i18n-title="btn.repeat" data-i18n-aria="aria.repeat" title="リピート" aria-label="リピート">🔁</button>
                 </div>
 
-                <!-- Right: Mode & Export -->
                 <div class="control-group right">
                     <select id="modeSelect" class="mode-select">
                         <option value="0">Bars</option>
@@ -94,82 +82,89 @@
                         <option value="7">Hexagon</option>
                         <option value="8">Mirror</option>
                     </select>
-                    <button id="exportBtn" class="icon-btn" title="動画書き出し" aria-label="動画を書き出す">🎬</button>
+                    <button id="exportBtn" class="icon-btn" data-i18n-title="btn.export" data-i18n-aria="aria.export" title="動画書き出し" aria-label="動画を書き出す">🎬</button>
                 </div>
             </div>
         </div>
 
-        <!-- Playlist Panel -->
         <div id="playlistPanel" class="playlist-panel glass collapsed">
             <div class="playlist-header">
-                <h3>プレイリスト</h3>
+                <h3 data-i18n="playlist.title">プレイリスト</h3>
                 <div class="playlist-actions">
-                    <button id="clearPlaylistBtn" class="icon-btn sm" title="すべて削除" aria-label="プレイリストをすべて削除">🗑️</button>
-                    <button id="nativeFileBtn" class="icon-btn sm file-btn" title="ファイル追加" aria-label="ファイルを追加">➕</button>
+                    <button id="clearPlaylistBtn" class="icon-btn sm" data-i18n-title="btn.clearAll" data-i18n-aria="aria.clearAll" title="すべて削除" aria-label="プレイリストをすべて削除">🗑️</button>
+                    <button id="nativeFileBtn" class="icon-btn sm file-btn" data-i18n-title="btn.addFile" data-i18n-aria="aria.addFile" title="ファイル追加" aria-label="ファイルを追加">➕</button>
                     <input type="file" id="fileInput" multiple hidden>
                 </div>
-                <button id="closePlaylistBtn" class="icon-btn sm" title="閉じる" aria-label="プレイリストを閉じる">✖</button>
+                <button id="closePlaylistBtn" class="icon-btn sm" data-i18n-title="btn.close" data-i18n-aria="aria.closePlaylist" title="閉じる" aria-label="プレイリストを閉じる">✖</button>
             </div>
             <div class="playlist-search">
-                <input type="text" id="playlistSearchInput" placeholder="曲名で検索..." aria-label="プレイリスト検索">
+                <input type="text" id="playlistSearchInput" data-i18n-placeholder="playlist.search" placeholder="曲名で検索..." aria-label="プレイリスト検索">
             </div>
             <div id="playlistItems" class="playlist-items">
-                <div class="playlist-empty">曲を追加してください</div>
+                <div class="playlist-empty" data-i18n="playlist.empty">曲を追加してください</div>
             </div>
         </div>
     </div>
 
-    <!-- Persistent Controls (Always Visible) -->
     <div id="persistentControls">
-        <button id="toggleUIBtn" class="icon-btn" title="UI表示切替 (H)" aria-label="UI表示を切り替える">
+        <button id="toggleUIBtn" class="icon-btn" data-i18n-title="btn.toggleUI" data-i18n-aria="aria.toggleUI" title="UI表示切替 (H)" aria-label="UI表示を切り替える">
             <img src="audio-visualizer-icon-btn.png" alt="UI切替" class="btn-icon">
         </button>
     </div>
 
-    <!-- Settings Modal -->
     <div id="settingsModal" class="modal">
         <div class="modal-content glass">
             <div class="modal-header">
-                <h2>設定</h2>
-                <button id="closeSettingsBtn" class="close-btn">✖</button>
+                <h2 data-i18n="settings.title">設定</h2>
+                <button id="closeSettingsBtn" class="close-btn" data-i18n-title="btn.close" aria-label="閉じる">✖</button>
             </div>
             
             <div class="tabs">
-                <button class="tab-btn active" data-tab="display">表示</button>
-                <button class="tab-btn" data-tab="audio">音声/入力</button>
-                <button class="tab-btn" data-tab="player">プレーヤー</button>
-                <button class="tab-btn" data-tab="help">ヘルプ</button>
-                <button class="tab-btn" data-tab="developer">開発者より</button>
+                <button class="tab-btn active" data-tab="display" data-i18n="tab.display">表示</button>
+                <button class="tab-btn" data-tab="audio" data-i18n="tab.audio">音声/入力</button>
+                <button class="tab-btn" data-tab="player" data-i18n="tab.player">プレーヤー</button>
+                <button class="tab-btn" data-tab="help" data-i18n="tab.help">ヘルプ</button>
+                <button class="tab-btn" data-tab="developer" data-i18n="tab.developer">開発者より</button>
             </div>
 
             <div class="tab-content active" id="tab-display">
-                <div class="settings-section-title">表示チューニング</div>
+                <div class="settings-section-title" data-i18n="section.system">システム / System</div>
                 <div class="setting-item">
-                    <label>スムージング (滑らかさ)</label>
+                    <label for="langSelect" data-i18n="label.language">言語 / Language</label>
+                    <select id="langSelect" style="width: 100%; padding: 6px; background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); color: #fff; border-radius: 4px; margin-top: 5px; outline: none;">
+                        <option value="ja">日本語</option>
+                        <option value="en">English</option>
+                        <option value="zh">中文 (简体)</option>
+                    </select>
+                </div>
+
+                <div class="settings-section-title" data-i18n="section.displayTuning">表示チューニング</div>
+                <div class="setting-item">
+                    <label data-i18n="label.smoothing">スムージング (滑らかさ)</label>
                     <div class="range-wrapper">
                         <input type="range" id="smoothingSlider" min="0.1" max="0.95" step="0.05">
                         <span id="smoothingValue">0.70</span>
                     </div>
                 </div>
                 <div class="setting-item">
-                    <label>感度 (Sensitivity)</label>
+                    <label data-i18n="label.sensitivity">感度 (Sensitivity)</label>
                     <div class="range-wrapper">
                         <input type="range" id="sensitivitySlider" min="0.1" max="3.0" step="0.1">
                         <span id="sensitivityValue">1.0</span>
                     </div>
                 </div>
                 <div class="setting-item" style="display: none;">
-                    <label>ビジュアライザー品質（FFT）</label>
+                    <label data-i18n="label.fftQuality">ビジュアライザー品質（FFT）</label>
                     <select id="qualitySelect">
-                        <option value="1024">省電力 (軽量)</option>
-                        <option value="2048" selected>バランス</option>
-                        <option value="4096">高精細</option>
-                        <option value="8192">超精細</option>
+                        <option value="1024" data-i18n="opt.fftLight">省電力 (軽量)</option>
+                        <option value="2048" data-i18n="opt.fftBalance" selected>バランス</option>
+                        <option value="4096" data-i18n="opt.fftHigh">高精細</option>
+                        <option value="8192" data-i18n="opt.fftUltra">超精細</option>
                     </select>
-                    <p class="hint">※ 品質が高いほどCPU負荷が増えます。バー本数も自動調整します。</p>
+                    <p class="hint" data-i18n="hint.fft">※ 品質が高いほどCPU負荷が増えます。バー本数も自動調整します。</p>
                 </div>
                 <div class="setting-item">
-                    <label>バーの本数</label>
+                    <label data-i18n="label.barCount">バーの本数</label>
                     <select id="barCountSelect">
                         <option value="32">32</option>
                         <option value="64">64</option>
@@ -179,113 +174,114 @@
                     </select>
                 </div>
                 <div class="setting-item">
-                    <label>フレームレート (FPS)</label>
+                    <label data-i18n="label.fps">フレームレート (FPS)</label>
                     <select id="fpsSelect">
-                        <option value="30">30 FPS (省電力)</option>
-                        <option value="60" selected>60 FPS (標準)</option>
-                        <option value="120">120 FPS (高品質)</option>
-                        <option value="0">無制限 (MAX)</option>
+                        <option value="30" data-i18n="opt.fps30">30 FPS (省電力)</option>
+                        <option value="60" data-i18n="opt.fps60" selected>60 FPS (標準)</option>
+                        <option value="120" data-i18n="opt.fps120">120 FPS (高品質)</option>
+                        <option value="0" data-i18n="opt.fpsMax">無制限 (MAX)</option>
                     </select>
                 </div>
                 <div class="setting-item">
-                    <label>レンダリングモード</label>
+                    <label data-i18n="label.renderMode">レンダリングモード</label>
                     <select id="renderModeSelect">
-                        <option value="auto">自動 (Auto)</option>
-                        <option value="gpu">GPU優先</option>
-                        <option value="cpu">CPU (互換性重視)</option>
+                        <option value="auto" data-i18n="opt.renderAuto">自動 (Auto)</option>
+                        <option value="gpu" data-i18n="opt.renderGpu">GPU優先</option>
+                        <option value="cpu" data-i18n="opt.renderCpu">CPU (互換性重視)</option>
                     </select>
                     <span id="gpuStatusHint" class="hint"></span>
                 </div>
-                <div class="settings-section-title">クイック設定</div>
+                <div class="settings-section-title" data-i18n="section.quickSettings">クイック設定</div>
+                
                 <div class="setting-item">
                     <label>
-                        <input type="checkbox" id="autoHideUICheckbox" checked> UI自動非表示
+                        <input type="checkbox" id="autoHideUICheckbox" checked> <span data-i18n="label.autoHideUI">UI自動非表示</span>
                     </label>
                 </div>
                 <div class="setting-item">
                     <label>
-                        <input type="checkbox" id="showVideoCheckbox"> 動画を表示 (動画ファイル時)
+                        <input type="checkbox" id="showVideoCheckbox"> <span data-i18n="label.showVideo">動画を表示 (動画ファイル時)</span>
                     </label>
                 </div>
                 <div class="setting-item">
-                    <label>動画表示モード</label>
+                    <label data-i18n="label.videoMode">動画表示モード</label>
                     <select id="videoModeSelect">
-                        <option value="window">ウィンドウ (移動可能)</option>
-                        <option value="background">背景 (全画面)</option>
+                        <option value="window" data-i18n="opt.videoWindow">ウィンドウ (移動可能)</option>
+                        <option value="background" data-i18n="opt.videoBg">背景 (全画面)</option>
                     </select>
                 </div>
                 <div class="setting-item">
-                    <label>背景表示時のフィットモード</label>
+                    <label data-i18n="label.videoFitMode">背景表示時のフィットモード</label>
                     <select id="videoFitModeSelect">
-                        <option value="cover">画面を埋める (cover)</option>
-                        <option value="contain">全体を表示 (contain)</option>
-                        <option value="fill">引き伸ばす (fill)</option>
+                        <option value="cover" data-i18n="opt.fitCover">画面を埋める (cover)</option>
+                        <option value="contain" data-i18n="opt.fitContain">全体を表示 (contain)</option>
+                        <option value="fill" data-i18n="opt.fitFill">引き伸ばす (fill)</option>
                     </select>
                 </div>
                 <div class="setting-item">
                     <label>
-                        <input type="checkbox" id="showLabelsCheckbox"> 周波数ラベルを表示
+                        <input type="checkbox" id="showLabelsCheckbox"> <span data-i18n="label.showFreq">周波数ラベルを表示</span>
                     </label>
                 </div>
                 <hr style="border-color: var(--glass-border); margin: 20px 0;">
                 <div class="setting-item">
-                    <label>発光強度 (Glow)</label>
+                    <label data-i18n="label.glow">発光強度 (Glow)</label>
                     <div class="range-wrapper">
                         <input type="range" id="glowSlider" min="0" max="50" step="1">
-                        <span id="glowValue">中</span>
+                        <span id="glowValue" data-i18n="val.medium">中</span>
                     </div>
                 </div>
                 <div class="setting-item">
-                    <label>ビジュアライザー不透明度</label>
+                    <label data-i18n="label.opacity">ビジュアライザー不透明度</label>
                     <div class="range-wrapper">
                         <input type="range" id="opacitySlider" min="0.1" max="1.0" step="0.1" value="1.0">
                         <span id="opacityValue">1.0</span>
                     </div>
                 </div>
                 <div class="setting-item">
-                    <label>変化モード (Change)</label>
+                    <label data-i18n="label.changeMode">変化モード (Change)</label>
                     <select id="changeModeSelect">
-                        <option value="off">通常</option>
-                        <option value="plus">増分のみ</option>
-                        <option value="plusminus">上下変化</option>
+                        <option value="off" data-i18n="opt.changeNormal">通常</option>
+                        <option value="plus" data-i18n="opt.changePlus">増分のみ</option>
+                        <option value="plusminus" data-i18n="opt.changeUpDown">上下変化</option>
                     </select>
                 </div>
                 <div class="setting-item">
                     <label>
-                        <input type="checkbox" id="sandModeCheckbox"> 砂モード (Bars/Circle)
+                        <input type="checkbox" id="sandModeCheckbox"> <span data-i18n="label.sandMode">砂モード (Bars/Circle)</span>
                     </label>
                 </div>
                 <div class="setting-item">
-                    <label>砂の落下速度</label>
+                    <label data-i18n="label.sandRate">砂の落下速度</label>
                     <div class="range-wrapper">
                         <input type="range" id="sandFallRateSlider" min="0.1" max="2.0" step="0.1">
                         <span id="sandFallRateValue">0.6</span>
                     </div>
                 </div>
                 <div class="setting-item">
-                    <label>円形バー角度補正</label>
+                    <label data-i18n="label.circleAngle">円形バー角度補正</label>
                     <div class="range-wrapper">
                         <input type="range" id="circleAngleOffsetSlider" min="-180" max="180" step="1" value="0">
                         <span id="circleAngleOffsetValue">0°</span>
                     </div>
-                    <button type="button" class="mini-btn" id="resetCircleAngleBtn">0° にリセット</button>
+                    <button type="button" class="mini-btn" id="resetCircleAngleBtn" data-i18n="btn.reset0">0° にリセット</button>
                 </div>
                 <div class="setting-item">
                     <label>
-                        <input type="checkbox" id="mirrorCheckbox"> 左右反転 (Mirror)
+                        <input type="checkbox" id="mirrorCheckbox"> <span data-i18n="label.mirrorMode">左右反転 (Mirror)</span>
                     </label>
                 </div>
                 <div class="setting-item">
                     <label>
-                        <input type="checkbox" id="rainbowCheckbox"> 虹色モード (Rainbow)
+                        <input type="checkbox" id="rainbowCheckbox"> <span data-i18n="label.rainbowMode">虹色モード (Rainbow)</span>
                     </label>
                 </div>
                 <div class="setting-item">
-                    <label>固定色</label>
+                    <label data-i18n="label.fixedColor">固定色</label>
                     <input type="color" id="fixedColorPicker">
                 </div>
                 <div class="setting-item">
-                    <label>背景ぼかし (Blur) <small style="color: #888;">(※背景表示時のみ適用)</small></label>
+                    <label><span data-i18n="label.bgBlur">背景ぼかし (Blur)</span> <small style="color: #888;" data-i18n="label.bgBlurHint">(※背景表示時のみ適用)</small></label>
                     <div class="range-wrapper">
                         <input type="range" id="bgBlurSlider" min="0" max="20" step="1" value="0">
                         <span id="bgBlurValue">0px</span>
@@ -295,13 +291,13 @@
 
             <div class="tab-content" id="tab-audio">
                 <div class="setting-item">
-                    <label>マイク入力デバイス</label>
+                    <label data-i18n="label.micDevice">マイク入力デバイス</label>
                     <select id="micDeviceSelect">
-                        <option value="">デフォルト</option>
+                        <option value="" data-i18n="opt.micDefault">デフォルト</option>
                     </select>
                 </div>
                 <div class="setting-item">
-                    <label>周波数範囲 (Low - High)</label>
+                    <label data-i18n="label.freqRange">周波数範囲 (Low - High)</label>
                     <div class="range-wrapper">
                         <input type="range" id="lowFreqSlider" min="20" max="500" step="10">
                         <span id="lowFreqValue">20Hz</span>
@@ -312,20 +308,19 @@
                     </div>
                 </div>
                 <div class="setting-item">
-                    <label>音域プリセット</label>
+                    <label data-i18n="label.freqPreset">音域プリセット</label>
                     <select id="freqRangeSelect">
-                        <option value="standard">標準 (20-16kHz)</option>
-                        <option value="full">フル (20-20kHz)</option>
-                        <option value="voice">ボイス (100-8kHz)</option>
-                        <option value="bass">バス (20-4kHz)</option>
-                        <option value="custom">カスタム</option>
+                        <option value="standard" data-i18n="opt.freqStandard">標準 (20-16kHz)</option>
+                        <option value="full" data-i18n="opt.freqFull">フル (20-20kHz)</option>
+                        <option value="voice" data-i18n="opt.freqVoice">ボイス (100-8kHz)</option>
+                        <option value="bass" data-i18n="opt.freqBass">バス (20-4kHz)</option>
+                        <option value="custom" data-i18n="opt.freqCustom">カスタム</option>
                     </select>
                 </div>
                 <hr style="border-color: var(--glass-border); margin: 20px 0;">
                 <div class="setting-item">
-                    <label>イコライザー (EQ)</label>
+                    <label data-i18n="label.equalizer">イコライザー (EQ)</label>
                     <div class="eq-controls" style="display: flex; gap: 4px; height: 100px; align-items: flex-end;">
-                        <!-- EQ Sliders generated by JS, but placeholders here for structure -->
                         <div style="flex:1; display:flex; flex-direction:column; align-items:center;">
                             <input type="range" id="eq60" min="-20" max="20" step="1" style="writing-mode: vertical-lr; direction: rtl; width: 8px; height: 80px;">
                             <span style="font-size:0.6rem; margin-top:4px;">60</span>
@@ -360,7 +355,7 @@
                         </div>
                     </div>
                     <div style="margin-top: 8px; display: flex; gap: 4px; flex-wrap: wrap;">
-                        <button class="eq-preset-btn" data-preset="flat" style="flex:1; min-width: 60px; padding: 4px 6px; background: rgba(255,255,255,0.1); border:none; color:#fff; border-radius:4px; cursor:pointer; font-size:0.7rem;">フラット</button>
+                        <button class="eq-preset-btn" data-preset="flat" data-i18n="eq.flat" style="flex:1; min-width: 60px; padding: 4px 6px; background: rgba(255,255,255,0.1); border:none; color:#fff; border-radius:4px; cursor:pointer; font-size:0.7rem;">フラット</button>
                         <button class="eq-preset-btn" data-preset="rock" style="flex:1; min-width: 60px; padding: 4px 6px; background: rgba(255,255,255,0.1); border:none; color:#fff; border-radius:4px; cursor:pointer; font-size:0.7rem;">Rock</button>
                         <button class="eq-preset-btn" data-preset="pop" style="flex:1; min-width: 60px; padding: 4px 6px; background: rgba(255,255,255,0.1); border:none; color:#fff; border-radius:4px; cursor:pointer; font-size:0.7rem;">Pop</button>
                         <button class="eq-preset-btn" data-preset="jazz" style="flex:1; min-width: 60px; padding: 4px 6px; background: rgba(255,255,255,0.1); border:none; color:#fff; border-radius:4px; cursor:pointer; font-size:0.7rem;">Jazz</button>
@@ -369,58 +364,58 @@
                         <button class="eq-preset-btn" data-preset="vocal" style="flex:1; min-width: 60px; padding: 4px 6px; background: rgba(255,255,255,0.1); border:none; color:#fff; border-radius:4px; cursor:pointer; font-size:0.7rem;">Vocal</button>
                         <button class="eq-preset-btn" data-preset="electronic" style="flex:1; min-width: 60px; padding: 4px 6px; background: rgba(255,255,255,0.1); border:none; color:#fff; border-radius:4px; cursor:pointer; font-size:0.7rem;">EDM</button>
                     </div>
-                    <button id="resetEqBtn" style="margin-top: 6px; width: 100%; padding: 6px; background: rgba(255,255,255,0.1); border:none; color:#fff; border-radius:4px; cursor:pointer;">EQリセット</button>
+                    <button id="resetEqBtn" data-i18n="btn.resetEq" style="margin-top: 6px; width: 100%; padding: 6px; background: rgba(255,255,255,0.1); border:none; color:#fff; border-radius:4px; cursor:pointer;">EQリセット</button>
                 </div>
             </div>
 
             <div class="tab-content" id="tab-player">
                 <div class="setting-item resource-monitor">
-                    <label>📊 リソースモニター</label>
+                    <label data-i18n="label.resourceMonitor">📊 リソースモニター</label>
                     <div id="resourceMonitor" style="font-size: 0.8rem; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 6px; margin-top: 8px;">
                         <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                            <span>FPS:</span>
+                            <span data-i18n="res.fps">FPS:</span>
                             <span id="fpsValue">-- fps</span>
                         </div>
                         <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                            <span>メモリ:</span>
+                            <span data-i18n="res.memory">メモリ:</span>
                             <span id="memoryValue">-- MB</span>
                         </div>
                         <div style="display: flex; justify-content: space-between;">
-                            <span>レンダリング:</span>
+                            <span data-i18n="res.rendering">レンダリング:</span>
                             <span id="gpuValue">--</span>
                         </div>
                     </div>
                 </div>
                 <div class="setting-item">
-                    <label>音楽の重心 (L/R)</label>
+                    <label data-i18n="label.balance">音楽の重心 (L/R)</label>
                     <div class="range-wrapper">
                         <input type="range" id="balanceSlider" min="-100" max="100" step="1" value="0" style="background: linear-gradient(90deg,#4facfe,#ffffff,#f5576c);">
                         <span id="balanceValue">C</span>
                     </div>
-                    <button type="button" class="mini-btn" id="resetBalanceBtn">中央にリセット</button>
+                    <button type="button" class="mini-btn" id="resetBalanceBtn" data-i18n="btn.resetCenter">中央にリセット</button>
                 </div>
                 <div class="setting-item">
                     <label>
-                        <input type="checkbox" id="autoPlayNextCheckbox" checked> 自動で次の曲を再生
+                        <input type="checkbox" id="autoPlayNextCheckbox" checked> <span data-i18n="label.autoPlayNext">自動で次の曲を再生</span>
                     </label>
                 </div>
                 <div class="setting-item">
                     <label>
-                        <input type="checkbox" id="stopOnVideoEndCheckbox"> 動画終了時に停止 (動画優先)
+                        <input type="checkbox" id="stopOnVideoEndCheckbox"> <span data-i18n="label.stopOnVideoEnd">動画終了時に停止 (動画優先)</span>
                     </label>
                 </div>
                 <div class="setting-item">
                     <label>
-                        <input type="checkbox" id="persistSettingsCheckbox" checked> 設定をブラウザに保存する
+                        <input type="checkbox" id="persistSettingsCheckbox" checked> <span data-i18n="label.persistSettings">設定をブラウザに保存する</span>
                     </label>
                 </div>
                 <div class="setting-item">
-                    <label>再生速度</label>
+                    <label data-i18n="label.playbackSpeed">再生速度</label>
                     <select id="speedSelect" style="width: 100%; padding: 6px; background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); color: #fff; border-radius: 4px;">
                         <option value="0.25">0.25x</option>
                         <option value="0.5">0.5x</option>
                         <option value="0.75">0.75x</option>
-                        <option value="1" selected>1.0x (通常)</option>
+                        <option value="1" data-i18n="opt.speedNormal" selected>1.0x (通常)</option>
                         <option value="1.25">1.25x</option>
                         <option value="1.5">1.5x</option>
                         <option value="1.75">1.75x</option>
@@ -428,14 +423,14 @@
                     </select>
                 </div>
                 <div class="setting-item">
-                    <label>スリープタイマー <span id="sleepTimerStatus" style="color: var(--accent); font-size: 0.8rem;"></span></label>
+                    <label><span data-i18n="label.sleepTimer">スリープタイマー</span> <span id="sleepTimerStatus" style="color: var(--accent); font-size: 0.8rem;"></span></label>
                     <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;">
                         <button class="sleep-btn active" data-minutes="0">OFF</button>
-                        <button class="sleep-btn" data-minutes="15">15分</button>
-                        <button class="sleep-btn" data-minutes="30">30分</button>
-                        <button class="sleep-btn" data-minutes="45">45分</button>
-                        <button class="sleep-btn" data-minutes="60">1時間</button>
-                        <button class="sleep-btn" data-minutes="90">1.5時間</button>
+                        <button class="sleep-btn" data-minutes="15" data-i18n="btn.sleep15">15分</button>
+                        <button class="sleep-btn" data-minutes="30" data-i18n="btn.sleep30">30分</button>
+                        <button class="sleep-btn" data-minutes="45" data-i18n="btn.sleep45">45分</button>
+                        <button class="sleep-btn" data-minutes="60" data-i18n="btn.sleep60">1時間</button>
+                        <button class="sleep-btn" data-minutes="90" data-i18n="btn.sleep90">1.5時間</button>
                     </div>
                 </div>
 
@@ -443,37 +438,35 @@
 
             <div class="tab-content" id="tab-presets">
                 <div class="setting-item">
-                    <label>カラープリセット</label>
+                    <label data-i18n="label.colorPresets">カラープリセット</label>
                     <div id="colorPresetList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px; margin-top: 10px;">
-                        <!-- JSで生成 -->
-                    </div>
+                        </div>
                 </div>
                 <hr style="border-color: var(--glass-border); margin: 20px 0;">
                 <div class="setting-item">
-                    <label>設定プリセット (保存/読込)</label>
+                    <label data-i18n="label.settingPresets">設定プリセット (保存/読込)</label>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
-                        <button class="action-btn" id="savePreset1">Slot 1 保存</button>
-                        <button class="action-btn" id="loadPreset1">Slot 1 読込</button>
-                        <button class="action-btn" id="savePreset2">Slot 2 保存</button>
-                        <button class="action-btn" id="loadPreset2">Slot 2 読込</button>
-                        <button class="action-btn" id="savePreset3">Slot 3 保存</button>
-                        <button class="action-btn" id="loadPreset3">Slot 3 読込</button>
+                        <button class="action-btn" id="savePreset1" data-i18n="btn.saveSlot1">Slot 1 保存</button>
+                        <button class="action-btn" id="loadPreset1" data-i18n="btn.loadSlot1">Slot 1 読込</button>
+                        <button class="action-btn" id="savePreset2" data-i18n="btn.saveSlot2">Slot 2 保存</button>
+                        <button class="action-btn" id="loadPreset2" data-i18n="btn.loadSlot2">Slot 2 読込</button>
+                        <button class="action-btn" id="savePreset3" data-i18n="btn.saveSlot3">Slot 3 保存</button>
+                        <button class="action-btn" id="loadPreset3" data-i18n="btn.loadSlot3">Slot 3 読込</button>
                     </div>
                 </div>
             </div>
 
-            <!-- Storage tab disabled for v1.0.3 -->
             <div class="tab-content" id="tab-storage" style="display: none;">
                 <div class="setting-item">
                     <label>
-                        <input type="checkbox" id="storeLocalFilesCheckbox"> ファイルをアプリ内に保存する（容量を使用）
+                        <input type="checkbox" id="storeLocalFilesCheckbox"> <span data-i18n="label.storeLocalFiles">ファイルをアプリ内に保存する（容量を使用）</span>
                     </label>
-                    <p class="hint">有効時: 取り込んだファイルをアプリ内に保持。無効時: URI参照のみで保存しません。</p>
+                    <p class="hint" data-i18n="hint.storeLocalFiles">有効時: 取り込んだファイルをアプリ内に保持。無効時: URI参照のみで保存しません。</p>
                 </div>
                 <div class="setting-item">
                     <div class="storage-actions">
-                        <button id="storageRefreshBtn" class="mini-btn">🔄 更新</button>
-                        <button id="storageDeleteAllBtn" class="mini-btn danger">🗑️ すべて削除</button>
+                        <button id="storageRefreshBtn" class="mini-btn" data-i18n="btn.refresh">🔄 更新</button>
+                        <button id="storageDeleteAllBtn" class="mini-btn danger" data-i18n="btn.deleteAll">🗑️ すべて削除</button>
                     </div>
                     <div id="storageSummary" class="hint"></div>
                     <div id="storageList" class="storage-list"></div>
@@ -482,33 +475,33 @@
 
             <div class="tab-content" id="tab-help">
                 <div class="help-section">
-                    <h3>キーボードショートカット</h3>
+                    <h3 data-i18n="help.shortcuts">キーボードショートカット</h3>
                     <ul class="shortcut-list">
-                        <li>再生 / 一時停止 <span>Space</span></li>
-                        <li>前の曲 / 次の曲 <span>← / →</span></li>
-                        <li>音量アップ / ダウン <span>↑ / ↓</span></li>
-                        <li>再生速度ダウン / アップ <span>[ / ]</span></li>
-                        <li>UI表示切替 <span>H</span></li>
-                        <li>動画表示切替 <span>V</span></li>
-                        <li>低電力モード切替 <span>L</span></li>
-                        <li>シャッフル切替 <span>S</span></li>
-                        <li>リピート切替 <span>P</span></li>
-                        <li>ビジュアライザーモード切替 <span>M</span></li>
-                        <li>虹色モード切替 <span>R</span></li>
-                        <li>左右反転切替 <span>X</span></li>
+                        <li><span data-i18n="shortcut.play">再生 / 一時停止</span> <span>Space</span></li>
+                        <li><span data-i18n="shortcut.prevNext">前の曲 / 次の曲</span> <span>← / →</span></li>
+                        <li><span data-i18n="shortcut.volume">音量アップ / ダウン</span> <span>↑ / ↓</span></li>
+                        <li><span data-i18n="shortcut.speed">再生速度ダウン / アップ</span> <span>[ / ]</span></li>
+                        <li><span data-i18n="shortcut.toggleUI">UI表示切替</span> <span>H</span></li>
+                        <li><span data-i18n="shortcut.toggleVideo">動画表示切替</span> <span>V</span></li>
+                        <li><span data-i18n="shortcut.powerSave">低電力モード切替</span> <span>L</span></li>
+                        <li><span data-i18n="shortcut.shuffle">シャッフル切替</span> <span>S</span></li>
+                        <li><span data-i18n="shortcut.repeat">リピート切替</span> <span>P</span></li>
+                        <li><span data-i18n="shortcut.visualizer">ビジュアライザーモード切替</span> <span>M</span></li>
+                        <li><span data-i18n="shortcut.rainbow">虹色モード切替</span> <span>R</span></li>
+                        <li><span data-i18n="shortcut.mirror">左右反転切替</span> <span>X</span></li>
                     </ul>
                 </div>
             </div>
 
             <div class="tab-content" id="tab-developer">
-                <div id="developerMessageContent" style="padding: 10px; line-height: 1.35; white-space: pre-line; font-size: 0.9rem; color: var(--text-muted);">
+                <div id="developerMessageContent" data-i18n="status.loading" style="padding: 10px; line-height: 1.35; white-space: pre-line; font-size: 0.9rem; color: var(--text-muted);">
                     読み込み中...
                 </div>
             </div>
 
             <div class="modal-footer">
-                <button id="resetAllSettingsBtn">初期化</button>
-                <button id="saveSettingsBtn">保存して閉じる</button>
+                <button id="resetAllSettingsBtn" data-i18n="btn.resetAll">初期化</button>
+                <button id="saveSettingsBtn" data-i18n="btn.saveClose">保存して閉じる</button>
             </div>
         </div>
     </div>
