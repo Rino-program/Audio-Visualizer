@@ -258,7 +258,7 @@ const I18N = {
         "btn.saveSlot1": "Slot 1 保存",
         "btn.loadSlot1": "Slot 1 読込",
         "btn.saveSlot2": "Slot 2 保存",
-        "btn.loadSlot2`": "Slot 2 読込",
+        "btn.loadSlot2": "Slot 2 読込",
         "btn.saveSlot3": "Slot 3 保存",
         "btn.loadSlot3": "Slot 3 読込",
 
@@ -583,29 +583,70 @@ const I18N = {
     }
 };
 
+window.I18N = I18N;
+
 let currentLang = localStorage.getItem('app_lang') || 
     (navigator.language.startsWith('zh') ? 'zh' : navigator.language.startsWith('en') ? 'en' : 'ja');
 
 // ============== I18N FUNCTIONS ==============
 // 指定されたキーの翻訳テキストを返す関数
+// ============== I18N FUNCTIONS ==============
 function t(key) {
-    // state.settings.language が未設定なら 'ja' をデフォルトにする
-    const lang = state.settings.language || 'ja';
-    return I18N[lang]?.[key] || I18N['ja']?.[key] || key;
+    if (!window.I18N) return key;
+    if (I18N[currentLang] && I18N[currentLang][key] !== undefined) {
+        return I18N[currentLang][key];
+    }
+    if (I18N['ja'] && I18N['ja'][key] !== undefined) {
+        return I18N['ja'][key];
+    }
+    return key;
 }
 
-// 画面内の data-i18n 属性を持つ要素のテキストを一括更新する関数
 function updateLanguageUI() {
+    console.log(`🌐 言語適用開始: ${currentLang}`);
+
+    // 1. textContent
     document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
-        el.textContent = t(key);
+        const translated = t(key);
+        if (translated !== key) el.textContent = translated;
     });
 
-    // （任意）もし placeholder（入力欄のヒント）も翻訳したい場合
+    // 2. title
+    document.querySelectorAll('[data-i18n-title]').forEach(el => {
+        const key = el.getAttribute('data-i18n-title');
+        el.title = t(key);
+    });
+
+    // 3. aria-label
+    document.querySelectorAll('[data-i18n-aria]').forEach(el => {
+        const key = el.getAttribute('data-i18n-aria');
+        el.setAttribute('aria-label', t(key));
+    });
+
+    // 4. placeholder
     document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
         const key = el.getAttribute('data-i18n-placeholder');
         el.placeholder = t(key);
     });
+
+    // 5. 設定モーダル内の動的要素も強制更新
+    const modal = document.getElementById('settingsModal');
+    if (modal && modal.classList.contains('open')) {
+        modal.querySelectorAll('label, h2, h3, button, option, .tab-btn').forEach(el => {
+            const key = el.getAttribute('data-i18n') || el.getAttribute('data-i18n-title');
+            if (key) {
+                const translated = t(key);
+                if (translated !== key) {
+                    if (el.tagName === 'OPTION' || el.tagName === 'BUTTON' || el.tagName === 'LABEL') {
+                        el.textContent = translated;
+                    }
+                }
+            }
+        });
+    }
+
+    console.log("✅ 翻訳適用完了");
 }
 
 // ============== UTILITY ==============
@@ -1271,15 +1312,25 @@ async function init() {
         const modeName = e.target.options[e.target.selectedIndex].text;
         showOverlay(`📊 モード: ${modeName}`);
     };
-    const langSelect = $('languageSelect');
+    // === 言語切り替え（強化版）===
+    const langSelect = document.getElementById('langSelect');
     if (langSelect) {
-        langSelect.value = state.settings.language || 'ja'; // 現在の設定値を反映
-        langSelect.onchange = e => {
-            state.settings.language = e.target.value; // 設定を更新
-            updateLanguageUI();                      // 画面のテキストを更新
-            saveSettingsToStorage();                 // 設定をローカルストレージに保存
-            showOverlay(t('msg_lang_changed') || 'Language changed'); // 通知を表示
-        };
+        langSelect.value = currentLang;
+        
+        // 変更イベント
+        langSelect.addEventListener('change', (e) => {
+            currentLang = e.target.value;
+            localStorage.setItem('app_lang', currentLang);
+            state.settings.language = currentLang;
+            
+            updateLanguageUI();           // 即時反映
+            saveSettingsToStorage();
+            
+            // メッセージ（存在しないキーを安全に扱う）
+            showOverlay(currentLang === 'ja' ? '🇯🇵 日本語に変更しました' : 
+                       currentLang === 'en' ? '🇬🇧 English' : 
+                       '🇨🇳 中文');
+        });
     }
     // UI表示ボタン：タッチ環境で click/touchstart が二重に走りやすいので
     // 「押して離した(pointerup)」タイミングでのみトグルする
@@ -2814,8 +2865,14 @@ function applySettingsToUI() {
 }
 
 function openSettings() { 
+    const langSelect = document.getElementById('langSelect');
+    if (langSelect) {
+        langSelect.value = currentLang;   // 確実に現在の言語を表示
+    }
+
     els.settingsModal.classList.add('open'); 
-    state.settingsOpen = true; 
+    state.settingsOpen = true;
+    
     // 設定タブ中はUI非表示ボタンを隠す
     const persistentControls = document.getElementById('persistentControls');
     if (persistentControls) persistentControls.style.display = 'none';
@@ -2828,8 +2885,16 @@ function closeSettings() {
     if (persistentControls) persistentControls.style.display = '';
 }
 function saveSettings() { 
+    const langSelect = document.getElementById('langSelect');
+    if (langSelect) {
+        currentLang = langSelect.value;
+        localStorage.setItem('app_lang', currentLang);
+        state.settings.language = currentLang;
+    }
+
+    updateLanguageUI();        // 保存時にも確実に反映
     saveSettingsToStorage(); 
-    closeSettings(); 
+    closeSettings();
     showOverlay('✅ 設定を保存しました');
 }
 
@@ -4709,6 +4774,9 @@ function drawMirrorBars(fd, maxH, drawH, drawStartY) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // 初回翻訳
+    updateLanguageUI();
+    
     init().catch(err => {
         console.error('Init failed:', err);
     });
