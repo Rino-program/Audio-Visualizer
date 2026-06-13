@@ -48,8 +48,8 @@
         <div id="controlsBar" class="controls-bar glass">
             <div class="progress-container" id="progressContainer">
                 <div class="seek-track">
-                    <div id="seekBuffer" class="seek-buffer"></div>
-                    <div id="seekFill" class="seek-fill"></div>
+                    <div id="seekBuffer" class="seek-buffer" style="z-index: 2;"></div>
+                    <div id="seekFill" class="seek-fill" style="z-index: 1;"></div>
                 </div>
                 <input type="range" id="seekBar" value="0" min="0" step="0.1">
             </div>
@@ -116,7 +116,7 @@
         <div class="modal-content glass">
             <div class="modal-header">
                 <h2 data-i18n="settings.title">設定</h2>
-                <button id="closeSettingsBtn" class="close-btn" data-i18n-title="btn.close" aria-label="閉じる">✖</button>
+                <button id="closeSettingsBtn" class="close-btn" aria-label="閉じる">✖</button>
             </div>
             
             <div class="tabs">

@@ -457,6 +457,8 @@ body.drag-over::after {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    text-align: left;
+    margin-top: 2px;
 }
 
 #statusText {

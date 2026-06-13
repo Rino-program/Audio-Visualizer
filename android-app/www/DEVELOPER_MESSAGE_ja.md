@@ -1,11 +1,13 @@
 # 開発者より
 
 Audio Visualizer をお使いいただきありがとうございます。
-このアプリはローカル再生と可視化に集中した Android 版です。
+このアプリはローカル再生に集中した F-Droid 版です。
 
 ## このアプリについて
 
 音楽ファイルを美しいビジュアルと共に楽しむためのツールです。
+このアプリはオープンソースで開発されており、GitHub でコードを公開しています。
+https://github.com/Rino-program/Audio-Visualizer
 
 ## 今後の予定
 
@@ -16,6 +18,7 @@ Audio Visualizer をお使いいただきありがとうございます。
 ## お問い合わせ
 
 ご意見・ご要望は GitHub リポジトリの Issues へお願いします。
+https://github.com/Rino-program/Audio-Visualizer/issues
 
 ---
 

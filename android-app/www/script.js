@@ -110,7 +110,8 @@ const I18N = {
     ja: {
         // ステータス・再生情報
         "status.waiting": "🎵 待機中...",
-        "status.nextUp": "次: --",
+        "next.none": "次: --",
+        "next.track": "次: {name}",
         "status.loading": "⏳ 読み込み中...",
 
         // トップバー コントロール
@@ -281,11 +282,68 @@ const I18N = {
         "shortcut.repeat": "リピート切替",
         "shortcut.visualizer": "ビジュアライザーモード切替",
         "shortcut.rainbow": "虹色モード切替",
-        "shortcut.mirror": "左右反転切替"
+        "shortcut.mirror": "左右反転切替",
+        
+        "overlay.seekBack": "⏪ 巻き戻し",
+        "overlay.seekForward": "⏩ 早送り",
+        "overlay.videoLoadFailed": "動画の読み込みに失敗しました",
+        "overlay.videoEnded": "動画が終了しました",
+        "overlay.languageChangedJa": "言語を日本語に変更しました",
+        "overlay.languageChangedEn": "言語を英語に変更しました",
+        "overlay.languageChangedZh": "言語を中国語に変更しました",
+        "confirm.resetAll": "すべての設定を初期化しますか？",
+        "confirm.clearPlaylist": "プレイリストを空にしますか？",
+        "status.idle": "🎵 待機中...",
+        "common.unknown": "不明",
+        "overlay.playlistCleared": "プレイリストを消去しました",
+        "overlay.videoOn": "動画表示をオンにしました",
+        "overlay.videoOff": "動画表示をオフにしました",
+        "overlay.rainbowOn": "虹色モードをオンにしました",
+        "overlay.rainbowOff": "虹色モードをオフにしました",
+        "overlay.mirrorOn": "左右反転をオンにしました",
+        "overlay.mirrorOff": "左右反転をオフにしました",
+        "alert.filePickerMissing": "この環境ではファイル選択機能を利用できません",
+        "overlay.noFileSelected": "ファイルが選択されませんでした",
+        "overlay.fileSelectFailed": "ファイルの選択に失敗しました",
+        "overlay.androidOnly": "この機能は Android 版でのみ利用できます",
+        "overlay.selectFolder": "フォルダを選択してください",
+        "overlay.filesAdded": "ファイルが追加されました",
+        "overlay.folderNoFiles": "フォルダ内に読み込めるファイルが見つかりません",
+        "overlay.nowPlaying": "再生中: {title}",
+        "playlist.restored": "プレイリストを復元しました",
+        "overlay.centerReset": "音声の重心を中央に戻しました",
+        "confirm.switchUriMode": "URI モードに切り替えますか？",
+        "overlay.localSaveOn": "端末内保存をオンにしました",
+        "overlay.localSaveOff": "端末内保存をオフにしました",
+        "overlay.loadFailed": "読み込みに失敗しました",
+        "overlay.settingsSaved": "設定を保存しました",
+        "devMessage.loadFailed": "開発者メッセージの読み込みに失敗しました",
+        "status.mic": "🎤 マイク入力中",
+        "overlay.micStarted": "マイク入力モードに切り替えました",
+        "overlay.deleteNone": "削除する項目がありません",
+        "confirm.deleteStoredFiles": "保存済みファイルをすべて削除しますか？",
+        "overlay.allDeleted": "すべて削除しました",
+        "storage.empty": "保存データはありません",
+        "overlay.playlistReordered": "プレイリストの順番を変更しました",
+        "overlay.sleepStopped": "スリープタイマーで停止しました",
+        "alert.exportBlockedMic": "マイク入力中は動画を書き出せません",
+        "confirm.exportVideo": "動画を書き出しますか？",
+        "overlay.exporting": "動画を書き出し中...",
+        "alert.exportComplete": "書き出しが完了しました",
+        "common.unsupported": "非対応",
+        "status.playError": "🎵 再生エラー",
+        "overlay.audioError": "音声エラーが発生しました",
+        "overlay.playFailed": "再生に失敗しました",
+        "overlay.urlPrepareFailed": "URL の準備に失敗しました",
+        "repeat.none": "なし",
+        "repeat.one": "1 曲",
+        "repeat.all": "全曲",
+        "overlay.mode": "モード: {mode}"
     },
     en: {
         "status.waiting": "🎵 Waiting...",
-        "status.nextUp": "Next: --",
+        "next.none": "Next: --",
+        "next.track": "Next: {name}",
         "status.loading": "⏳ Loading...",
         "tooltip.fileMode": "File Playback Mode",
         "aria.fileMode": "File Playback Mode",
@@ -430,11 +488,68 @@ const I18N = {
         "shortcut.repeat": "Toggle Repeat",
         "shortcut.visualizer": "Toggle Visualizer Mode",
         "shortcut.rainbow": "Toggle Rainbow Mode",
-        "shortcut.mirror": "Toggle Mirror Mode"
+        "shortcut.mirror": "Toggle Mirror Mode",
+
+        "overlay.seekBack": "⏪ Seek Back",
+        "overlay.seekForward": "⏩ Seek Forward",
+        "overlay.videoLoadFailed": "Failed to load video",
+        "overlay.videoEnded": "Video ended",
+        "overlay.languageChangedJa": "Language changed to Japanese",
+        "overlay.languageChangedEn": "Language changed to English",
+        "overlay.languageChangedZh": "Language changed to Chinese",
+        "confirm.resetAll": "Reset all settings?",
+        "confirm.clearPlaylist": "Clear the playlist?",
+        "status.idle": "🎵 Idle...",
+        "common.unknown": "Unknown",
+        "overlay.playlistCleared": "Playlist cleared",
+        "overlay.videoOn": "Video display turned on",
+        "overlay.videoOff": "Video display turned off",
+        "overlay.rainbowOn": "Rainbow mode turned on",
+        "overlay.rainbowOff": "Rainbow mode turned off",
+        "overlay.mirrorOn": "Mirror mode turned on",
+        "overlay.mirrorOff": "Mirror mode turned off",
+        "alert.filePickerMissing": "File picker is not available in this environment",
+        "overlay.noFileSelected": "No file was selected",
+        "overlay.fileSelectFailed": "Failed to select file",
+        "overlay.androidOnly": "This feature is available only on Android",
+        "overlay.selectFolder": "Please select a folder",
+        "overlay.filesAdded": "Files added",
+        "overlay.folderNoFiles": "No playable files were found in the folder",
+        "overlay.nowPlaying": "Now playing: {title}",
+        "playlist.restored": "Playlist restored",
+        "overlay.centerReset": "Audio balance reset to center",
+        "confirm.switchUriMode": "Switch to URI mode?",
+        "overlay.localSaveOn": "Local file storage enabled",
+        "overlay.localSaveOff": "Local file storage disabled",
+        "overlay.loadFailed": "Failed to load",
+        "overlay.settingsSaved": "Settings saved",
+        "devMessage.loadFailed": "Failed to load developer message",
+        "status.mic": "🎤 Microphone input",
+        "overlay.micStarted": "Switched to microphone input mode",
+        "overlay.deleteNone": "Nothing to delete",
+        "confirm.deleteStoredFiles": "Delete all stored files?",
+        "overlay.allDeleted": "All deleted",
+        "storage.empty": "No stored data",
+        "overlay.playlistReordered": "Playlist reordered",
+        "overlay.sleepStopped": "Stopped by sleep timer",
+        "alert.exportBlockedMic": "Cannot export video while using microphone input",
+        "confirm.exportVideo": "Export the video?",
+        "overlay.exporting": "Exporting video...",
+        "alert.exportComplete": "Export completed",
+        "common.unsupported": "Unsupported",
+        "status.playError": "🎵 Playback error",
+        "overlay.audioError": "An audio error occurred",
+        "overlay.playFailed": "Playback failed",
+        "overlay.urlPrepareFailed": "Failed to prepare URL",
+        "repeat.none": "None",
+        "repeat.one": "One track",
+        "repeat.all": "All tracks",
+        "overlay.mode": "Mode: {mode}"
     },
     zh: {
         "status.waiting": "🎵 等待中...",
-        "status.nextUp": "下一首: --",
+        "next.none": "下一首: --",
+        "next.track": "下一首: {name}",
         "status.loading": "⏳ 加载中...",
         "tooltip.fileMode": "文件播放模式",
         "aria.fileMode": "文件播放模式",
@@ -579,7 +694,63 @@ const I18N = {
         "shortcut.repeat": "切换 循环模式",
         "shortcut.visualizer": "切换 可视化样式",
         "shortcut.rainbow": "切换 彩虹渐变",
-        "shortcut.mirror": "切换 左右翻转"
+        "shortcut.mirror": "切换 左右翻转",
+
+        "overlay.seekBack": "⏪ 后退",
+        "overlay.seekForward": "⏩ 前进",
+        "overlay.videoLoadFailed": "视频加载失败",
+        "overlay.videoEnded": "视频已结束",
+        "overlay.languageChangedJa": "语言已切换为日语",
+        "overlay.languageChangedEn": "语言已切换为英语",
+        "overlay.languageChangedZh": "语言已切换为中文",
+        "confirm.resetAll": "要重置所有设置吗？",
+        "confirm.clearPlaylist": "要清空播放列表吗？",
+        "status.idle": "🎵 空闲中...",
+        "common.unknown": "未知",
+        "overlay.playlistCleared": "播放列表已清空",
+        "overlay.videoOn": "已开启视频显示",
+        "overlay.videoOff": "已关闭视频显示",
+        "overlay.rainbowOn": "已开启彩虹模式",
+        "overlay.rainbowOff": "已关闭彩虹模式",
+        "overlay.mirrorOn": "已开启左右翻转",
+        "overlay.mirrorOff": "已关闭左右翻转",
+        "alert.filePickerMissing": "当前环境不支持文件选择器",
+        "overlay.noFileSelected": "未选择文件",
+        "overlay.fileSelectFailed": "文件选择失败",
+        "overlay.androidOnly": "此功能仅在 Android 版可用",
+        "overlay.selectFolder": "请选择文件夹",
+        "overlay.filesAdded": "文件已添加",
+        "overlay.folderNoFiles": "文件夹中没有可读取的文件",
+        "overlay.nowPlaying": "正在播放: {title}",
+        "playlist.restored": "播放列表已恢复",
+        "overlay.centerReset": "已将声像重置为中心",
+        "confirm.switchUriMode": "切换到 URI 模式吗？",
+        "overlay.localSaveOn": "已开启本地保存",
+        "overlay.localSaveOff": "已关闭本地保存",
+        "overlay.loadFailed": "加载失败",
+        "overlay.settingsSaved": "设置已保存",
+        "devMessage.loadFailed": "开发者消息加载失败",
+        "status.mic": "🎤 麦克风输入中",
+        "overlay.micStarted": "已切换到麦克风输入模式",
+        "overlay.deleteNone": "没有可删除的项目",
+        "confirm.deleteStoredFiles": "要删除所有已保存文件吗？",
+        "overlay.allDeleted": "已全部删除",
+        "storage.empty": "没有保存的数据",
+        "overlay.playlistReordered": "播放列表顺序已调整",
+        "overlay.sleepStopped": "已因睡眠定时器停止",
+        "alert.exportBlockedMic": "使用麦克风输入时无法导出视频",
+        "confirm.exportVideo": "要导出视频吗？",
+        "overlay.exporting": "正在导出视频...",
+        "alert.exportComplete": "导出完成",
+        "common.unsupported": "不支持",
+        "status.playError": "🎵 播放错误",
+        "overlay.audioError": "发生音频错误",
+        "overlay.playFailed": "播放失败",
+        "overlay.urlPrepareFailed": "URL 准备失败",
+        "repeat.none": "无",
+        "repeat.one": "单曲",
+        "repeat.all": "全部",
+        "overlay.mode": "模式: {mode}"
     }
 };
 
@@ -590,7 +761,6 @@ let currentLang = localStorage.getItem('app_lang') ||
 
 // ============== I18N FUNCTIONS ==============
 // 指定されたキーの翻訳テキストを返す関数
-// ============== I18N FUNCTIONS ==============
 function t(key, vars = {}) {
     if (!window.I18N) return key;
     let text;
@@ -1173,6 +1343,7 @@ function clearPlayTimeout() { if (state.playTimeout) { clearTimeout(state.playTi
 async function init() {
     loadSettings();
     updateLanguageUI();
+    loadDeveloperMessage();
     library = loadLibraryFromStorage();
     await loadPlaylistFromStorage();
     rebuildLibraryFromPlaylist();
@@ -1239,6 +1410,7 @@ async function init() {
         }
     });
     audio.addEventListener('playing', () => {
+        console.log('[STATUS] playing');
         if (bgVideo.src && state.settings.showVideo) {
             // 音声が実際に再生開始された瞬間に動画の時間を同期
             bgVideo.currentTime = audio.currentTime + getVideoStartOffset();
@@ -1246,15 +1418,16 @@ async function init() {
         }
         const track = state.playlist[state.currentIndex];
         if (track) {
-            els.statusText.textContent = t('status.loading');
+            // els.statusText.textContent = t('status.loading');
             updateTopBadge(track, state.currentIndex);
         }
         updateMediaSessionMetadata();
         updateMediaSessionPlaybackState();
     });
     audio.addEventListener('waiting', () => {
-        if (bgVideo.src) bgVideo.pause();
+    if (!state.isPlaying) {
         els.statusText.textContent = t('status.loading');
+    }
     });
     audio.addEventListener('pause', () => { 
         clearPlayTimeout();
@@ -1329,6 +1502,7 @@ async function init() {
             state.settings.language = currentLang;
             
             updateLanguageUI();           // 即時反映
+            loadDeveloperMessage();
             saveSettingsToStorage();
             
             // メッセージ（存在しないキーを安全に扱う）
@@ -2896,6 +3070,7 @@ function saveSettings() {
     }
 
     updateLanguageUI();        // 保存時にも確実に反映
+    loadDeveloperMessage();
     saveSettingsToStorage(); 
     closeSettings();
     showOverlay(t('overlay.settingsSaved'));
@@ -2915,19 +3090,34 @@ function switchTab(tabId) {
     }
 }
 
-// 開発者メッセージを読み込み・表示
 async function loadDeveloperMessage() {
     try {
-        const response = await fetch('DEVELOPER_MESSAGE.md');
-        if (!response.ok) throw new Error('Failed to load developer message');
+        const lang = currentLang || 'ja';
+
+        const response = await fetch(`DEVELOPER_MESSAGE_${lang}.md`);
+
+        if (!response.ok) {
+            throw new Error(`Failed to load DEVELOPER_MESSAGE_${lang}.md`);
+        }
+
         const markdown = await response.text();
         const html = simpleMarkdownToHtml(markdown);
+
         const contentEl = document.getElementById('developerMessageContent');
-        if (contentEl) contentEl.innerHTML = html;
+
+        if (contentEl) {
+            contentEl.innerHTML = html;
+        }
+
     } catch (error) {
         console.warn('Failed to load developer message:', error);
-        const contentEl = document.getElementById('developerMessageContent');
-        if (contentEl) contentEl.textContent = t('devMessage.loadFailed');
+
+        const contentEl =
+            document.getElementById('developerMessageContent');
+
+        if (contentEl) {
+            contentEl.textContent = t('devMessage.loadFailed');
+        }
     }
 }
 
@@ -3356,6 +3546,7 @@ function playTrack(index) {
     clearPlayTimeout();
     state.currentIndex = index;
     const track = state.playlist[index];
+    console.log('[STATUS] playTrack', track.name);
     els.statusText.textContent = `🎵 [${index + 1}/${state.playlist.length}] ${track.name}`;
     updateTopBadge(track, index);
     updateNowPlayingUI(track, index);
@@ -3474,28 +3665,33 @@ function hashString(input) {
 }
 
 function updateTopBadge(track, index) {
-    if (!els.nowPlayingArtSm) return;
+    updateNextUpText(index);
+
+    if (!els.nowPlayingArtSm || !track) return;
+
     const info = getTrackDisplayInfo(track);
     const base = info.title + info.artist;
     const hue = hashString(base) % 360;
-    els.nowPlayingArtSm.style.background = `linear-gradient(135deg, hsla(${hue}, 85%, 55%, 0.7), hsla(${(hue + 40) % 360}, 85%, 45%, 0.7))`;
+
+    els.nowPlayingArtSm.style.background =
+        `linear-gradient(135deg, hsla(${hue}, 85%, 55%, 0.7), hsla(${(hue + 40) % 360}, 85%, 45%, 0.7))`;
+
     els.nowPlayingArtSm.textContent = info.icon;
-    updateNextUpText(index);
 }
 
 function updateNextUpText(currentIndex) {
-    if (!els.nextUpText) return;
-    if (!state.playlist.length || currentIndex < 0) {
-        els.nextUpText.textContent = t('next.none');
-        return;
-    }
+    console.log('DEBUG currentIndex:', currentIndex);
+    console.log('DEBUG playlist length:', state.playlist.length);
+
     const nextIndex = (currentIndex + 1) % state.playlist.length;
+
+    console.log('DEBUG nextIndex:', nextIndex);
+
     const nextTrack = state.playlist[nextIndex];
-    if (!nextTrack) {
-        els.nextUpText.textContent = t('next.none');
-        return;
-    }
-    els.nextUpText.textContent = t('next.track', { name: nextTrack.name });
+
+    console.log('DEBUG nextTrack:', nextTrack);
+
+    els.nextUpText.textContent = nextTrack?.name ?? 'ERROR';
 }
 
 function updateNowPlayingCustom(title, artist, icon, indexText) {
@@ -4785,7 +4981,7 @@ function drawMirrorBars(fd, maxH, drawH, drawStartY) {
 document.addEventListener('DOMContentLoaded', () => {
     // 初回翻訳
     updateLanguageUI();
-    
+    loadDeveloperMessage();
     init().catch(err => {
         console.error('Init failed:', err);
     });
