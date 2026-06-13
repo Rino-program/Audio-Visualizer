@@ -1,0 +1,5 @@
+Here are the details of this update:
+
+Language Support: Added and finalized English, Japanese, and Chinese UI localized versions.
+Bug Fixes: Corrected the version mismatch issue and fixed other minor bugs.
+UI Adjustments: Made minor UI enhancements (including a fix for the white icon issue).
