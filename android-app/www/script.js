@@ -821,6 +821,8 @@ function updateLanguageUI() {
         });
     }
 
+    updateNextUpText(state.currentIndex);
+    els.statusText.textContent = state.playlist[state.currentIndex] ? `🎵 [${state.currentIndex + 1}/${state.playlist.length}] ${state.playlist[state.currentIndex].name}` : t('status.idle');
     console.log("✅ 翻訳適用完了");
 }
 
@@ -2272,6 +2274,8 @@ async function openNativeFilePicker() {
         if (state.currentIndex === -1) playTrack(state.playlist.length - accepted.length);
         saveSettingsToStorage();
         setTimeout(() => showOverlay(t('overlay.filesAdded', { count: accepted.length })), 500);
+        els.statusText.textContent = state.playlist[state.currentIndex] ? `🎵 [${state.currentIndex + 1}/${state.playlist.length}] ${state.playlist[state.currentIndex].name}` : t('status.idle');
+        updateNextUpText(state.currentIndex);
     } catch (error) {
         console.error('FilePicker failed:', error);
         showOverlay(t('overlay.fileSelectFailed'));
@@ -2343,6 +2347,8 @@ async function openNativeFolderImport() {
         }
         saveSettingsToStorage();
         setTimeout(() => showOverlay(t('overlay.filesAdded', { count: files.length })), 500);
+        els.statusText.textContent = state.playlist[state.currentIndex] ? `🎵 [${state.currentIndex + 1}/${state.playlist.length}] ${state.playlist[state.currentIndex].name}` : t('status.idle');
+        updateNextUpText(state.currentIndex);
     } catch (error) {
         console.error('Folder import failed:', error);
         // Fallback to file picker
@@ -3606,8 +3612,8 @@ function updateVolume() {
 function onMetadataLoaded() { els.seekBar.max = audio.duration || 0; updateTimeDisplay(); }
 function updateProgress() { 
     if (!isNaN(audio.currentTime)) { 
-        els.seekBar.value = audio.currentTime; 
         updateTimeDisplay(); 
+        els.seekBar.value = audio.currentTime;
     } 
 }
 function updateTimeDisplay() {
@@ -3625,7 +3631,7 @@ function handleAudioError(e) {
 function formatTime(s) { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s / 60); const sec = Math.floor(s % 60); return `${m}:${sec.toString().padStart(2, '0')}`; }
 
 function updateSeekVisuals() {
-    if (!els.seekFill || !els.seekBuffer) return;
+    if (!els.seekFill) return;
     const duration = audio.duration || 0;
     const current = audio.currentTime || 0;
     const playedPct = duration > 0 ? Math.min(100, Math.max(0, (current / duration) * 100)) : 0;
@@ -3638,8 +3644,6 @@ function updateSeekVisuals() {
             if (current + 0.2 >= start) bufferedEnd = Math.max(bufferedEnd, end);
         }
     } catch {}
-    const bufferedPct = duration > 0 ? Math.min(100, Math.max(0, (bufferedEnd / duration) * 100)) : 0;
-    els.seekBuffer.style.width = `${bufferedPct}%`;
 }
 
 function getTrackDisplayInfo(track) {
@@ -3680,18 +3684,12 @@ function updateTopBadge(track, index) {
 }
 
 function updateNextUpText(currentIndex) {
-    console.log('DEBUG currentIndex:', currentIndex);
-    console.log('DEBUG playlist length:', state.playlist.length);
 
     const nextIndex = (currentIndex + 1) % state.playlist.length;
 
-    console.log('DEBUG nextIndex:', nextIndex);
-
     const nextTrack = state.playlist[nextIndex];
 
-    console.log('DEBUG nextTrack:', nextTrack);
-
-    els.nextUpText.textContent = nextTrack?.name ?? 'ERROR';
+    els.nextUpText.textContent = nextTrack ? t("next.track", { name: nextTrack.name }) : t("next.none");
 }
 
 function updateNowPlayingCustom(title, artist, icon, indexText) {
@@ -3772,6 +3770,8 @@ async function handleFiles(files) {
     saveSettingsToStorage();
     
     setTimeout(() => {
+        els.statusText.textContent = state.playlist[state.currentIndex] ? `🎵 [${state.currentIndex + 1}/${state.playlist.length}] ${state.playlist[state.currentIndex].name}` : t('status.idle');
+        updateNextUpText(state.currentIndex);
         showOverlay(t('overlay.filesAdded', { count: accepted.length }));
     }, 500);
 }

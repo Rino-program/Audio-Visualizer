@@ -15,6 +15,9 @@ https://github.com/Rino-program/Audio-Visualizer
 - ミュージックプレーヤーとして発展させる
 - ユーザーフィードバックへの対応
 
+## 注意事項
+- 対応フォーマットは使用機種やAndroid バージョンによって異なります。
+
 ## お問い合わせ
 
 ご意見・ご要望は GitHub リポジトリの Issues へお願いします。

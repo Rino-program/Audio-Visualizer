@@ -9,6 +9,8 @@ https://github.com/Rino-program/Audio-Visualizer
 - 进一步优化功能
 - 发展为音乐播放器
 - 响应用户反馈
+## 注意事项
+- 支持的格式因设备型号和Android版本而异。
 ## 联系我们
 如有意见或建议，请提交至 GitHub 仓库的 Issues 页面。
 https://github.com/Rino-program/Audio-Visualizer/issues
