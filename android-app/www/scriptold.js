@@ -591,20 +591,15 @@ let currentLang = localStorage.getItem('app_lang') ||
 // ============== I18N FUNCTIONS ==============
 // 指定されたキーの翻訳テキストを返す関数
 // ============== I18N FUNCTIONS ==============
-function t(key, vars = {}) {
+function t(key) {
     if (!window.I18N) return key;
-    let text;
     if (I18N[currentLang] && I18N[currentLang][key] !== undefined) {
-        text = I18N[currentLang][key];
-    } else if (I18N['ja'] && I18N['ja'][key] !== undefined) {
-        text = I18N['ja'][key];
-    } else {
-        text = key;
+        return I18N[currentLang][key];
     }
-    for (const [name, value] of Object.entries(vars)) {
-        text = text.replaceAll(`{${name}}`, String(value));
+    if (I18N['ja'] && I18N['ja'][key] !== undefined) {
+        return I18N['ja'][key];
     }
-    return text;
+    return key;
 }
 
 function updateLanguageUI() {
@@ -968,7 +963,7 @@ function seekBySeconds(deltaSeconds) {
     if (bgVideo.src) {
         try { bgVideo.currentTime = next; } catch {}
     }
-    showOverlay(deltaSeconds < 0 ? t('overlay.seekBack') : t('overlay.seekForward'));
+    showOverlay(deltaSeconds < 0 ? '⏪ -10秒' : '⏩ +10秒');
 }
 
 function setupPlaylistEventDelegation() {
@@ -1246,7 +1241,7 @@ async function init() {
         }
         const track = state.playlist[state.currentIndex];
         if (track) {
-            els.statusText.textContent = t('status.loading');
+            els.statusText.textContent = `🎵 [${state.currentIndex + 1}/${state.playlist.length}] ${track.name}`;
             updateTopBadge(track, state.currentIndex);
         }
         updateMediaSessionMetadata();
@@ -1254,7 +1249,7 @@ async function init() {
     });
     audio.addEventListener('waiting', () => {
         if (bgVideo.src) bgVideo.pause();
-        els.statusText.textContent = t('status.loading');
+        els.statusText.textContent = '⏳ 読み込み中...';
     });
     audio.addEventListener('pause', () => { 
         clearPlayTimeout();
@@ -1291,7 +1286,7 @@ async function init() {
         // MP3等の音声ファイルの場合はエラーメッセージを表示しない
         const currentTrack = state.playlist[state.currentIndex];
         if (currentTrack && currentTrack.isVideo) {
-            showOverlay(t('overlay.videoLoadFailed'));
+            showOverlay('⚠️ 動画の読み込みに失敗しました');
         }
         els.videoContainer.classList.add('hidden');
     });
@@ -1300,7 +1295,7 @@ async function init() {
             audio.pause();
             state.isPlaying = false;
             updatePlayBtn();
-            showOverlay(t('overlay.videoEnded'));
+            showOverlay('⏹ 動画終了により停止しました');
         }
     });
     
@@ -1315,7 +1310,7 @@ async function init() {
     els.modeSelect.onchange = e => { 
         state.mode = +e.target.value; 
         const modeName = e.target.options[e.target.selectedIndex].text;
-        showOverlay(t('overlay.mode', { mode: modeName }));
+        showOverlay(`📊 モード: ${modeName}`);
     };
     // === 言語切り替え（強化版）===
     const langSelect = document.getElementById('langSelect');
@@ -1332,7 +1327,9 @@ async function init() {
             saveSettingsToStorage();
             
             // メッセージ（存在しないキーを安全に扱う）
-            showOverlay(currentLang === 'ja' ? t('overlay.languageChangedJa') : currentLang === 'en' ? t('overlay.languageChangedEn') : t('overlay.languageChangedZh'));
+            showOverlay(currentLang === 'ja' ? '🇯🇵 日本語に変更しました' : 
+                       currentLang === 'en' ? '🇬🇧 English' : 
+                       '🇨🇳 中文');
         });
     }
     // UI表示ボタン：タッチ環境で click/touchstart が二重に走りやすいので
@@ -1350,7 +1347,7 @@ async function init() {
     els.closeSettingsBtn.onclick = closeSettings;
     els.saveSettingsBtn.onclick = saveSettings;
     els.resetAllSettingsBtn.onclick = async () => {
-        if (confirm(t('confirm.resetAll'))) {
+        if (confirm('すべての設定、プレイリスト、保存ファイルを削除して初期状態に戻しますか？')) {
             try {
                 // プレイリストのBlobURLを解放
                 state.playlist.forEach(t => { 
@@ -1385,7 +1382,7 @@ async function init() {
                 location.reload();
             } catch (err) {
                 console.error('Failed to reset:', err);
-                alert(t('alert.initFailed', { message: err.message }));
+                alert('初期化に失敗しました: ' + err.message);
             }
         }
     };
@@ -1395,7 +1392,7 @@ async function init() {
     els.closePlaylistBtn.onclick = togglePlaylist;
     els.playlistSearchInput.oninput = scheduleRenderPlaylist;
     els.clearPlaylistBtn.onclick = async () => {
-        if (confirm(t('confirm.clearPlaylist'))) {
+        if (confirm('プレイリストをすべてクリアしますか？')) {
             await deleteAllLocalTrackStorage(state.playlist);
             state.playlist.forEach(t => { if (t.source === 'local' && isBlobUrl(t.url)) URL.revokeObjectURL(t.url); });
             state.playlist = [];
@@ -1405,11 +1402,11 @@ async function init() {
             updatePlayBtn();
             updateVideoVisibility();
             renderPlaylist();
-            els.statusText.textContent = t('status.idle');
+            els.statusText.textContent = '待機中...';
             updateTopBadge(null, -1);
-            updateNowPlayingCustom(t('common.unknown'), '--', '🎵', '0/0');
+            updateNowPlayingCustom('未再生', '--', '🎵', '0/0');
             saveSettingsToStorage();
-            showOverlay(t('overlay.playlistCleared'));
+            showOverlay('✅ プレイリストをクリアしました');
         }
     };
     
@@ -1545,20 +1542,20 @@ async function init() {
                 e.preventDefault(); 
                 els.volSlider.value = Math.min(1, +els.volSlider.value + 0.1); 
                 updateVolume(); 
-                showOverlay(t('overlay.volumeUp', { value: Math.round(audio.volume * 100) }));
+                showOverlay(`🔊 音量: ${Math.round(audio.volume * 100)}%`);
                 break;
             case 'ArrowDown': 
                 e.preventDefault(); 
                 els.volSlider.value = Math.max(0, +els.volSlider.value - 0.1); 
                 updateVolume(); 
-                showOverlay(t('overlay.volumeDown', { value: Math.round(audio.volume * 100) }));
+                showOverlay(`🔉 音量: ${Math.round(audio.volume * 100)}%`);
                 break;
             case 'KeyH': e.preventDefault(); toggleUI(); break;
             case 'KeyV': 
                 state.settings.showVideo = !state.settings.showVideo; 
                 updateVideoVisibility(); 
                 applySettingsToUI(); 
-                showOverlay(state.settings.showVideo ? t('overlay.videoOn') : t('overlay.videoOff'));
+                showOverlay(state.settings.showVideo ? '📺 動画表示: ON' : '📺 動画表示: OFF');
                 break;
             case 'KeyL': {
                 // FPSサイクル: 30 → 60 → 120 → 無制限 → 30
@@ -1569,18 +1566,18 @@ async function init() {
                 state.settings.targetFps = nextFps;
                 state.settings.lowPowerMode = (nextFps <= 30);
                 applySettingsToUI();
-                showOverlay(t('overlay.fps', { fps: nextFps === 0 ? '∞' : nextFps })); 
+                showOverlay(`🎬 FPS: ${nextFps === 0 ? '無制限' : nextFps}`); 
                 break;
             }
             case 'KeyR': 
                 state.settings.rainbow = !state.settings.rainbow; 
                 applySettingsToUI(); 
-                showOverlay(state.settings.rainbow ? t('overlay.rainbowOn') : t('overlay.rainbowOff')); 
+                showOverlay(state.settings.rainbow ? '🌈 虹色モード: ON' : '🎨 虹色モード: OFF'); 
                 break;
             case 'KeyX': 
                 state.settings.mirror = !state.settings.mirror; 
                 applySettingsToUI(); 
-                showOverlay(state.settings.mirror ? t('overlay.mirrorOn') : t('overlay.mirrorOff')); 
+                showOverlay(state.settings.mirror ? '🪞 左右反転: ON' : '🪞 左右反転: OFF'); 
                 break;
             case 'KeyS': toggleShuffle(); applySettingsToUI(); break;
             case 'KeyP': toggleRepeat(); applySettingsToUI(); break;
@@ -1593,7 +1590,7 @@ async function init() {
                 if (bgVideo.src) bgVideo.playbackRate = rates[ni];
                 syncVideoRateAfterChange();
                 const sel = $('speedSelect'); if (sel) sel.value = rates[ni];
-                showOverlay(t('overlay.playbackSpeed', { rate: rates[ni] }));
+                showOverlay(`⏪ 再生速度: ${rates[ni]}x`);
                 break;
             }
             case 'BracketRight': {
@@ -1605,14 +1602,14 @@ async function init() {
                 if (bgVideo.src) bgVideo.playbackRate = rates[ni];
                 syncVideoRateAfterChange();
                 const sel = $('speedSelect'); if (sel) sel.value = rates[ni];
-                showOverlay(t('overlay.playbackSpeed', { rate: rates[ni] }));
+                showOverlay(`⏩ 再生速度: ${rates[ni]}x`);
                 break;
             }
             case 'KeyM': 
                 state.mode = (state.mode + 1) % 9; 
                 els.modeSelect.value = state.mode;
                 const modeName = els.modeSelect.options[els.modeSelect.selectedIndex].text;
-                showOverlay(t('overlay.mode', { mode: modeName }));
+                showOverlay(`📊 モード: ${modeName}`);
                 break;
         }
     });
@@ -2042,7 +2039,7 @@ async function openNativeFilePicker() {
     const filePicker = plugins?.FilePicker;
 
     if (!filePicker || typeof filePicker.pickFiles !== 'function') {
-        alert(t('alert.filePickerMissing'));
+        alert('FilePickerプラグインが見つかりません。android-appで依存追加後に `npx cap sync` してください。');
         return;
     }
 
@@ -2068,7 +2065,7 @@ async function openNativeFilePicker() {
         }
 
         if (accepted.length === 0) {
-            showOverlay(t('overlay.noFileSelected'));
+            showOverlay('対応するファイルを選択してください');
             return;
         }
 
@@ -2081,7 +2078,7 @@ async function openNativeFilePicker() {
             console.log('Last selected path saved:', lastPath);
         }
 
-        showOverlay(t('overlay.importingFiles', { count: accepted.length }));
+        showOverlay(`📥 ${accepted.length}個のファイルを取り込み中...`);
 
         for (const item of accepted) {
             state.playlist.push({
@@ -2097,16 +2094,16 @@ async function openNativeFilePicker() {
         renderPlaylist();
         if (state.currentIndex === -1) playTrack(state.playlist.length - accepted.length);
         saveSettingsToStorage();
-        setTimeout(() => showOverlay(t('overlay.filesAdded', { count: accepted.length })), 500);
+        setTimeout(() => showOverlay(`✅ ${accepted.length}個のファイルを追加しました`), 500);
     } catch (error) {
         console.error('FilePicker failed:', error);
-        showOverlay(t('overlay.fileSelectFailed'));
+        showOverlay('❌ ファイル選択に失敗しました');
     }
 }
 
 async function openNativeFolderImport() {
     if (!isNativeCapacitor()) {
-        showOverlay(t('overlay.androidOnly'));
+        showOverlay('この機能はAndroidアプリ版で利用できます');
         return;
     }
 
@@ -2120,11 +2117,11 @@ async function openNativeFolderImport() {
     }
 
     try {
-        showOverlay(t('overlay.selectFolder'));
+        showOverlay('📂 フォルダを選択してください');
         const result = await folderImport.pickAudioFolder({});
         const files = Array.isArray(result?.files) ? result.files : [];
         if (files.length === 0) {
-            showOverlay(t('overlay.folderNoFiles'));
+            showOverlay('フォルダ内に対応ファイルが見つかりませんでした');
             return;
         }
 
@@ -2140,7 +2137,7 @@ async function openNativeFolderImport() {
             console.log('Last selected folder path (from file) saved:', folderPath);
         }
 
-        showOverlay(t('overlay.importingFiles', { count: files.length }));
+        showOverlay(`📥 ${files.length}個のファイルを追加中...`);
 
         for (const f of files) {
             const name = typeof f?.name === 'string' ? f.name : '';
@@ -2168,7 +2165,7 @@ async function openNativeFolderImport() {
             playTrack(firstAddedIndex);
         }
         saveSettingsToStorage();
-        setTimeout(() => showOverlay(t('overlay.filesAdded', { count: files.length })), 500);
+        setTimeout(() => showOverlay(`✅ ${files.length}個のファイルを追加しました`), 500);
     } catch (error) {
         console.error('Folder import failed:', error);
         // Fallback to file picker
@@ -2359,7 +2356,7 @@ async function loadPlaylistFromStorage() {
     if (state.currentIndex >= state.playlist.length) state.currentIndex = -1;
     renderPlaylist();
     if (state.playlist.length > 0) {
-        els.statusText.textContent = t('playlist.restored');
+        els.statusText.textContent = '📂 プレイリストを復元しました';
     }
 }
 
@@ -2396,7 +2393,7 @@ async function purgeIdbLocalTracksFromPlaylist() {
         state.isPlaying = false;
         updatePlayBtn();
         state.currentIndex = -1;
-        els.statusText.textContent = t('status.idle');
+        els.statusText.textContent = '待機中...';
     } else if (state.currentIndex >= 0) {
         state.currentIndex = Math.max(-1, state.currentIndex - removedBeforeCurrent);
     }
@@ -2532,7 +2529,7 @@ function setupSettingsInputs() {
                 const el = $(id);
                 if (el) el.value = values[i];
             });
-            showOverlay(t('overlay.eq', { name: btn.textContent }));
+            showOverlay(`🎵 EQ: ${btn.textContent}`);
         });
     });
 
@@ -2543,7 +2540,7 @@ function setupSettingsInputs() {
             const fps = +e.target.value;
             state.settings.targetFps = fps;
             state.settings.lowPowerMode = (fps <= 30);
-            showOverlay(t('overlay.fps', { fps: fps === 0 ? '∞' : fps }));
+            showOverlay(`🎬 FPS: ${fps === 0 ? '無制限' : fps}`);
         };
     }
     const glowSlider = $('glowSlider');
@@ -2593,7 +2590,7 @@ function setupSettingsInputs() {
             const label = $('balanceValue');
             if (label) label.textContent = 'C';
             applyBalanceToPan();
-            showOverlay(t('overlay.centerReset'));
+            showOverlay('音楽の重心を中央にリセット');
         };
     }
     const fixedColorPicker = $('fixedColorPicker');
@@ -2638,19 +2635,19 @@ function setupSettingsInputs() {
             state.settings.storeLocalFiles = nextValue;
 
             if (prevValue && !nextValue && hasIdbLocalTracksInPlaylist()) {
-                const ok = confirm(t('confirm.switchUriMode'));
+                const ok = confirm('「URIのみ」に切り替えるため、アプリ内に保存済みのローカルファイルをプレイリストから削除しますか？\n\n削除すると、再起動後にそれらの曲は復元できなくなります。');
                 if (ok) {
                     await purgeIdbLocalTracksFromPlaylist();
                 } else {
                     // 取り消し: 設定を元に戻す
                     state.settings.storeLocalFiles = true;
                     e.target.checked = true;
-                    showOverlay(t('overlay.localSaveOn'));
+                    showOverlay('💾 ローカル保存: ON');
                     return;
                 }
             }
 
-            showOverlay(state.settings.storeLocalFiles ? t('overlay.localSaveOn') : t('overlay.localSaveOff'));
+            showOverlay(state.settings.storeLocalFiles ? '💾 ローカル保存: ON' : '🔗 ローカル保存: OFF (URIのみ)');
             renderStorageList();
         };
     }
@@ -2746,7 +2743,7 @@ function setupPresets() {
             state.settings.fixedColor = p.color;
             state.settings.rainbow = false;
             applySettingsToUI();
-            showOverlay(t('overlay.colorApplied', { name: p.name }));
+            showOverlay(`🎨 ${p.name} カラー適用`);
         };
         list.appendChild(btn);
     });
@@ -2760,7 +2757,7 @@ function setupPresets() {
 function savePreset(slot) {
     const presetData = JSON.stringify(state.settings);
     localStorage.setItem(`visualizerPreset_${slot}`, presetData);
-    showOverlay(t('overlay.presetSaved', { slot }));
+    showOverlay(`💾 プリセット ${slot} を保存しました`);
 }
 
 function loadPreset(slot) {
@@ -2777,12 +2774,12 @@ function loadPreset(slot) {
                 state.analyser.fftSize = state.settings.fftSize;
                 applySensitivityToAnalyser();
             }
-            showOverlay(t('overlay.presetLoaded', { slot }));
+            showOverlay(`📂 プリセット ${slot} を読み込みました`);
         } catch (e) {
-            showOverlay(t('overlay.loadFailed'));
+            showOverlay('❌ 読み込みに失敗しました');
         }
     } else {
-        showOverlay(t('overlay.presetEmpty', { slot }));
+        showOverlay(`❌ プリセット ${slot} は空です`);
     }
 }
 
@@ -2898,7 +2895,7 @@ function saveSettings() {
     updateLanguageUI();        // 保存時にも確実に反映
     saveSettingsToStorage(); 
     closeSettings();
-    showOverlay(t('overlay.settingsSaved'));
+    showOverlay('✅ 設定を保存しました');
 }
 
 function switchTab(tabId) {
@@ -2927,7 +2924,7 @@ async function loadDeveloperMessage() {
     } catch (error) {
         console.warn('Failed to load developer message:', error);
         const contentEl = document.getElementById('developerMessageContent');
-        if (contentEl) contentEl.textContent = t('devMessage.loadFailed');
+        if (contentEl) contentEl.textContent = '開発者メッセージを読み込めませんでした。';
     }
 }
 
@@ -3101,13 +3098,13 @@ async function setInputSource(source) {
         audio.pause();
         clearPlayTimeout();
         await startMic();
-        els.statusText.textContent = t('status.mic');
+        els.statusText.textContent = '🎤 マイク入力中';
         updateTopBadge(null, -1);
         updateNowPlayingCustom('マイク入力', 'ライブ入力', '🎤', 'LIVE');
     } else {
         stopMic();
         connectFileSource();
-        els.statusText.textContent = state.playlist[state.currentIndex] ? `🎵 ${state.playlist[state.currentIndex].name}` : t('status.idle');
+        els.statusText.textContent = state.playlist[state.currentIndex] ? `🎵 ${state.playlist[state.currentIndex].name}` : '待機中...';
         updateTopBadge(state.playlist[state.currentIndex], state.currentIndex);
         if (state.playlist[state.currentIndex]) {
             updateNowPlayingUI(state.playlist[state.currentIndex], state.currentIndex);
@@ -3187,14 +3184,14 @@ async function startMic() {
         console.log('AudioContext state after mic start:', state.audioCtx.state);
         console.log('Analyser connected, bufLen:', state.bufLen);
         
-        showOverlay(t('overlay.micStarted'));
+        showOverlay('🎤 マイク入力開始');
     } catch (e) {
         console.error('Mic error:', e);
         let msg = 'マイクアクセスに失敗しました';
         if (e.name === 'NotAllowedError') msg = 'マイク権限が拒否されました';
         else if (e.name === 'NotFoundError') msg = 'マイクが見つかりません';
         
-        showOverlay(t('overlay.warn', { msg }));
+        showOverlay(`⚠️ ${msg}`);
         alert(`${msg}: ${e.message}`);
         setInputSource('file');
     }
@@ -3298,7 +3295,7 @@ function togglePlay() {
 function toggleShuffle() {
     state.settings.shuffle = !state.settings.shuffle;
     updateShuffleRepeatUI();
-    showOverlay(state.settings.shuffle ? t('overlay.shuffleOn') : t('overlay.shuffleOff'));
+    showOverlay(state.settings.shuffle ? '🔀 シャッフルON' : '🔀 シャッフルOFF');
 }
 
 function toggleRepeat() {
@@ -3306,14 +3303,8 @@ function toggleRepeat() {
     const idx = modes.indexOf(state.settings.repeatMode);
     state.settings.repeatMode = modes[(idx + 1) % modes.length];
     updateShuffleRepeatUI();
-    function getRepeatLabels() {
-    return {
-        none: t('repeat.none'),
-        one: t('repeat.one'),
-        all: t('repeat.all')
-    };
-}
-    showOverlay(getRepeatLabels()[state.settings.repeatMode]);
+    const labels = { none: '🔁 リピートOFF', one: '🔂 1曲リピート', all: '🔁 全曲リピート' };
+    showOverlay(labels[state.settings.repeatMode]);
 }
 
 function updateShuffleRepeatUI() {
@@ -3362,7 +3353,7 @@ function playTrack(index) {
     renderPlaylist();
     
     // 再生中の曲をオーバーレイで表示
-    showOverlay(t('overlay.nowPlaying', { title: track.name }), 3000);
+    showOverlay(`Now Playing: ${track.name}`, 3000);
     
     if (state.playTimeout) clearTimeout(state.playTimeout);
     
@@ -3380,7 +3371,7 @@ function playTrack(index) {
             state.playTimeout = setTimeout(() => { 
                 audio.play().catch(e => {
                     console.warn("Playback failed:", e);
-                    showOverlay(t('overlay.playFailed'));
+                    showOverlay('⚠️ 再生に失敗しました');
                     // 失敗した場合は次の曲へ（無限ループ防止のため少し待つ）
                     setTimeout(nextTrack, 2000);
                 }); 
@@ -3396,7 +3387,7 @@ function playTrack(index) {
             blobCache.enforceLimit([audio.src, bgVideo.src]);
         } catch (e) {
             console.warn('ensureUrlForTrack failed', e);
-            showOverlay(t('overlay.urlPrepareFailed'));
+            showOverlay('⚠️ URL準備に失敗しました');
             setTimeout(nextTrack, 2000);
         }
     })();
@@ -3426,8 +3417,8 @@ function updateTimeDisplay() {
 function updatePlayBtn() { els.playBtn.textContent = state.isPlaying ? '⏸' : '▶'; }
 function handleAudioError(e) { 
     console.error('Audio error:', e); 
-    els.statusText.textContent = t('status.playError'); 
-    showOverlay(t('overlay.audioError'));
+    els.statusText.textContent = '再生エラー'; 
+    showOverlay('⚠️ オーディオエラーが発生しました');
     // エラー時は次の曲へ
     setTimeout(nextTrack, 3000);
 }
@@ -3486,16 +3477,16 @@ function updateTopBadge(track, index) {
 function updateNextUpText(currentIndex) {
     if (!els.nextUpText) return;
     if (!state.playlist.length || currentIndex < 0) {
-        els.nextUpText.textContent = t('next.none');
+        els.nextUpText.textContent = '次: --';
         return;
     }
     const nextIndex = (currentIndex + 1) % state.playlist.length;
     const nextTrack = state.playlist[nextIndex];
     if (!nextTrack) {
-        els.nextUpText.textContent = t('next.none');
+        els.nextUpText.textContent = '次: --';
         return;
     }
-    els.nextUpText.textContent = t('next.track', { name: nextTrack.name });
+    els.nextUpText.textContent = `次: ${nextTrack.name}`;
 }
 
 function updateNowPlayingCustom(title, artist, icon, indexText) {
@@ -3529,11 +3520,11 @@ async function handleFiles(files) {
     });
 
     if (accepted.length === 0) {
-        showOverlay(t('overlay.noFileSelected'));
+        showOverlay('対応するファイルを選択してください');
         return;
     }
 
-    showOverlay(t('overlay.importingFiles', { count: accepted.length }));
+    showOverlay(`📥 ${accepted.length}個のファイルを取り込み中...`);
 
     for (const item of accepted) {
         const file = item.file;
@@ -3576,7 +3567,7 @@ async function handleFiles(files) {
     saveSettingsToStorage();
     
     setTimeout(() => {
-        showOverlay(t('overlay.filesAdded', { count: accepted.length }));
+        showOverlay(`✅ ${accepted.length}個のファイルを追加しました`);
     }, 500);
 }
 
@@ -3591,12 +3582,12 @@ function renderPlaylist() {
                                   .filter(track => track.name.toLowerCase().includes(query));
 
     if (state.playlist.length === 0) { 
-        els.playlistItems.innerHTML = `<div class="playlist-empty">${t('playlist.empty')}</div>`; 
+        els.playlistItems.innerHTML = '<div class="playlist-empty">曲を追加してください</div>'; 
         return; 
     }
     
     if (filtered.length === 0) {
-        els.playlistItems.innerHTML = `<div class="playlist-empty">${t('playlist.notFound')}</div>`;
+        els.playlistItems.innerHTML = '<div class="playlist-empty">見つかりませんでした</div>';
         return;
     }
 
@@ -3642,7 +3633,7 @@ function removeTracksByLocalRefs(refs) {
         state.isPlaying = false;
         updatePlayBtn();
         state.currentIndex = -1;
-        els.statusText.textContent = t('status.idle');
+        els.statusText.textContent = '待機中...';
     } else if (state.currentIndex >= 0) {
         state.currentIndex = Math.max(-1, state.currentIndex - removedBeforeCurrent);
     }
@@ -3672,15 +3663,15 @@ async function deleteLibraryEntry(ref) {
 async function deleteAllLibraryEntries() {
     const refs = Object.keys(library);
     if (refs.length === 0) {
-        showOverlay(t('overlay.deleteNone'));
+        showOverlay('削除対象がありません');
         return;
     }
-    const ok = confirm(t('confirm.deleteStoredFiles'));
+    const ok = confirm('アプリ内に保持しているファイルをすべて削除しますか？\nプレイリストからも削除されます。');
     if (!ok) return;
     for (const ref of refs) {
         await deleteLibraryEntry(ref);
     }
-    showOverlay(t('overlay.allDeleted'));
+    showOverlay('🗑️ すべて削除しました');
     renderStorageList();
 }
 
@@ -3688,7 +3679,7 @@ function renderStorageList() {
     if (!els.storageList) return;
     const refs = Object.keys(library);
     if (refs.length === 0) {
-        els.storageList.innerHTML = `<div class="hint">${t('storage.empty')}</div>`;
+        els.storageList.innerHTML = '<div class="hint">保存済みのファイルはありません</div>';
         if (els.storageSummary) els.storageSummary.textContent = '';
         return;
     }
@@ -3853,7 +3844,7 @@ function performPlaylistReorder(draggedIdx, targetIdx) {
     
     renderPlaylist();
     saveSettingsToStorage();
-    showOverlay(t('overlay.playlistReordered'));
+    showOverlay('プレイリストの順序を変更しました');
     
     // プレイリストの表示位置を調整（下に移動した場合、タブの上部が隠れないようにする）
     scrollToCurrentPlaylistItem();
@@ -4013,7 +4004,7 @@ async function removeFromPlaylist(index) {
             // プレイリストが空になった場合
             audio.pause();
             state.currentIndex = -1;
-            els.statusText.textContent = t('status.idle');
+            els.statusText.textContent = '待機中...';
             updateVideoVisibility();
         }
     } else if (state.currentIndex > index) {
@@ -4087,11 +4078,11 @@ function startSleepTimer(minutes) {
             audio.pause();
             state.isPlaying = false;
             updatePlayBtn();
-            showOverlay(t('overlay.sleepStopped'));
+            showOverlay('💤 スリープタイマーで停止しました');
         }
         updateSleepTimerStatus();
     }, 1000);
-    showOverlay(t('overlay.sleepStart', { minutes }));
+    showOverlay(`⏰ ${minutes}分後に停止します`);
     updateSleepTimerStatus();
 }
 function stopSleepTimer() {
@@ -4116,9 +4107,9 @@ function updateSleepTimerStatus() {
 
 // ============== EXPORT ==============
 function startExport() {
-    if (state.inputSource === 'mic') { alert(t('alert.exportBlockedMic')); return; }
+    if (state.inputSource === 'mic') { alert('マイク入力モードでは書き出しできません'); return; }
     if (!state.playlist[state.currentIndex]) return;
-    if (!confirm(t('confirm.exportVideo'))) return;
+    if (!confirm('現在の曲を動画として書き出しますか？')) return;
     state.isExporting = true;
     const stream = cv.captureStream(60);
     state.mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9' });
@@ -4127,7 +4118,7 @@ function startExport() {
     audio.pause(); audio.currentTime = 0;
     state.gainNode.gain.value = 0;
     if (state.uiVisible) toggleUI();
-    showOverlay(t('overlay.exporting'), 0);
+    showOverlay('🎬 動画書き出し中...', 0);
     state.mediaRecorder.start();
     audio.play();
 }
@@ -4143,7 +4134,7 @@ function finishExport() {
         a.href = URL.createObjectURL(blob);
         a.download = `visualizer_${state.playlist[state.currentIndex].name}.webm`;
         a.click();
-        alert(t('alert.exportComplete'));
+        alert('書き出し完了');
     }, 500);
 }
 
@@ -4268,7 +4259,7 @@ function updateResourceMonitor() {
             const usedMB = Math.round(performance.memory.usedJSHeapSize / (1024 * 1024));
             memoryEl.textContent = usedMB + ' MB';
         } else {
-            memoryEl.textContent = t('common.unsupported');
+            memoryEl.textContent = '未対応';
         }
     }
     
