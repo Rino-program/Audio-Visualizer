@@ -204,7 +204,6 @@ const I18N = {
         "opt.fitFill": "引き伸ばす (fill)",
         "label.showFreq": "周波数ラベルを表示",
         "label.glow": "発光強度 (Glow)",
-        "val.medium": "中",
         "label.opacity": "ビジュアライザー不透明度",
         "label.changeMode": "変化モード (Change)",
         "opt.changeNormal": "通常",
@@ -420,7 +419,6 @@ const I18N = {
         "opt.fitFill": "Stretch to Fill",
         "label.showFreq": "Show Frequency Labels",
         "label.glow": "Glow Strength",
-        "val.medium": "Med",
         "label.opacity": "Visualizer Opacity",
         "label.changeMode": "Change Mode",
         "opt.changeNormal": "Normal",
@@ -626,7 +624,6 @@ const I18N = {
         "opt.fitFill": "拉伸填充 (Fill)",
         "label.showFreq": "显示频率标签",
         "label.glow": "发光强度 (Glow)",
-        "val.medium": "中",
         "label.opacity": "可视化不透明度",
         "label.changeMode": "动态模式",
         "opt.changeNormal": "普通",
@@ -2730,7 +2727,7 @@ function setupSettingsInputs() {
     if (glowSlider) {
         glowSlider.oninput = e => { 
             state.settings.glowStrength = +e.target.value; 
-            $('glowValue').textContent = state.settings.glowStrength > 30 ? '強' : state.settings.glowStrength > 10 ? '中' : '弱';
+            $('glowValue').textContent = state.settings.glowStrength > 30 ? 'strong' : state.settings.glowStrength > 10 ? 'Medium' : 'weak';
         };
     }
     const rainbowCheckbox = $('rainbowCheckbox');
