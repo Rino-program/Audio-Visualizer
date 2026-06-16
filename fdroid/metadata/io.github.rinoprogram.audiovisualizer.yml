@@ -16,18 +16,19 @@ Binaries:
 Builds:
   - versionName: 1.0.8
     versionCode: 8
-    commit: c488fda0a40b3f36199f1a726120063098ccba4a
+    commit: 575638c1aa8c5c87961b83663b0217999c5a7788
     subdir: android-app/android/app
     sudo:
       - apt-get update
-      - apt-get install -y nodejs npm openjdk-21-jdk
+      - apt-get install -y nodejs npm
     gradle:
       - yes
-    build:
-      - export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+    prebuild:
       - cd ../../
       - npm ci
       - npx --package=@capacitor/cli cap sync
+    scandelete:
+      - android-app/node_modules
 
 AllowedAPKSigningKeys: c9812e0591a0182fff8323dd045557b8d1bcc33f8e3fcd255567828608b76c58
 

@@ -9,6 +9,11 @@ https://github.com/Rino-program/Audio-Visualizer
 - Further feature improvements
 - Developing it into a full-fledged music player
 - Addressing user feedback
+## License & Request
+This application is open-source software released under the MIT License. You are completely free to use, modify, and distribute it.
+## A Small Request from the Developer (Optional)
+If you use this app for your projects or creations, we would be absolutely thrilled if you could share it on X (formerly Twitter) with the hashtag #AudioVisualizerFDroid, or mention the creator @Rinoprogram!
+Knowing how this app is being used motivates us immensely. (Of course, this is entirely optional, so feel free to use it without any notification!)
 ## Important Notes
 - Supported formats vary depending on the device model and Android version.
 ## Contact Us

@@ -3127,51 +3127,60 @@ async function loadDeveloperMessage() {
     }
 }
 
-// 簡易Markdown→HTML変換
+// 簡易Markdown→HTML変換（隙間問題解消版）
 function simpleMarkdownToHtml(markdown) {
-    let html = markdown;
+    // 前後の不要な空白を削除
+    let html = markdown.trim();
     
-    // コードブロック（```）を保護
+    // 1. コードブロック（```）を保護
     const codeBlocks = [];
     html = html.replace(/```([\s\S]*?)```/g, (match, code) => {
-        codeBlocks.push(code);
-        return `%%%CODE_BLOCK_${codeBlocks.length - 1}%%%`;
+        codeBlocks.push(code.trim());
+        return `\n\n%%%CODE_BLOCK_${codeBlocks.length - 1}%%%\n\n`;
     });
     
-    // 見出し
-    html = html.replace(/^### (.+)$/gm, '<h4 style="margin-top: 12px; margin-bottom: 6px; color: var(--accent-color);">$1</h4>');
-    html = html.replace(/^## (.+)$/gm, '<h3 style="margin-top: 14px; margin-bottom: 6px; color: var(--accent-color);">$1</h3>');
-    html = html.replace(/^# (.+)$/gm, '<h2 style="margin-top: 14px; margin-bottom: 6px; color: var(--accent-color);">$1</h2>');
+    // 2. ブロック要素（見出し・水平線）の変換
+    // ※ 記述を「margin: 上 右 下 左;」の形式に統一
+    html = html.replace(/^### (.+)$/gm, '\n\n<h4 style="margin: 12px 0 6px 0; color: var(--accent-color);">$1</h4>\n\n');
+    html = html.replace(/^## (.+)$/gm, '\n\n<h3 style="margin: 14px 0 6px 0; color: var(--accent-color);">$1</h3>\n\n');
+    html = html.replace(/^# (.+)$/gm, '\n\n<h2 style="margin: 14px 0 6px 0; color: var(--accent-color);">$1</h2>\n\n');
+    html = html.replace(/^---$/gm, '\n\n<hr style="margin: 12px 0; border: none; border-top: 1px solid var(--glass-border);">\n\n');
     
-    // リスト
-	html = html.replace(/^- (.+)$/gm, '<li style="margin-left: 18px; margin-bottom: 2px;">$1</li>');
-	html = html.replace(/(<li.*<\/li>\n?)+/g, '<ul style="margin: 4px 0; padding-left: 18px;">$&</ul>');
-    // 太字
+    // 3. リスト要素の変換
+    html = html.replace(/^- (.+)$/gm, '<li style="margin-left: 18px; margin-bottom: 2px;">$1</li>');
+    // 連続する <li> を <ul> で囲む（隙間対策として内部の改行コードも一撃で消去）
+    html = html.replace(/(?:<li[^>]*>.*?<\/li>\n?)+/g, match => {
+        const cleanedLi = match.replace(/\n/g, ''); 
+        return `\n\n<ul style="margin: 4px 0; padding-left: 18px;">${cleanedLi}</ul>\n\n`;
+    });
+    
+    // 4. インライン装飾（太字、斜体、リンク）
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-    
-    // 斜体
     html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-    
-    // リンク
     html = html.replace(/\[([^\]]+)\]\(([^\)]+)\)/g, '<a href="$2" target="_blank" style="color: var(--accent-color); text-decoration: underline;">$1</a>');
     
-    // 水平線
-    html = html.replace(/^---$/gm, '<hr style="margin: 12px 0; border: none; border-top: 1px solid var(--glass-border);">');
-    
-    // 段落（空行）を<p>でラップして、過度な空白を防止
+    // 5. 段落（ブロック）処理と「無駄な改行コード」の徹底排除
     const blocks = html.split(/\n{2,}/);
-    html = blocks.map(block => {
-        const b = block.trim();
-        if (!b) return '';
-        // 既にHTMLタグになっているブロックはそのまま
-        if (/^<(h2|h3|h4|ul|ol|pre|hr)/.test(b)) return b;
-        // 段内の改行は<br>に変換
-        return `<p style="margin: 0 0 6px 0;">${b.replace(/\n/g, '<br>')}</p>`;
-    }).join('');
+    html = blocks
+        .map(block => block.trim())
+        .filter(block => block !== '') // 空っぽのブロック（不要な空行）を完全に仕分けして消す
+        .map(block => {
+            // すでにHTMLブロック要素、またはコードブロックのプレースホルダーの場合はスルー
+            if (/^<(h2|h3|h4|ul|ol|hr)/i.test(block) || block.startsWith('%%%CODE_BLOCK_')) {
+                return block;
+            }
+            // 普通のテキストだけを <p> で囲み、段落内の改行は <br> に
+            return `<p style="margin: 0 0 6px 0;">${block.replace(/\n/g, '<br>')}</p>`;
+        })
+        .join(''); // ★最重要：改行（\n）を挟まずにピッタリ結合！
     
-    // コードブロックを復元
+    // 6. コードブロックを復元
     codeBlocks.forEach((code, i) => {
-        html = html.replace(`%%%CODE_BLOCK_${i}%%%`, `<pre style="background: rgba(0,0,0,0.3); padding: 6px; border-radius: 3px; overflow-x: auto;"><code>${code.trim()}</code></pre>`);
+        // pre タグのブラウザデフォルトマージンを「margin: 6px 0;」で上書きリセット
+        html = html.replace(
+            `%%%CODE_BLOCK_${i}%%%`, 
+            `<pre style="margin: 6px 0; background: rgba(0,0,0,0.3); padding: 6px; border-radius: 3px; overflow-x: auto;"><code style="white-space: pre;">${code}</code></pre>`
+        );
     });
     
     return html;
