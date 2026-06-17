@@ -1516,8 +1516,8 @@ async function init() {
     });
     // Initialize toggle button label
     els.toggleUIBtn.innerHTML = state.uiVisible 
-        ? '<img src="audio-visualizer-icon-btn.png" alt="表示" class="btn-icon">' 
-        : '<img src="audio-visualizer-icon-btn.png" alt="非表示" class="btn-icon">';
+        ? '<img src="audio-visualizer-icon-btn360.png" alt="表示" class="btn-icon">' 
+        : '<img src="audio-visualizer-icon-btn360.png" alt="非表示" class="btn-icon">';
 
     els.openSettingsBtn.onclick = openSettings;
     els.closeSettingsBtn.onclick = closeSettings;
@@ -4247,8 +4247,8 @@ function toggleUI() {
     if (els.toggleUIBtn) {
         // Initialize toggle button label
         els.toggleUIBtn.innerHTML = state.uiVisible 
-            ? '<img src="audio-visualizer-icon-btn.png" alt="表示" class="btn-icon">' 
-            : '<img src="audio-visualizer-icon-btn.png" alt="非表示" class="btn-icon">';
+            ? '<img src="audio-visualizer-icon-btn360.png" alt="表示" class="btn-icon">' 
+            : '<img src="audio-visualizer-icon-btn360.png" alt="非表示" class="btn-icon">';
 
     }
 
