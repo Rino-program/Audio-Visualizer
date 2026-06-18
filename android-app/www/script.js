@@ -1510,10 +1510,14 @@ async function init() {
     }
     // UI表示ボタン：タッチ環境で click/touchstart が二重に走りやすいので
     // 「押して離した(pointerup)」タイミングでのみトグルする
-    els.toggleUIBtn.addEventListener('click', e => {
-        e.preventDefault();
-        toggleUI();
-    });
+    // pointerup を優先的に使用（より正確）
+    els.toggleUIBtn.addEventListener('pointerup', e => {
+        if (e.pointerType === 'touch' || e.pointerType === 'mouse') {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            toggleUI();
+        }
+    }, { passive: false });
     // Initialize toggle button label
     els.toggleUIBtn.innerHTML = state.uiVisible 
         ? '<img src="audio-visualizer-icon-btn360.png" alt="表示" class="btn-icon">' 
@@ -1703,7 +1707,10 @@ async function init() {
     // Auto-hide UI
     document.addEventListener('mousemove', resetUITimeout);
     document.addEventListener('mousedown', resetUITimeout);
-    document.addEventListener('touchstart', resetUITimeout);
+    document.addEventListener('touchstart', resetUITimeout, { passive: true });  // passive維持
+    // pointerdown も追加（現代的）
+    document.addEventListener('pointerdown', resetUITimeout);
+    
     document.addEventListener('keydown', e => {
         resetUITimeout();
         const tag = e.target.tagName;
@@ -1799,6 +1806,11 @@ function resetUITimeout(e) {
     if (!state.settings.autoHideUI) {
         return;
     }
+
+    // === 修正ポイント：トグルボタン自体へのタッチは自動表示/リセットをスキップ ===
+    if (e && e.target && (e.target.closest('#toggleUIBtn') || e.target.id === 'toggleUIBtn')) {
+        return;  // ボタン操作は toggleUI() が直接処理する
+    }
     
     // タップ操作やマウス移動でUIを表示
     if (!state.uiVisible) {
@@ -1808,7 +1820,9 @@ function resetUITimeout(e) {
     if (state.uiTimeout) clearTimeout(state.uiTimeout);
     
     // 設定画面やプレイリストが開いている間、またはマウスがUI上にある間は消さない
-    const isOverUI = e && (e.target.closest('.top-bar') || e.target.closest('.controls-bar') || e.target.closest('.settings-modal') || e.target.closest('.playlist-container'));
+    const isOverUI = e && (e.target.closest('.top-bar') || e.target.closest('.controls-bar') || 
+                          e.target.closest('.settings-modal') || e.target.closest('.playlist-container') ||
+                          e.target.closest('#persistentControls'));  // persistentControlsも追加
 
     if (state.isPlaying && !state.settingsOpen && !state.playlistVisible && !isOverUI) {
         state.uiTimeout = setTimeout(() => {
@@ -4239,20 +4253,16 @@ function togglePlaylist() {
 
 // ============== UI CONTROLS ==============
 function toggleUI() { 
-    // 状態を即座に反転
     state.uiVisible = !state.uiVisible; 
     
-    // DOM更新
     els.uiLayer.classList.toggle('hidden', !state.uiVisible); 
+    
     if (els.toggleUIBtn) {
-        // Initialize toggle button label
         els.toggleUIBtn.innerHTML = state.uiVisible 
             ? '<img src="audio-visualizer-icon-btn360.png" alt="表示" class="btn-icon">' 
             : '<img src="audio-visualizer-icon-btn360.png" alt="非表示" class="btn-icon">';
-
     }
 
-    // UIを非表示にする時は開いているパネル/モーダルを閉じる
     if (!state.uiVisible) {
         if (state.settingsOpen) closeSettings();
         if (state.playlistVisible) {
@@ -4260,11 +4270,9 @@ function toggleUI() {
             state.playlistVisible = false;
             if (els.playlistToggle) els.playlistToggle.textContent = '📂';
         }
-    } else {
-        // 自動非表示が有効の時のみタイムアウトを設定
-        if (state.settings.autoHideUI) {
-            resetUITimeout();
-        }
+    } else if (state.settings.autoHideUI) {
+        // 少し遅延させて即時リセットを防ぐ
+        setTimeout(resetUITimeout, 100);
     }
 }
 
