@@ -1353,24 +1353,31 @@ async function init() {
 
     setAppHeight();
     resize();
-    window.addEventListener('resize', debounce(resize, 150));
+    window.addEventListener('resize', debounce(() => {
+        resize();
+        clampVideoContainerToViewport(els.videoContainer);
+    }, 150));
+
     if (window.visualViewport) {
         const onViewportChange = debounce(() => {
             setAppHeight();
             resize();
+            clampVideoContainerToViewport(els.videoContainer);
         }, 100);
         window.visualViewport.addEventListener('resize', onViewportChange);
         window.visualViewport.addEventListener('scroll', onViewportChange);
     }
+
     window.addEventListener('orientationchange', () => {
         setTimeout(() => {
             setAppHeight();
             resize();
             calculateUIHeights();
+            clampVideoContainerToViewport(els.videoContainer);
+
             // Monitor モードの場合は画面向き変更後に再計算して再描画
             if (state.mode === 'monitor') {
                 requestAnimationFrame(() => {
-                    // 画面サイズを再取得してから描画
                     const viewW = window.visualViewport?.width || window.innerWidth;
                     const viewH = window.visualViewport?.height || window.innerHeight;
                     W = cv.width = viewW;
@@ -1380,9 +1387,11 @@ async function init() {
                 });
             }
         }, 200);
+
         setTimeout(() => {
             setAppHeight();
             resize();
+            clampVideoContainerToViewport(els.videoContainer);
         }, 500);
     });
     // Calculate UI heights after initial render
@@ -1844,13 +1853,8 @@ function initDraggableVideo() {
     let isFirstDrag = true; // 初回ドラッグフラグ
 
     // 保存された位置を復元
-    const savedPos = localStorage.getItem('videoWindowPos');
-    if (savedPos) {
-        const { left, top } = JSON.parse(savedPos);
-        container.style.left = left;
-        container.style.top = top;
-        container.style.transform = 'none';
-        isFirstDrag = false; // 位置が保存されている場合は初回ではない
+    if (restoreVideoWindowPos(container)) {
+        isFirstDrag = false;
     }
 
     // Mouse events
@@ -1918,9 +1922,10 @@ function initDraggableVideo() {
 
     function constrainPosition(x, y) {
         const containerRect = container.getBoundingClientRect();
-        const maxX = window.innerWidth - containerRect.width;
-        const maxY = window.innerHeight - containerRect.height;
-        
+        const { width: vw, height: vh } = getViewportSize();
+        const maxX = vw - containerRect.width;
+        const maxY = vh - containerRect.height;
+
         return {
             x: Math.max(0, Math.min(x, maxX)),
             y: Math.max(0, Math.min(y, maxY))
@@ -1957,12 +1962,74 @@ function initDraggableVideo() {
         document.removeEventListener('mouseup', stopDragging);
         document.removeEventListener('touchend', stopDragging);
         
-        // 位置を保存
-        localStorage.setItem('videoWindowPos', JSON.stringify({
-            left: container.style.left,
-            top: container.style.top
-        }));
+        // 位置を保存（画面サイズに対する割合で保存）
+        saveVideoWindowPos(container);
     }
+}
+
+function getViewportSize() {
+    const vv = window.visualViewport;
+    return {
+        width: vv?.width || window.innerWidth,
+        height: vv?.height || window.innerHeight
+    };
+}
+
+function saveVideoWindowPos(container) {
+    const { width: vw, height: vh } = getViewportSize();
+    const rect = container.getBoundingClientRect();
+
+    const maxLeft = Math.max(1, vw - rect.width);
+    const maxTop = Math.max(1, vh - rect.height);
+
+    const left = Math.max(0, Math.min(rect.left, maxLeft));
+    const top = Math.max(0, Math.min(rect.top, maxTop));
+
+    localStorage.setItem('videoWindowPos', JSON.stringify({
+        leftRatio: left / maxLeft,
+        topRatio: top / maxTop
+    }));
+}
+
+function restoreVideoWindowPos(container) {
+    const savedPos = localStorage.getItem('videoWindowPos');
+    if (!savedPos) return false;
+
+    try {
+        const pos = JSON.parse(savedPos);
+        const { width: vw, height: vh } = getViewportSize();
+        const rect = container.getBoundingClientRect();
+
+        const maxLeft = Math.max(0, vw - rect.width);
+        const maxTop = Math.max(0, vh - rect.height);
+
+        const left = Math.max(0, Math.min(maxLeft, Math.round(maxLeft * (pos.leftRatio ?? 0.5))));
+        const top = Math.max(0, Math.min(maxTop, Math.round(maxTop * (pos.topRatio ?? 0.35))));
+
+        container.style.left = `${left}px`;
+        container.style.top = `${top}px`;
+        container.style.bottom = '';
+        container.style.transform = 'none';
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+function clampVideoContainerToViewport(container) {
+    if (!container || container.classList.contains('hidden')) return;
+
+    const { width: vw, height: vh } = getViewportSize();
+    const rect = container.getBoundingClientRect();
+
+    const maxLeft = Math.max(0, vw - rect.width);
+    const maxTop = Math.max(0, vh - rect.height);
+
+    const left = Math.max(0, Math.min(rect.left, maxLeft));
+    const top = Math.max(0, Math.min(rect.top, maxTop));
+
+    container.style.left = `${left}px`;
+    container.style.top = `${top}px`;
 }
 
 function updateVideoVisibility() {
@@ -1984,16 +2051,28 @@ function updateVideoVisibility() {
     }
 	
     // モード切替時に残りやすいスタイルを整理
-    if (state.settings.videoMode !== 'window') {
+    if (state.settings.videoMode === 'background') {
+        container.style.top = '';
+        container.style.left = '';
         container.style.bottom = '';
+        container.style.transform = 'none';
+    } else {
+        container.style.bottom = '';
+        
+        // 保存位置があればそれを優先
+        if (restoreVideoWindowPos(container)) {
+            // 何もしない
+        } else {
+            // 初回だけ中央下に配置
+            container.style.top = 'auto';
+            container.style.bottom = '120px';
+            container.style.left = '50%';
+            container.style.transform = 'translateX(-50%)';
+        }
     }
-    
-    // ウィンドウモードで位置が未設定なら中央下に配置
-    if (state.settings.videoMode === 'window' && !localStorage.getItem('videoWindowPos')) {
-        container.style.top = 'auto';
-        container.style.bottom = '120px';
-        container.style.left = '50%';
-        container.style.transform = 'translateX(-50%)';
+
+    if (state.settings.videoMode === 'window') {
+        requestAnimationFrame(() => clampVideoContainerToViewport(container));
     }
 
     // 背景ぼかし（固定強度）
