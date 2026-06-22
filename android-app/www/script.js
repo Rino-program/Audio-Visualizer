@@ -1308,6 +1308,8 @@ function releaseObjectUrlForTrack(track) {
 let W, H;
 let topBarH = 0;
 let bottomBarH = 0;
+let orientationChangeTimer1 = null;
+let orientationChangeTimer2 = null;
 
 function setAppHeight() {
     const viewH = window.visualViewport?.height || window.innerHeight;
@@ -1369,7 +1371,10 @@ async function init() {
     }
 
     window.addEventListener('orientationchange', () => {
-        setTimeout(() => {
+        clearTimeout(orientationChangeTimer1);
+        clearTimeout(orientationChangeTimer2);
+
+        orientationChangeTimer1 = setTimeout(() => {
             setAppHeight();
             resize();
             calculateUIHeights();
@@ -1388,7 +1393,7 @@ async function init() {
             }
         }, 200);
 
-        setTimeout(() => {
+        orientationChangeTimer2 = setTimeout(() => {
             setAppHeight();
             resize();
             clampVideoContainerToViewport(els.videoContainer);
@@ -2115,11 +2120,21 @@ function applyCanvasResolution() {
     cv.style.height = `${viewH}px`;
     W = targetW;
     H = targetH;
+    const ctx = cv.getContext('2d');
+    if (ctx && typeof ctx.setTransform === 'function') {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
+    const ctx = cv.getContext('2d');
+    if (ctx && typeof ctx.setTransform === 'function') {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
 }
 
 function resize() {
     setAppHeight();
     applyCanvasResolution();
+    recenterFloatingUiAfterResize();
+
     // Recalculate UI heights on resize
     requestAnimationFrame(() => {
         calculateUIHeights();
@@ -2148,6 +2163,30 @@ function updatePlaylistTopOffset() {
 
     const topPx = Math.ceil(bottomY + 8);
     document.documentElement.style.setProperty('--playlist-top', `${topPx}px`);
+}
+
+function recenterFloatingUiAfterResize() {
+    const cv = document.getElementById('cv');
+    if (cv) {
+        const ctx = cv.getContext('2d');
+        if (ctx && typeof ctx.setTransform === 'function') {
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+        }
+    }
+
+    const videoContainer = document.querySelector('.video-container');
+    if (videoContainer) {
+        videoContainer.style.left = '50%';
+        videoContainer.style.right = 'auto';
+        videoContainer.style.transform = 'translateX(-50%) translateZ(0)';
+    }
+
+    const floatingPanels = document.querySelectorAll('.playlist-panel, #persistentControls');
+    floatingPanels.forEach((el) => {
+        el.style.left = '';
+        el.style.right = '';
+        el.style.transform = '';
+    });
 }
 
 function calculateUIHeights() {
@@ -5079,3 +5118,69 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('Init failed:', err);
     });
 });
+
+if (!window.__audioVisualizerBgGuardInstalled) {
+  window.__audioVisualizerBgGuardInstalled = true;
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      if (typeof syncNativeMediaNotification === 'function' && typeof state !== 'undefined' && state.isPlaying) {
+        syncNativeMediaNotification(false);
+      }
+
+      if (typeof updateMediaSessionMetadata === 'function') {
+        updateMediaSessionMetadata();
+      }
+    }
+  });
+}
+
+(() => {
+  if (window.__layoutViewportFixInstalled) return;
+  window.__layoutViewportFixInstalled = true;
+
+  const updateViewportLayout = () => {
+    const vv = window.visualViewport;
+    const width = Math.max(
+      1,
+      Math.round((vv && vv.width) || window.innerWidth || document.documentElement.clientWidth || 0)
+    );
+    const height = Math.max(
+      1,
+      Math.round((vv && vv.height) || window.innerHeight || document.documentElement.clientHeight || 0)
+    );
+
+    document.documentElement.style.setProperty('--app-width', `${width}px`);
+    document.documentElement.style.setProperty('--app-height', `${height}px`);
+
+    const cv = document.getElementById('cv');
+    if (cv) {
+      const dpr = window.devicePixelRatio || 1;
+      cv.width = Math.round(width * dpr);
+      cv.height = Math.round(height * dpr);
+      cv.style.width = '100%';
+      cv.style.height = '100%';
+    }
+
+    const video = document.getElementById('videoContainer');
+    if (video && !video.classList.contains('background-mode')) {
+      video.style.left = '50%';
+      video.style.transform = 'translateX(-50%) translateZ(0)';
+    }
+  };
+
+  let timer = 0;
+  const schedule = () => {
+    clearTimeout(timer);
+    timer = setTimeout(updateViewportLayout, 80);
+  };
+
+  window.addEventListener('resize', schedule, { passive: true });
+  window.addEventListener('orientationchange', schedule, { passive: true });
+  window.addEventListener('pageshow', schedule);
+  document.addEventListener('DOMContentLoaded', schedule, { once: true });
+
+  schedule();
+})();
+
+

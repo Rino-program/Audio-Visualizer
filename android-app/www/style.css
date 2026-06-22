@@ -116,7 +116,7 @@ button, input, select {
     min-height: 90px;
     will-change: transform, top, left;
     backface-visibility: hidden;
-    transform: translateZ(0);
+    transform: translateX(-50%) translateZ(0);
     transition: top 0.3s, left 0.3s, width 0.3s, height 0.3s, border-radius 0.3s, transform 0.3s, opacity 0.3s;
     contain: strict;
 }
@@ -1702,3 +1702,8 @@ select option {
     display: block;
     margin-top: 4px;
 }
+/* __videoContainerCenterFix */
+.video-container {
+  transform: translateX(-50%) translateZ(0);
+}
+
