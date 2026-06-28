@@ -5222,4 +5222,4 @@ setInterval(() => {
     if (document.visibilityState === 'visible') {
         forceCanvasFix();
     }
-}, 10000);   // 10秒ごとに軽くチェック
+}, 3000);   // 3秒ごとに軽くチェック

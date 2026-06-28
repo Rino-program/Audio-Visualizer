@@ -1,0 +1,25 @@
+## v1.0.10 更新内容
+
+- 修复后台播放
+  优化了 WebView、MediaSession 和通知同步，即使应用进入后台，播放也能够持续进行。
+
+- 修复屏幕旋转布局问题
+  在横竖屏切换时重新计算 UI 和 Canvas 坐标，修复了界面偏左和绘制位置错位的问题。
+
+- 修复 Canvas 尺寸异常
+  修复了从最近任务界面返回时 Canvas 尺寸可能出现严重偏差的问题。
+  现在每 3 秒会重新计算一次 Canvas 尺寸，同时进一步提升了屏幕旋转后的绘制准确性。
+
+- 新增版本号显示
+  设置页面现在会显示应用版本号。
+
+- 修复 Android 14 后台播放停止的问题
+  （对上述后台播放修复的进一步增强）
+
+  MediaPlaybackService 改进：
+  - 在 AndroidManifest.xml 中添加 `foregroundServiceType="mediaPlayback"`（Android 14 必需）
+  - 使用辅助方法统一并确保 `startForeground()` 的调用，减少重复代码
+  - 在 `onDestroy()` 中显式调用 `stopForeground()`
+  - 优化通知渠道创建和 PendingIntent 的处理，提高稳定性
+
+  通过以上改进，即使应用在后台运行或屏幕关闭，媒体播放也能够稳定持续。

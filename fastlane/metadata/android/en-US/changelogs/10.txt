@@ -1,0 +1,25 @@
+## What's New in v1.0.10
+
+- Fixed Background Playback
+  Improved WebView, MediaSession, and notification synchronization to ensure playback continues even when the app is running in the background.
+
+- Fixed Screen Rotation Layout Issues
+  Recalculated UI and Canvas coordinates when switching between portrait and landscape orientations, preventing left alignment and rendering position issues.
+
+- Fixed Canvas Size Issues
+  Resolved an issue where the Canvas size could become significantly incorrect when returning from the recent apps screen.
+  The Canvas size is now recalculated every 3 seconds, improving rendering accuracy after screen rotations as well.
+
+- Added Version Display
+  The app version is now displayed in the Settings screen.
+
+- Fixed Background Playback Stopping on Android 14
+  (Additional improvements to the background playback fix above)
+
+  Improvements to MediaPlaybackService:
+  - Added `foregroundServiceType="mediaPlayback"` to AndroidManifest.xml (required for Android 14)
+  - Centralized and ensured reliable `startForeground()` calls through a helper function, reducing duplicate code
+  - Explicitly calls `stopForeground()` in `onDestroy()`
+  - Improved notification channel creation and PendingIntent handling for greater stability
+
+  These changes ensure that media playback continues reliably while the app is in the background or the screen is turned off.
