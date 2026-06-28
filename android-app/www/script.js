@@ -337,7 +337,8 @@ const I18N = {
         "repeat.none": "なし",
         "repeat.one": "1 曲",
         "repeat.all": "全曲",
-        "overlay.mode": "モード: {mode}"
+        "overlay.mode": "モード: {mode}",
+        "version.prefix": "バージョン"
     },
     en: {
         "status.waiting": "🎵 Waiting...",
@@ -542,7 +543,8 @@ const I18N = {
         "repeat.none": "None",
         "repeat.one": "One track",
         "repeat.all": "All tracks",
-        "overlay.mode": "Mode: {mode}"
+        "overlay.mode": "Mode: {mode}",
+        "version.prefix": "Version"
     },
     zh: {
         "status.waiting": "🎵 等待中...",
@@ -747,7 +749,8 @@ const I18N = {
         "repeat.none": "无",
         "repeat.one": "单曲",
         "repeat.all": "全部",
-        "overlay.mode": "模式: {mode}"
+        "overlay.mode": "模式: {mode}",
+        "version.prefix": "版本"
     }
 };
 
@@ -1360,15 +1363,15 @@ async function init() {
         clampVideoContainerToViewport(els.videoContainer);
     }, 150));
 
+    // visualViewportの変化にも対応
     if (window.visualViewport) {
-        const onViewportChange = debounce(() => {
-            setAppHeight();
-            resize();
-            clampVideoContainerToViewport(els.videoContainer);
-        }, 100);
-        window.visualViewport.addEventListener('resize', onViewportChange);
-        window.visualViewport.addEventListener('scroll', onViewportChange);
+        window.visualViewport.addEventListener('resize', resize);
+        window.visualViewport.addEventListener('scroll', resize);
     }
+    window.addEventListener('resize', resize);
+    window.addEventListener('orientationchange', () => {
+        setTimeout(resize, 100); // 向き変更後に少し待つ
+    });
 
     window.addEventListener('orientationchange', () => {
         clearTimeout(orientationChangeTimer1);
@@ -2107,40 +2110,58 @@ function updateVideoVisibility() {
     }
 }
 
-function applyCanvasResolution() {
+function applyCanvasResolution(force = false) {
     if (!cv) return;
-    const dpr = Math.min(2, window.devicePixelRatio || 1); // ビジュアライザーは高解像度
-    const viewW = window.visualViewport?.width || window.innerWidth;
-    const viewH = window.visualViewport?.height || window.innerHeight;
-    const targetW = Math.max(1, Math.floor(viewW * dpr));
-    const targetH = Math.max(1, Math.floor(viewH * dpr));
+
+    const dpr = Math.min(2.5, window.devicePixelRatio || 1);
+
+    let viewW = Math.floor(window.visualViewport?.width || window.innerWidth);
+    let viewH = Math.floor(window.visualViewport?.height || window.innerHeight);
+
+    // 小さすぎる場合は少し待って再試行
+    if (!force && (viewW < 200 || viewH < 300)) {
+        setTimeout(() => applyCanvasResolution(true), 80);
+        return;
+    }
+
+    const targetW = Math.floor(viewW * dpr);
+    const targetH = Math.floor(viewH * dpr);
+
     cv.width = targetW;
     cv.height = targetH;
-    cv.style.width = `${viewW}px`;
-    cv.style.height = `${viewH}px`;
+    cv.style.width = '100%';
+    cv.style.height = '100%';
+    cv.style.top = '0';
+    cv.style.left = '0';
+    cv.style.right = '0';
+    cv.style.bottom = '0';
+    cv.style.position = 'absolute';
+
     W = targetW;
     H = targetH;
-    const ctx = cv.getContext('2d');
-    if (ctx && typeof ctx.setTransform === 'function') {
+
+    const ctx = cv.getContext('2d', { alpha: true });
+    if (ctx) {
         ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, targetW, targetH);
     }
-    const ctx = cv.getContext('2d');
-    if (ctx && typeof ctx.setTransform === 'function') {
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-    }
+
+    console.log(`✅ Canvas: ${viewW}×${viewH} (internal: ${targetW}×${targetH})`);
 }
 
 function resize() {
     setAppHeight();
+    
+    // 初期化時・リサイズ時に複数回実行
     applyCanvasResolution();
+    setTimeout(() => applyCanvasResolution(true), 30);
+    setTimeout(() => applyCanvasResolution(true), 120);
+
     recenterFloatingUiAfterResize();
 
-    // Recalculate UI heights on resize
     requestAnimationFrame(() => {
         calculateUIHeights();
-        if (state.mode === 'monitor') {
-            drawMonitor();
-        }
+        if (state.mode === 'monitor') drawMonitor();
     });
 }
 
@@ -5184,3 +5205,21 @@ if (!window.__audioVisualizerBgGuardInstalled) {
 })();
 
 
+// ==================== スマホ初期化・隙間対策 ====================
+// 起動直後と定期的にCanvasサイズを強制修正
+function forceCanvasFix() {
+    applyCanvasResolution(true);   // true = 強制モード
+}
+
+// 起動後すぐに複数回実行
+setTimeout(forceCanvasFix, 50);
+setTimeout(forceCanvasFix, 150);
+setTimeout(forceCanvasFix, 400);
+setTimeout(forceCanvasFix, 800);
+
+// 定期的にチェック（万が一の保険）
+setInterval(() => {
+    if (document.visibilityState === 'visible') {
+        forceCanvasFix();
+    }
+}, 10000);   // 10秒ごとに軽くチェック

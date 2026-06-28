@@ -45,6 +45,11 @@
     --ui-pad-mobile: 12px;
     --ui-gap: clamp(10px, 1.6vw, 16px);
     --ui-gap-tight: clamp(8px, 1.2vw, 12px);
+
+    --sat: env(safe-area-inset-top);
+    --sab: env(safe-area-inset-bottom);
+    --sal: env(safe-area-inset-left);
+    --sar: env(safe-area-inset-right);
 }
 
 html, body {
@@ -86,15 +91,14 @@ button, input, select {
 
 /* Canvas Layer */
 #cv {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
     z-index: 0;
     pointer-events: none;
-    will-change: transform;
-    contain: strict;
+    display: block;
 }
 
 /* Video Layer */
@@ -1570,7 +1574,7 @@ select option {
     }
 
     .tab-content {
-        padding: 16px;
+        padding: 12px 16px;
     }
 
     .setting-item {
