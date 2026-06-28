@@ -20,6 +20,7 @@ import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
 
 public class MediaPlaybackService extends Service {
+
     public static final String ACTION_UPDATE = "io.github.rinoprogram.audiovisualizer.action.UPDATE";
     public static final String ACTION_STOP_SERVICE = "io.github.rinoprogram.audiovisualizer.action.STOP_SERVICE";
 
@@ -52,17 +53,16 @@ public class MediaPlaybackService extends Service {
         mediaSession.setActive(true);
 
         ensureNotificationChannel();
-        updateMediaSession();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent == null) {
-            startForeground(NOTIFICATION_ID, buildNotification());
-            return START_STICKY;
+            return startAsForeground();
         }
 
         String action = intent.getAction();
+
         if (ACTION_UPDATE.equals(action)) {
             String newTitle = intent.getStringExtra(EXTRA_TITLE);
             String newArtist = intent.getStringExtra(EXTRA_ARTIST);
@@ -73,8 +73,7 @@ public class MediaPlaybackService extends Service {
             isPlaying = newIsPlaying;
 
             updateMediaSession();
-            startForeground(NOTIFICATION_ID, buildNotification());
-            return START_STICKY;
+            return startAsForeground();
         }
 
         if (ACTION_STOP_SERVICE.equals(action)) {
@@ -93,8 +92,14 @@ public class MediaPlaybackService extends Service {
             broadcastCommand("prev");
         }
 
-        // Keep notification alive while service is running
-        startForeground(NOTIFICATION_ID, buildNotification());
+        // デフォルトで通知を維持
+        return startAsForeground();
+    }
+
+    /** Android 14対応: startForeground を確実に呼ぶヘルパー */
+    private int startAsForeground() {
+        Notification notification = buildNotification();
+        startForeground(NOTIFICATION_ID, notification);
         return START_STICKY;
     }
 
@@ -132,6 +137,7 @@ public class MediaPlaybackService extends Service {
         if (launchIntent == null) {
             launchIntent = new Intent();
         }
+
         PendingIntent contentIntent = PendingIntent.getActivity(
                 this,
                 0,
@@ -188,7 +194,6 @@ public class MediaPlaybackService extends Service {
                 )
                 .setPriority(NotificationCompat.PRIORITY_LOW);
 
-        // Also support headset / external media buttons (best effort)
         builder.setDeleteIntent(MediaButtonReceiver.buildMediaButtonPendingIntent(
                 this,
                 PlaybackStateCompat.ACTION_STOP
@@ -203,8 +208,7 @@ public class MediaPlaybackService extends Service {
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
 
-        NotificationChannel existing = nm.getNotificationChannel(CHANNEL_ID);
-        if (existing != null) return;
+        if (nm.getNotificationChannel(CHANNEL_ID) != null) return;
 
         NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
@@ -236,6 +240,7 @@ public class MediaPlaybackService extends Service {
                 mediaSession.release();
             }
         } catch (Exception ignored) {}
+        stopForeground(true);
         super.onDestroy();
     }
 }

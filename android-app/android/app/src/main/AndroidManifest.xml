@@ -49,9 +49,13 @@
         </receiver>
 
         <service
-            android:name=".MediaPlaybackService"
-            android:exported="false"
-            android:foregroundServiceType="mediaPlayback" />
+            android:name="io.github.rinoprogram.audiovisualizer.PlaybackService"
+            android:foregroundServiceType="mediaPlayback"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
     </application>
 
     <!-- Permissions -->
