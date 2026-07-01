@@ -4687,18 +4687,43 @@ function draw(ts = 0) {
             const targetTime = audio.currentTime + videoOffset;
             const timeDiff = bgVideo.currentTime - targetTime;
             const absTimeDiff = Math.abs(timeDiff);
-            
-            if (absTimeDiff > 2.0) {
-                bgVideo.currentTime = targetTime;
-                bgVideo.playbackRate = baseRate;
-                videoSyncCooldown = 1.5;
-            } else if (absTimeDiff > 0.1) {
+
+            if (absTimeDiff > 45.0) {
+                if (timeDiff > 10.0) {
+                    bgVideo.currentTime = targetTime;
+                    bgVideo.playbackRate = baseRate;
+                    videoSyncCooldown = 1.5;
+                } else {
+                    bgVideo.playbackRate = baseRate * 10;
+                }
+            } else if (absTimeDiff > 25.0) {
+                if (timeDiff > 3.0) {
+                    bgVideo.currentTime = targetTime;
+                    bgVideo.playbackRate = baseRate;
+                    videoSyncCooldown = 1.5;
+                } else {
+                    bgVideo.playbackRate = baseRate * 7;
+                }
+            } else if (absTimeDiff > 10.0) {
+                if (timeDiff > 0) {
+                    bgVideo.currentTime = targetTime;
+                    bgVideo.playbackRate = baseRate;
+                    videoSyncCooldown = 1.5;
+                } else {
+                    bgVideo.playbackRate = baseRate * 3;
+                }
+            } else if (absTimeDiff > 3.0) {
+                if (timeDiff > 0) {
+                    bgVideo.playbackRate = baseRate * Math.max(0.85, 1 - absTimeDiff * 0.1);
+                } else {
+                    bgVideo.playbackRate = baseRate * Math.min(1.2, 1 + absTimeDiff * 0.1);
+                }
+            } else if (absTimeDiff > 0.3) {
                 if (timeDiff > 0) {
                     bgVideo.playbackRate = baseRate * Math.max(0.95, 1 - absTimeDiff * 0.1);
                 } else {
                     bgVideo.playbackRate = baseRate * Math.min(1.05, 1 + absTimeDiff * 0.1);
                 }
-                videoSyncCooldown = 0.8;
             } else {
                 if (Math.abs(bgVideo.playbackRate - baseRate) > 0.01) {
                     bgVideo.playbackRate = baseRate;
