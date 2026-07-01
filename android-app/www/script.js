@@ -2118,12 +2118,6 @@ function applyCanvasResolution(force = false) {
     let viewW = Math.floor(window.visualViewport?.width || window.innerWidth);
     let viewH = Math.floor(window.visualViewport?.height || window.innerHeight);
 
-    // 小さすぎる場合は少し待って再試行
-    if (!force && (viewW < 200 || viewH < 300)) {
-        setTimeout(() => applyCanvasResolution(true), 80);
-        return;
-    }
-
     const targetW = Math.floor(viewW * dpr);
     const targetH = Math.floor(viewH * dpr);
 
@@ -2154,9 +2148,7 @@ function resize() {
     
     // 初期化時・リサイズ時に複数回実行
     applyCanvasResolution();
-    setTimeout(() => applyCanvasResolution(true), 30);
-    setTimeout(() => applyCanvasResolution(true), 120);
-    setTimeout(() => applyCanvasResolution(true), 180);
+    setTimeout(() => applyCanvasResolution(true), 150);
 
     recenterFloatingUiAfterResize();
 
@@ -5214,6 +5206,4 @@ function forceCanvasFix() {
 
 // 起動後すぐに複数回実行
 setTimeout(forceCanvasFix, 50);
-setTimeout(forceCanvasFix, 150);
-setTimeout(forceCanvasFix, 400);
-setTimeout(forceCanvasFix, 800);
+setTimeout(forceCanvasFix, 700);
