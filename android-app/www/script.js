@@ -99,671 +99,89 @@ const state = {
         // Volume persistence
         volume: 1.0,
         // 言語設定
-        language: 'ja'
+        language: 'ja-JP'
     }
 };
 
 // ==========================================================================
 // 多言語対応 (i18n) 完全版翻訳辞書データ
 // ==========================================================================
-const I18N = {
-    ja: {
-        // ステータス・再生情報
-        "status.waiting": "🎵 待機中...",
-        "next.none": "次: --",
-        "next.track": "次: {name}",
-        "status.loading": "⏳ 読み込み中...",
+// 1. 読み込みたい言語（ファイル名）のリストを定義
+const languages = ['ja-JP', 'en-US', 'zh-CN'];
 
-        // トップバー コントロール
-        "tooltip.fileMode": "ファイル再生モード",
-        "aria.fileMode": "ファイル再生モード",
-        "btn.modeFile": "📁 File",
-        "tooltip.micMode": "マイク入力モード",
-        "aria.micMode": "マイク入力モード",
-        "btn.modeMic": "🎤 Mic",
-        "btn.playlist": "プレイリスト",
-        "aria.playlist": "プレイリストを開く",
-        "btn.settings": "設定",
-        "aria.settings": "設定を開く",
+let currentLang;
 
-        // ボトムバー コントロール
-        "aria.volume": "音量",
-        "btn.shuffle": "シャッフル",
-        "aria.shuffle": "シャッフル",
-        "aria.prev": "前の曲",
-        "aria.playPause": "再生/一時停止",
-        "aria.next": "次の曲",
-        "btn.repeat": "リピート",
-        "aria.repeat": "リピート",
-        "btn.export": "動画書き出し",
-        "aria.export": "動画を書き出す",
+// アプリ起動時に最初に実行する関数
+async function initI18n() {
+const i18nData = {};
 
-        // ビデオレイヤー
-        "btn.close": "閉じる",
-        "btn.bgToggle": "背景切替",
-        "aria.closeVideo": "動画を閉じる",
-        "aria.toggleVideo": "動画表示モードを切り替える",
-
-        // プレイリスト パネル
-        "playlist.title": "プレイリスト",
-        "btn.clearAll": "すべて削除",
-        "aria.clearAll": "プレイリストをすべて削除",
-        "btn.addFile": "ファイル追加",
-        "aria.addFile": "ファイルを追加",
-        "aria.closePlaylist": "プレイリストを閉じる",
-        "playlist.search": "曲名で検索...",
-        "playlist.empty": "曲を追加してください",
-
-        // 常時表示コントロール
-        "btn.toggleUI": "UI表示切替 (H)",
-        "aria.toggleUI": "UI表示を切り替える",
-
-        // 設定モーダル共通
-        "settings.title": "設定",
-        "tab.display": "表示",
-        "tab.audio": "音声/入力",
-        "tab.player": "プレーヤー",
-        "tab.help": "ヘルプ",
-        "tab.developer": "開発者より",
-        "btn.resetAll": "初期化",
-        "btn.saveClose": "保存して閉じる",
-
-        // 設定：システムセクション
-        "section.system": "システム / System",
-        "label.language": "言語 / Language",
-
-        // 設定：表示タブ
-        "section.displayTuning": "表示チューニング",
-        "label.smoothing": "スムージング (滑らかさ)",
-        "label.sensitivity": "感度 (Sensitivity)",
-        "label.fftQuality": "ビジュアライザー品質（FFT）",
-        "opt.fftLight": "省電力 (軽量)",
-        "opt.fftBalance": "バランス",
-        "opt.fftHigh": "高精細",
-        "opt.fftUltra": "超精細",
-        "hint.fft": "※ 品質が高いほどCPU負荷が増えます。バー本数も自動調整します。",
-        "label.barCount": "バーの本数",
-        "label.fps": "フレームレート (FPS)",
-        "opt.fps30": "30 FPS (省電力)",
-        "opt.fps60": "60 FPS (標準)",
-        "opt.fps120": "120 FPS (高品質)",
-        "opt.fpsMax": "無制限 (MAX)",
-        "label.renderMode": "レンダリングモード",
-        "opt.renderAuto": "自動 (Auto)",
-        "opt.renderGpu": "GPU優先",
-        "opt.renderCpu": "CPU (互換性重視)",
-        "section.quickSettings": "クイック設定",
-        "label.autoHideUI": "UI自動非表示",
-        "label.showVideo": "動画を表示 (動画ファイル時)",
-        "label.videoMode": "動画表示モード",
-        "opt.videoWindow": "ウィンドウ (移動可能)",
-        "opt.videoBg": "背景 (全画面)",
-        "label.videoFitMode": "背景表示時のフィットモード",
-        "opt.fitCover": "画面を埋める (cover)",
-        "opt.fitContain": "全体を表示 (contain)",
-        "opt.fitFill": "引き伸ばす (fill)",
-        "label.showFreq": "周波数ラベルを表示",
-        "label.glow": "発光強度 (Glow)",
-        "label.opacity": "ビジュアライザー不透明度",
-        "label.changeMode": "変化モード (Change)",
-        "opt.changeNormal": "通常",
-        "opt.changePlus": "増分のみ",
-        "opt.changeUpDown": "上下変化",
-        "label.sandMode": "砂モード (Bars/Circle)",
-        "label.sandRate": "砂の落下速度",
-        "label.circleAngle": "円形バー角度補正",
-        "btn.reset0": "0° にリセット",
-        "label.mirrorMode": "左右反転 (Mirror)",
-        "label.rainbowMode": "虹色モード (Rainbow)",
-        "label.fixedColor": "固定色",
-        "label.bgBlur": "背景ぼかし (Blur)",
-        "label.bgBlurHint": "(※背景表示時のみ適用)",
-
-        // 設定：音声/入力タブ
-        "label.micDevice": "マイク入力デバイス",
-        "opt.micDefault": "デフォルト",
-        "label.freqRange": "周波数範囲 (Low - High)",
-        "label.freqPreset": "音域プリセット",
-        "opt.freqStandard": "標準 (20-16kHz)",
-        "opt.freqFull": "フル (20-20kHz)",
-        "opt.freqVoice": "ボイス (100-8kHz)",
-        "opt.freqBass": "バス (20-4kHz)",
-        "opt.freqCustom": "カスタム",
-        "label.equalizer": "イコライザー (EQ)",
-        "eq.flat": "フラット",
-        "btn.resetEq": "EQリセット",
-
-        // 設定：プレーヤータブ
-        "label.resourceMonitor": "📊 リソースモニター",
-        "res.fps": "FPS:",
-        "res.memory": "メモリ:",
-        "res.rendering": "レンダリング:",
-        "label.balance": "音楽の重心 (L/R)",
-        "btn.resetCenter": "中央にリセット",
-        "label.autoPlayNext": "自動で次の曲を再生",
-        "label.stopOnVideoEnd": "動画終了時に停止 (動画優先)",
-        "label.persistSettings": "設定をブラウザに保存する",
-        "label.playbackSpeed": "再生速度",
-        "opt.speedNormal": "1.0x (通常)",
-        "label.sleepTimer": "スリープタイマー",
-        "btn.sleep15": "15分",
-        "btn.sleep30": "30分",
-        "btn.sleep45": "45分",
-        "btn.sleep60": "1時間",
-        "btn.sleep90": "1.5時間",
-
-        // 設定：プリセットタブ
-        "label.colorPresets": "カラープリセット",
-        "label.settingPresets": "設定プリセット (保存/読込)",
-        "btn.saveSlot1": "Slot 1 保存",
-        "btn.loadSlot1": "Slot 1 読込",
-        "btn.saveSlot2": "Slot 2 保存",
-        "btn.loadSlot2": "Slot 2 読込",
-        "btn.saveSlot3": "Slot 3 保存",
-        "btn.loadSlot3": "Slot 3 読込",
-
-        // 設定：ストレージタブ
-        "label.storeLocalFiles": "ファイルをアプリ内に保存する（容量を使用）",
-        "hint.storeLocalFiles": "有効時: 取り込んだファイルをアプリ内に保持。無効時: URI参照のみで保存しません。",
-        "btn.refresh": "🔄 更新",
-        "btn.deleteAll": "🗑️ すべて削除",
-
-        // 設定：ヘルプタブ
-        "help.shortcuts": "キーボードショートカット",
-        "shortcut.play": "再生 / 一時停止",
-        "shortcut.prevNext": "前の曲 / 次の曲",
-        "shortcut.volume": "音量アップ / ダウン",
-        "shortcut.speed": "再生速度ダウン / アップ",
-        "shortcut.toggleUI": "UI表示切替",
-        "shortcut.toggleVideo": "動画表示切替",
-        "shortcut.powerSave": "低電力モード切替",
-        "shortcut.shuffle": "シャッフル切替",
-        "shortcut.repeat": "リピート切替",
-        "shortcut.visualizer": "ビジュアライザーモード切替",
-        "shortcut.rainbow": "虹色モード切替",
-        "shortcut.mirror": "左右反転切替",
-        
-        "overlay.seekBack": "⏪ 巻き戻し",
-        "overlay.seekForward": "⏩ 早送り",
-        "overlay.videoLoadFailed": "動画の読み込みに失敗しました",
-        "overlay.videoEnded": "動画が終了しました",
-        "overlay.languageChangedJa": "言語を日本語に変更しました",
-        "overlay.languageChangedEn": "言語を英語に変更しました",
-        "overlay.languageChangedZh": "言語を中国語に変更しました",
-        "confirm.resetAll": "すべての設定を初期化しますか？",
-        "confirm.clearPlaylist": "プレイリストを空にしますか？",
-        "status.idle": "🎵 待機中...",
-        "common.unknown": "不明",
-        "overlay.playlistCleared": "プレイリストを消去しました",
-        "overlay.videoOn": "動画表示をオンにしました",
-        "overlay.videoOff": "動画表示をオフにしました",
-        "overlay.rainbowOn": "虹色モードをオンにしました",
-        "overlay.rainbowOff": "虹色モードをオフにしました",
-        "overlay.mirrorOn": "左右反転をオンにしました",
-        "overlay.mirrorOff": "左右反転をオフにしました",
-        "alert.filePickerMissing": "この環境ではファイル選択機能を利用できません",
-        "overlay.noFileSelected": "ファイルが選択されませんでした",
-        "overlay.fileSelectFailed": "ファイルの選択に失敗しました",
-        "overlay.androidOnly": "この機能は Android 版でのみ利用できます",
-        "overlay.selectFolder": "フォルダを選択してください",
-        "overlay.filesAdded": "ファイルが追加されました",
-        "overlay.folderNoFiles": "フォルダ内に読み込めるファイルが見つかりません",
-        "overlay.nowPlaying": "再生中: {title}",
-        "playlist.restored": "プレイリストを復元しました",
-        "overlay.centerReset": "音声の重心を中央に戻しました",
-        "confirm.switchUriMode": "URI モードに切り替えますか？",
-        "overlay.localSaveOn": "端末内保存をオンにしました",
-        "overlay.localSaveOff": "端末内保存をオフにしました",
-        "overlay.loadFailed": "読み込みに失敗しました",
-        "overlay.settingsSaved": "設定を保存しました",
-        "devMessage.loadFailed": "開発者メッセージの読み込みに失敗しました",
-        "status.mic": "🎤 マイク入力中",
-        "overlay.micStarted": "マイク入力モードに切り替えました",
-        "overlay.deleteNone": "削除する項目がありません",
-        "confirm.deleteStoredFiles": "保存済みファイルをすべて削除しますか？",
-        "overlay.allDeleted": "すべて削除しました",
-        "storage.empty": "保存データはありません",
-        "overlay.playlistReordered": "プレイリストの順番を変更しました",
-        "overlay.sleepStopped": "スリープタイマーで停止しました",
-        "alert.exportBlockedMic": "マイク入力中は動画を書き出せません",
-        "confirm.exportVideo": "動画を書き出しますか？",
-        "overlay.exporting": "動画を書き出し中...",
-        "alert.exportComplete": "書き出しが完了しました",
-        "common.unsupported": "非対応",
-        "status.playError": "🎵 再生エラー",
-        "overlay.audioError": "音声エラーが発生しました",
-        "overlay.playFailed": "再生に失敗しました",
-        "overlay.urlPrepareFailed": "URL の準備に失敗しました",
-        "repeat.none": "なし",
-        "repeat.one": "1 曲",
-        "repeat.all": "全曲",
-        "overlay.mode": "モード: {mode}",
-        "version.prefix": "バージョン",
-        "resize": "Canvasサイズを再設定する",
-        "btn.resizeCanvas": "再設定"
-    },
-    en: {
-        "status.waiting": "🎵 Waiting...",
-        "next.none": "Next: --",
-        "next.track": "Next: {name}",
-        "status.loading": "⏳ Loading...",
-        "tooltip.fileMode": "File Playback Mode",
-        "aria.fileMode": "File Playback Mode",
-        "btn.modeFile": "📁 File",
-        "tooltip.micMode": "Microphone Input Mode",
-        "aria.micMode": "Microphone Input Mode",
-        "btn.modeMic": "🎤 Mic",
-        "btn.playlist": "Playlist",
-        "aria.playlist": "Open Playlist",
-        "btn.settings": "Settings",
-        "aria.settings": "Open Settings",
-        "aria.volume": "Volume",
-        "btn.shuffle": "Shuffle",
-        "aria.shuffle": "Shuffle",
-        "aria.prev": "Previous Track",
-        "aria.playPause": "Play/Pause",
-        "aria.next": "Next Track",
-        "btn.repeat": "Repeat",
-        "aria.repeat": "Repeat",
-        "btn.export": "Export Video",
-        "aria.export": "Export Video",
-        "btn.close": "Close",
-        "btn.bgToggle": "Toggle BG",
-        "aria.closeVideo": "Close Video",
-        "aria.toggleVideo": "Toggle Video Display Mode",
-        "playlist.title": "Playlist",
-        "btn.clearAll": "Clear All",
-        "aria.clearAll": "Clear all tracks from playlist",
-        "btn.addFile": "Add File",
-        "aria.addFile": "Add files",
-        "aria.closePlaylist": "Close Playlist",
-        "playlist.search": "Search by title...",
-        "playlist.empty": "Please add some tracks",
-        "btn.toggleUI": "Toggle UI (H)",
-        "aria.toggleUI": "Toggle UI Display",
-        "settings.title": "Settings",
-        "tab.display": "Display",
-        "tab.audio": "Audio/Input",
-        "tab.player": "Player",
-        "tab.help": "Help",
-        "tab.developer": "Developer",
-        "btn.resetAll": "Reset All",
-        "btn.saveClose": "Save & Close",
-        "section.system": "System",
-        "label.language": "Language",
-        "section.displayTuning": "Display Tuning",
-        "label.smoothing": "Smoothing",
-        "label.sensitivity": "Sensitivity",
-        "label.fftQuality": "Visualizer Quality (FFT)",
-        "opt.fftLight": "Power Saving (Light)",
-        "opt.fftBalance": "Balanced",
-        "opt.fftHigh": "High Definition",
-        "opt.fftUltra": "Ultra Definition",
-        "hint.fft": "* Higher quality increases CPU load. Bar count adjusts automatically.",
-        "label.barCount": "Number of Bars",
-        "label.fps": "Frame Rate (FPS)",
-        "opt.fps30": "30 FPS (Power Saving)",
-        "opt.fps60": "60 FPS (Standard)",
-        "opt.fps120": "120 FPS (High Quality)",
-        "opt.fpsMax": "Unlimited (MAX)",
-        "label.renderMode": "Rendering Mode",
-        "opt.renderAuto": "Auto",
-        "opt.renderGpu": "GPU Priority",
-        "opt.renderCpu": "CPU (Compatibility Mode)",
-        "section.quickSettings": "Quick Settings",
-        "label.autoHideUI": "Auto-hide UI",
-        "label.showVideo": "Show Video (When video file loaded)",
-        "label.videoMode": "Video Display Mode",
-        "opt.videoWindow": "Window (Movable)",
-        "opt.videoBg": "Background (Fullscreen)",
-        "label.videoFitMode": "Background Fit Mode",
-        "opt.fitCover": "Cover Screen",
-        "opt.fitContain": "Show Entire Video",
-        "opt.fitFill": "Stretch to Fill",
-        "label.showFreq": "Show Frequency Labels",
-        "label.glow": "Glow Strength",
-        "label.opacity": "Visualizer Opacity",
-        "label.changeMode": "Change Mode",
-        "opt.changeNormal": "Normal",
-        "opt.changePlus": "Increase Only",
-        "opt.changeUpDown": "Up/Down Change",
-        "label.sandMode": "Sand Mode (Bars/Circle)",
-        "label.sandRate": "Sand Fall Speed",
-        "label.circleAngle": "Circle Angle Offset",
-        "btn.reset0": "Reset to 0°",
-        "label.mirrorMode": "Mirror Mode",
-        "label.rainbowMode": "Rainbow Mode",
-        "label.fixedColor": "Fixed Color",
-        "label.bgBlur": "Background Blur",
-        "label.bgBlurHint": "(* Only applies when background is visible)",
-        "label.micDevice": "Microphone Device",
-        "opt.micDefault": "Default",
-        "label.freqRange": "Frequency Range (Low - High)",
-        "label.freqPreset": "Frequency Preset",
-        "opt.freqStandard": "Standard (20-16kHz)",
-        "opt.freqFull": "Full Range (20-20kHz)",
-        "opt.freqVoice": "Vocal (100-8kHz)",
-        "opt.freqBass": "Bass (20-4kHz)",
-        "opt.freqCustom": "Custom",
-        "label.equalizer": "Equalizer (EQ)",
-        "eq.flat": "Flat",
-        "btn.resetEq": "Reset EQ",
-        "label.resourceMonitor": "📊 Resource Monitor",
-        "res.fps": "FPS:",
-        "res.memory": "Memory:",
-        "res.rendering": "Rendering:",
-        "label.balance": "Audio Balance (L/R)",
-        "btn.resetCenter": "Reset to Center",
-        "label.autoPlayNext": "Auto-play Next Track",
-        "label.stopOnVideoEnd": "Stop Track when Video Ends",
-        "label.persistSettings": "Save Settings to Browser",
-        "label.playbackSpeed": "Playback Speed",
-        "opt.speedNormal": "1.0x (Normal)",
-        "label.sleepTimer": "Sleep Timer",
-        "btn.sleep15": "15 Min",
-        "btn.sleep30": "30 Min",
-        "btn.sleep45": "45 Min",
-        "btn.sleep60": "1 Hour",
-        "btn.sleep90": "1.5 Hours",
-        "label.colorPresets": "Color Presets",
-        "label.settingPresets": "Setting Presets (Save/Load)",
-        "btn.saveSlot1": "Save Slot 1",
-        "btn.loadSlot1": "Load Slot 1",
-        "btn.saveSlot2": "Save Slot 2",
-        "btn.loadSlot2": "Load Slot 2",
-        "btn.saveSlot3": "Save Slot 3",
-        "btn.loadSlot3": "Load Slot 3",
-        "label.storeLocalFiles": "Store Files in App (Uses Storage)",
-        "hint.storeLocalFiles": "Enabled: Keeps imported files inside the app. Disabled: References by URI only.",
-        "btn.refresh": "🔄 Refresh",
-        "btn.deleteAll": "🗑️ Delete All",
-        "help.shortcuts": "Keyboard Shortcuts",
-        "shortcut.play": "Play / Pause",
-        "shortcut.prevNext": "Previous / Next Track",
-        "shortcut.volume": "Volume Up / Down",
-        "shortcut.speed": "Playback Speed Down / Up",
-        "shortcut.toggleUI": "Toggle UI Display",
-        "shortcut.toggleVideo": "Toggle Video Display",
-        "shortcut.powerSave": "Toggle Power Saving Mode",
-        "shortcut.shuffle": "Toggle Shuffle",
-        "shortcut.repeat": "Toggle Repeat",
-        "shortcut.visualizer": "Toggle Visualizer Mode",
-        "shortcut.rainbow": "Toggle Rainbow Mode",
-        "shortcut.mirror": "Toggle Mirror Mode",
-
-        "overlay.seekBack": "⏪ Seek Back",
-        "overlay.seekForward": "⏩ Seek Forward",
-        "overlay.videoLoadFailed": "Failed to load video",
-        "overlay.videoEnded": "Video ended",
-        "overlay.languageChangedJa": "Language changed to Japanese",
-        "overlay.languageChangedEn": "Language changed to English",
-        "overlay.languageChangedZh": "Language changed to Chinese",
-        "confirm.resetAll": "Reset all settings?",
-        "confirm.clearPlaylist": "Clear the playlist?",
-        "status.idle": "🎵 Idle...",
-        "common.unknown": "Unknown",
-        "overlay.playlistCleared": "Playlist cleared",
-        "overlay.videoOn": "Video display turned on",
-        "overlay.videoOff": "Video display turned off",
-        "overlay.rainbowOn": "Rainbow mode turned on",
-        "overlay.rainbowOff": "Rainbow mode turned off",
-        "overlay.mirrorOn": "Mirror mode turned on",
-        "overlay.mirrorOff": "Mirror mode turned off",
-        "alert.filePickerMissing": "File picker is not available in this environment",
-        "overlay.noFileSelected": "No file was selected",
-        "overlay.fileSelectFailed": "Failed to select file",
-        "overlay.androidOnly": "This feature is available only on Android",
-        "overlay.selectFolder": "Please select a folder",
-        "overlay.filesAdded": "Files added",
-        "overlay.folderNoFiles": "No playable files were found in the folder",
-        "overlay.nowPlaying": "Now playing: {title}",
-        "playlist.restored": "Playlist restored",
-        "overlay.centerReset": "Audio balance reset to center",
-        "confirm.switchUriMode": "Switch to URI mode?",
-        "overlay.localSaveOn": "Local file storage enabled",
-        "overlay.localSaveOff": "Local file storage disabled",
-        "overlay.loadFailed": "Failed to load",
-        "overlay.settingsSaved": "Settings saved",
-        "devMessage.loadFailed": "Failed to load developer message",
-        "status.mic": "🎤 Microphone input",
-        "overlay.micStarted": "Switched to microphone input mode",
-        "overlay.deleteNone": "Nothing to delete",
-        "confirm.deleteStoredFiles": "Delete all stored files?",
-        "overlay.allDeleted": "All deleted",
-        "storage.empty": "No stored data",
-        "overlay.playlistReordered": "Playlist reordered",
-        "overlay.sleepStopped": "Stopped by sleep timer",
-        "alert.exportBlockedMic": "Cannot export video while using microphone input",
-        "confirm.exportVideo": "Export the video?",
-        "overlay.exporting": "Exporting video...",
-        "alert.exportComplete": "Export completed",
-        "common.unsupported": "Unsupported",
-        "status.playError": "🎵 Playback error",
-        "overlay.audioError": "An audio error occurred",
-        "overlay.playFailed": "Playback failed",
-        "overlay.urlPrepareFailed": "Failed to prepare URL",
-        "repeat.none": "None",
-        "repeat.one": "One track",
-        "repeat.all": "All tracks",
-        "overlay.mode": "Mode: {mode}",
-        "version.prefix": "Version",
-        "resize": "Resize Canvas",
-        "btn.resizeCanvas": "Resize"
-    },
-    zh: {
-        "status.waiting": "🎵 等待中...",
-        "next.none": "下一首: --",
-        "next.track": "下一首: {name}",
-        "status.loading": "⏳ 加载中...",
-        "tooltip.fileMode": "文件播放模式",
-        "aria.fileMode": "文件播放模式",
-        "btn.modeFile": "📁 文件",
-        "tooltip.micMode": "麦克风输入模式",
-        "aria.micMode": "麦克风输入模式",
-        "btn.modeMic": "🎤 麦克风",
-        "btn.playlist": "播放列表",
-        "aria.playlist": "打开播放列表",
-        "btn.settings": "设置",
-        "aria.settings": "打开设置",
-        "aria.volume": "音量",
-        "btn.shuffle": "随机播放",
-        "aria.shuffle": "随机播放",
-        "aria.prev": "上一首",
-        "aria.playPause": "播放/暂停",
-        "aria.next": "下一首",
-        "btn.repeat": "循环播放",
-        "aria.repeat": "循环播放",
-        "btn.export": "导出视频",
-        "aria.export": "导出视频",
-        "btn.close": "关闭",
-        "btn.bgToggle": "切换背景",
-        "aria.closeVideo": "关闭视频",
-        "aria.toggleVideo": "切换视频显示模式",
-        "playlist.title": "播放列表",
-        "btn.clearAll": "清空列表",
-        "aria.clearAll": "清空播放列表中的所有曲目",
-        "btn.addFile": "添加文件",
-        "aria.addFile": "添加文件",
-        "aria.closePlaylist": "关闭播放列表",
-        "playlist.search": "按搜索曲名...",
-        "playlist.empty": "请添加曲目",
-        "btn.toggleUI": "切换UI显示 (H)",
-        "aria.toggleUI": "切换UI显示",
-        "settings.title": "设置",
-        "tab.display": "显示",
-        "tab.audio": "音频/输入",
-        "tab.player": "播放器",
-        "tab.help": "帮助",
-        "tab.developer": "关于开发者",
-        "btn.resetAll": "重置全部",
-        "btn.saveClose": "保存并关闭",
-        "section.system": "系统设置",
-        "label.language": "语言 / Language",
-        "section.displayTuning": "画面微调",
-        "label.smoothing": "平滑度 (Smoothing)",
-        "label.sensitivity": "灵敏度 (Sensitivity)",
-        "label.fftQuality": "频谱精细度 (FFT)",
-        "opt.fftLight": "省电 (轻量)",
-        "opt.fftBalance": "平衡",
-        "opt.fftHigh": "高精细",
-        "opt.fftUltra": "超精细",
-        "hint.fft": "* 精细度越高，CPU负载越大。条形图数量会自动调整。",
-        "label.barCount": "频谱条数量",
-        "label.fps": "帧率 (FPS)",
-        "opt.fps30": "30 FPS (省电)",
-        "opt.fps60": "60 FPS (标准)",
-        "opt.fps120": "120 FPS (高质量)",
-        "opt.fpsMax": "无限制 (MAX)",
-        "label.renderMode": "渲染模式",
-        "opt.renderAuto": "自动 (Auto)",
-        "opt.renderGpu": "GPU 优先",
-        "opt.renderCpu": "CPU (兼容模式)",
-        "section.quickSettings": "快捷设置",
-        "label.autoHideUI": "自动隐藏 UI",
-        "label.showVideo": "显示视频 (仅限视频文件)",
-        "label.videoMode": "视频显示模式",
-        "opt.videoWindow": "窗口 (可移动)",
-        "opt.videoBg": "背景 (全屏)",
-        "label.videoFitMode": "背景填充模式",
-        "opt.fitCover": "裁剪填充 (Cover)",
-        "opt.fitContain": "完整显示 (Contain)",
-        "opt.fitFill": "拉伸填充 (Fill)",
-        "label.showFreq": "显示频率标签",
-        "label.glow": "发光强度 (Glow)",
-        "label.opacity": "可视化不透明度",
-        "label.changeMode": "动态模式",
-        "opt.changeNormal": "普通",
-        "opt.changePlus": "仅单向增强",
-        "opt.changeUpDown": "上下双向动态",
-        "label.sandMode": "落砂效果 (Bars/Circle)",
-        "label.sandRate": "落砂下落速度",
-        "label.circleAngle": "圆环角度修正",
-        "btn.reset0": "重置为 0°",
-        "label.mirrorMode": "左右翻转 (Mirror)",
-        "label.rainbowMode": "彩虹渐变 (Rainbow)",
-        "label.fixedColor": "固定颜色",
-        "label.bgBlur": "背景模糊 (Blur)",
-        "label.bgBlurHint": "(* 仅在背景视频可见时有效)",
-        "label.micDevice": "麦克风设备",
-        "opt.micDefault": "默认设备",
-        "label.freqRange": "频率范围 (Low - High)",
-        "label.freqPreset": "频段预设",
-        "opt.freqStandard": "标准 (20-16kHz)",
-        "opt.freqFull": "全频段 (20-20kHz)",
-        "opt.freqVoice": "人声优化 (100-8kHz)",
-        "opt.freqBass": "低音增强 (20-4kHz)",
-        "opt.freqCustom": "自定义",
-        "label.equalizer": "均衡器 (EQ)",
-        "eq.flat": "平直",
-        "btn.resetEq": "重置 EQ",
-        "label.resourceMonitor": "📊 资源监视器",
-        "res.fps": "FPS:",
-        "res.memory": "内存占用:",
-        "res.rendering": "渲染引擎:",
-        "label.balance": "声道平衡 (L/R)",
-        "btn.resetCenter": "恢复居中",
-        "label.autoPlayNext": "自动播放下一首",
-        "label.stopOnVideoEnd": "视频播放结束时停止曲目",
-        "label.persistSettings": "将设置保存到浏览器",
-        "label.playbackSpeed": "播放速度",
-        "opt.speedNormal": "1.0x (正常)",
-        "label.sleepTimer": "睡眠定时器",
-        "btn.sleep15": "15 分钟",
-        "btn.sleep30": "30 分钟",
-        "btn.sleep45": "45 分钟",
-        "btn.sleep60": "1 小时",
-        "btn.sleep90": "1.5 小时",
-        "label.colorPresets": "色彩预设",
-        "label.settingPresets": "配置存档 (保存/加载)",
-        "btn.saveSlot1": "保存至 槽位1",
-        "btn.loadSlot1": "从 槽位1 加载",
-        "btn.saveSlot2": "保存至 槽位2",
-        "btn.loadSlot2": "从 槽位2 加载",
-        "btn.saveSlot3": "保存至 槽位3",
-        "btn.loadSlot3": "从 槽位3 加载",
-        "label.storeLocalFiles": "将文件保存在本地应用内（占用设备空间）",
-        "hint.storeLocalFiles": "开启：文件持久化保存。关闭：仅通过URI引用，不重复占用空间。",
-        "btn.refresh": "🔄 刷新",
-        "btn.deleteAll": "🗑️ 全部删除",
-        "help.shortcuts": "键盘快捷键",
-        "shortcut.play": "播放 / 暂停",
-        "shortcut.prevNext": "上一首 / 下一首",
-        "shortcut.volume": "音量 增大 / 减小",
-        "shortcut.speed": "播放速度 减慢 / 加快",
-        "shortcut.toggleUI": "切换 UI 显示",
-        "shortcut.toggleVideo": "切换 视频显示",
-        "shortcut.powerSave": "切换 低功耗模式",
-        "shortcut.shuffle": "切换 随机播放",
-        "shortcut.repeat": "切换 循环模式",
-        "shortcut.visualizer": "切换 可视化样式",
-        "shortcut.rainbow": "切换 彩虹渐变",
-        "shortcut.mirror": "切换 左右翻转",
-
-        "overlay.seekBack": "⏪ 后退",
-        "overlay.seekForward": "⏩ 前进",
-        "overlay.videoLoadFailed": "视频加载失败",
-        "overlay.videoEnded": "视频已结束",
-        "overlay.languageChangedJa": "语言已切换为日语",
-        "overlay.languageChangedEn": "语言已切换为英语",
-        "overlay.languageChangedZh": "语言已切换为中文",
-        "confirm.resetAll": "要重置所有设置吗？",
-        "confirm.clearPlaylist": "要清空播放列表吗？",
-        "status.idle": "🎵 空闲中...",
-        "common.unknown": "未知",
-        "overlay.playlistCleared": "播放列表已清空",
-        "overlay.videoOn": "已开启视频显示",
-        "overlay.videoOff": "已关闭视频显示",
-        "overlay.rainbowOn": "已开启彩虹模式",
-        "overlay.rainbowOff": "已关闭彩虹模式",
-        "overlay.mirrorOn": "已开启左右翻转",
-        "overlay.mirrorOff": "已关闭左右翻转",
-        "alert.filePickerMissing": "当前环境不支持文件选择器",
-        "overlay.noFileSelected": "未选择文件",
-        "overlay.fileSelectFailed": "文件选择失败",
-        "overlay.androidOnly": "此功能仅在 Android 版可用",
-        "overlay.selectFolder": "请选择文件夹",
-        "overlay.filesAdded": "文件已添加",
-        "overlay.folderNoFiles": "文件夹中没有可读取的文件",
-        "overlay.nowPlaying": "正在播放: {title}",
-        "playlist.restored": "播放列表已恢复",
-        "overlay.centerReset": "已将声像重置为中心",
-        "confirm.switchUriMode": "切换到 URI 模式吗？",
-        "overlay.localSaveOn": "已开启本地保存",
-        "overlay.localSaveOff": "已关闭本地保存",
-        "overlay.loadFailed": "加载失败",
-        "overlay.settingsSaved": "设置已保存",
-        "devMessage.loadFailed": "开发者消息加载失败",
-        "status.mic": "🎤 麦克风输入中",
-        "overlay.micStarted": "已切换到麦克风输入模式",
-        "overlay.deleteNone": "没有可删除的项目",
-        "confirm.deleteStoredFiles": "要删除所有已保存文件吗？",
-        "overlay.allDeleted": "已全部删除",
-        "storage.empty": "没有保存的数据",
-        "overlay.playlistReordered": "播放列表顺序已调整",
-        "overlay.sleepStopped": "已因睡眠定时器停止",
-        "alert.exportBlockedMic": "使用麦克风输入时无法导出视频",
-        "confirm.exportVideo": "要导出视频吗？",
-        "overlay.exporting": "正在导出视频...",
-        "alert.exportComplete": "导出完成",
-        "common.unsupported": "不支持",
-        "status.playError": "🎵 播放错误",
-        "overlay.audioError": "发生音频错误",
-        "overlay.playFailed": "播放失败",
-        "overlay.urlPrepareFailed": "URL 准备失败",
-        "repeat.none": "无",
-        "repeat.one": "单曲",
-        "repeat.all": "全部",
-        "overlay.mode": "模式: {mode}",
-        "version.prefix": "版本",
-        "resize": "重新设置 Canvas 尺寸",
-        "btn.resizeCanvas": "重新设置"
+// 全言語のJSONを並行してフェッチ（一括読み込み）
+try {
+    const promises = languages.map(async (lang) => {
+    // I18Nフォルダ内のJSONファイルを指定
+    const response = await fetch(`./I18N/${lang}.json`);
+    if (!response.ok) {
+        throw new Error(`Failed to load: ${lang}.json`);
     }
-};
+    const data = await response.json();
+    
+    // キー名を「ja-JP」から「ja」にする場合はここで調整可能ですが、
+    // 今回はファイル名そのまま（"ja-JP" など）をキーにします。
+    // もし既存コードが window.I18N.ja で参照している場合は、ハイフン前で区切る処理を入れても良いです（後述）。
+    i18nData[lang] = data;
+    });
 
-window.I18N = I18N;
+    let savedLang = localStorage.getItem('app_lang');
+    // もし古い2文字が保存されていたら、新しい形式に変換する
+    if (savedLang === 'ja') savedLang = 'ja-JP';
+    if (savedLang === 'en') savedLang = 'en-US';
+    if (savedLang === 'zh') savedLang = 'zh-CN';
 
-let currentLang = localStorage.getItem('app_lang') || 
-    (navigator.language.startsWith('zh') ? 'zh' : navigator.language.startsWith('en') ? 'en' : 'ja');
+    currentLang = savedLang || (navigator.language.startsWith('zh-CN') ? 'zh-CN' : navigator.language.startsWith('en-US') ? 'en-US' : 'ja-JP');
+    localStorage.setItem('app_lang', currentLang);
+
+    // すべてのファイルの読み込み完了を待つ
+    await Promise.all(promises);
+
+    // 2. 既存のコードと互換性を持たせるために window.I18N にバインド
+    window.I18N = i18nData;
+
+    currentLang = localStorage.getItem('app_lang') || 
+        (navigator.language.startsWith('zh-CN') ? 'zh-CN' : navigator.language.startsWith('en-US') ? 'en-US' : 'ja-JP');
+
+    console.log("すべての翻訳ファイルを読み込みました:", window.I18N);
+
+    // 3. 翻訳データの準備ができたら、メインのアプリ処理を開始する
+    startApplication();
+
+    } catch (error) {
+        console.error("翻訳ファイルの読み込み中にエラーが発生しました:", error);
+        // フォールバック処理（例: 最悪エラーが出てもアプリが動くように空のオブジェクトを入れておくなど）
+        window.I18N = window.I18N || {};
+        startApplication();
+    }
+}
+
+// 元々 script.js のグローバル（直下）で動いていた処理はここにまとめる
+function startApplication() {
+    console.log("アプリのメイン処理を開始します");
+
+    currentLang = localStorage.getItem('app_lang') || 
+    (navigator.language.startsWith('zh-CN') ? 'zh-CN' : navigator.language.startsWith('en-US') ? 'en-US' : 'ja-JP');
+
+    // ==================== スマホ初期化・隙間対策 ====================
+    // 起動直後Canvasサイズを強制修正
+    function forceCanvasFix() {
+        applyCanvasResolution(true);   // true = 強制モード
+    }
+
+    // 起動後すぐに複数回実行
+    setTimeout(forceCanvasFix, 50);
+    setTimeout(forceCanvasFix, 700);
+}
+
+// 実行
+initI18n();
 
 // ============== I18N FUNCTIONS ==============
 // 指定されたキーの翻訳テキストを返す関数
@@ -772,8 +190,8 @@ function t(key, vars = {}) {
     let text;
     if (I18N[currentLang] && I18N[currentLang][key] !== undefined) {
         text = I18N[currentLang][key];
-    } else if (I18N['ja'] && I18N['ja'][key] !== undefined) {
-        text = I18N['ja'][key];
+    } else if (I18N['ja-JP'] && I18N['ja-JP'][key] !== undefined) {
+        text = I18N['ja-JP'][key];
     } else {
         text = key;
     }
@@ -1528,7 +946,7 @@ async function init() {
             saveSettingsToStorage();
             
             // メッセージ（存在しないキーを安全に扱う）
-            showOverlay(currentLang === 'ja' ? t('overlay.languageChangedJa') : currentLang === 'en' ? t('overlay.languageChangedEn') : t('overlay.languageChangedZh'));
+            showOverlay(currentLang === 'ja-JP' ? t('overlay.languageChangedja-JP') : currentLang === 'en-US' ? t('overlay.languageChangeden-US') : t('overlay.languageChangedzh-CN'));
         });
     }
     // UI表示ボタン：タッチ環境で click/touchstart が二重に走りやすいので
@@ -3247,9 +2665,9 @@ function switchTab(tabId) {
 
 async function loadDeveloperMessage() {
     try {
-        const lang = currentLang || 'ja';
+        const lang = currentLang || 'ja-JP';
 
-        const response = await fetch(`DEVELOPER_MESSAGE_${lang}.md`);
+        const response = await fetch(`./DevMessages/DEVELOPER_MESSAGE_${lang}.md`);
 
         if (!response.ok) {
             throw new Error(`Failed to load DEVELOPER_MESSAGE_${lang}.md`);
@@ -4728,7 +4146,7 @@ function draw(ts = 0) {
                         bgVideo.playbackRate = baseRate * 1.2;
                     }
                 }
-            } else if (absTimeDiff > 0.5) {
+            } else if (absTimeDiff > 0.2) {
                 if (timeDiff > 0) {
                     if (bgVideo.playbackRate !== baseRate * 0.95) {
                         bgVideo.playbackRate = baseRate * 0.95;
@@ -5163,8 +4581,9 @@ function drawMirrorBars(fd, maxH, drawH, drawStartY) {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // 初回翻訳
+    await initI18n();
     updateLanguageUI();
     loadDeveloperMessage();
     init().catch(err => {
@@ -5235,14 +4654,3 @@ if (!window.__audioVisualizerBgGuardInstalled) {
 
   schedule();
 })();
-
-
-// ==================== スマホ初期化・隙間対策 ====================
-// 起動直後Canvasサイズを強制修正
-function forceCanvasFix() {
-    applyCanvasResolution(true);   // true = 強制モード
-}
-
-// 起動後すぐに複数回実行
-setTimeout(forceCanvasFix, 50);
-setTimeout(forceCanvasFix, 700);

@@ -1,0 +1,7 @@
+v1.0.12(12) 的更新内容如下：
+
+- 优化了视频与音频同步的精度。
+
+- 将翻译数据从 android-app/www/script.js 移动到了 android-app/www/I18N/{lang}.json。
+
+- 将 DEVELOPER_MESSAGE_{lang}.md 的位置从 android-app/www 移动到了 android-app/www/DevMessages。

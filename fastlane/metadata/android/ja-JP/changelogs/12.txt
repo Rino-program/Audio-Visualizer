@@ -1,0 +1,7 @@
+v1.0.12(12)の更新内容は以下の通りです:
+
+- 動画と音声のズレの精度を上げました。
+
+- 翻訳のデータをandroid-app/www/script.js内からandroid-app/www/I18N/{lang}.json内に移動しました。
+
+- DEVELOPER_MESSAGE_{lang}.mdの場所をandroid-app/wwwからandroid-app/www/DevMessagesに移動しました。
