@@ -15,7 +15,6 @@ public class MainActivity extends BridgeActivity {
 		super.onCreate(savedInstanceState);
 		applyImmersiveFullscreen();
 		registerPlugin(LocalFolderImportPlugin.class);
-		registerPlugin(MediaNotificationPlugin.class);
 		
 		// WebView設定: バックグラウンド音声再生を有効化
 		WebView webView = getBridge().getWebView();

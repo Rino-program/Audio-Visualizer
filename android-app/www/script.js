@@ -2156,6 +2156,7 @@ function resize() {
     applyCanvasResolution();
     setTimeout(() => applyCanvasResolution(true), 30);
     setTimeout(() => applyCanvasResolution(true), 120);
+    setTimeout(() => applyCanvasResolution(true), 180);
 
     recenterFloatingUiAfterResize();
 
@@ -5206,7 +5207,7 @@ if (!window.__audioVisualizerBgGuardInstalled) {
 
 
 // ==================== スマホ初期化・隙間対策 ====================
-// 起動直後と定期的にCanvasサイズを強制修正
+// 起動直後Canvasサイズを強制修正
 function forceCanvasFix() {
     applyCanvasResolution(true);   // true = 強制モード
 }
@@ -5216,10 +5217,3 @@ setTimeout(forceCanvasFix, 50);
 setTimeout(forceCanvasFix, 150);
 setTimeout(forceCanvasFix, 400);
 setTimeout(forceCanvasFix, 800);
-
-// 定期的にチェック（万が一の保険）
-setInterval(() => {
-    if (document.visibilityState === 'visible') {
-        forceCanvasFix();
-    }
-}, 3000);   // 3秒ごとに軽くチェック
