@@ -34,5 +34,5 @@ AllowedAPKSigningKeys: c9812e0591a0182fff8323dd045557b8d1bcc33f8e3fcd25556782860
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 1.0.10
-CurrentVersionCode: 10
+CurrentVersion: 1.0.11
+CurrentVersionCode: 11

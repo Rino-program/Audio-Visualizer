@@ -1,6 +1,6 @@
 {
   "name": "audio-visualizer-android",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "description": "Audio Visualizer - Android APK版",
   "main": "index.js",
   "scripts": {
