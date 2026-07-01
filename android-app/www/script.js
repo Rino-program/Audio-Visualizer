@@ -338,7 +338,9 @@ const I18N = {
         "repeat.one": "1 曲",
         "repeat.all": "全曲",
         "overlay.mode": "モード: {mode}",
-        "version.prefix": "バージョン"
+        "version.prefix": "バージョン",
+        "resize": "Canvasサイズを再設定する",
+        "btn.resizeCanvas": "再設定"
     },
     en: {
         "status.waiting": "🎵 Waiting...",
@@ -544,7 +546,9 @@ const I18N = {
         "repeat.one": "One track",
         "repeat.all": "All tracks",
         "overlay.mode": "Mode: {mode}",
-        "version.prefix": "Version"
+        "version.prefix": "Version",
+        "resize": "Resize Canvas",
+        "btn.resizeCanvas": "Resize"
     },
     zh: {
         "status.waiting": "🎵 等待中...",
@@ -750,7 +754,9 @@ const I18N = {
         "repeat.one": "单曲",
         "repeat.all": "全部",
         "overlay.mode": "模式: {mode}",
-        "version.prefix": "版本"
+        "version.prefix": "版本",
+        "resize": "重新设置 Canvas 尺寸",
+        "btn.resizeCanvas": "重新设置"
     }
 };
 
