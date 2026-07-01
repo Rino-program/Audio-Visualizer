@@ -4687,7 +4687,7 @@ function draw(ts = 0) {
             lastVideoSyncCheckTs = ts;
         } else if (videoSyncCooldown > 0) {
             videoSyncCooldown -= dtSec;
-        } else if (!lastVideoSyncCheckTs || ts - lastVideoSyncCheckTs >= 500) {
+        } else if (!lastVideoSyncCheckTs || ts - lastVideoSyncCheckTs >= 800) {
             lastVideoSyncCheckTs = ts;
             const videoOffset = getVideoSyncOffset();
             const targetTime = audio.currentTime + videoOffset;
@@ -4695,20 +4695,18 @@ function draw(ts = 0) {
             const absTimeDiff = Math.abs(timeDiff);
 
             if (absTimeDiff > 45.0) {
-                if (timeDiff > 10.0) {
-                    bgVideo.currentTime = targetTime;
-                    bgVideo.playbackRate = baseRate;
-                    videoSyncCooldown = 1.5;
-                } else {
-                    bgVideo.playbackRate = baseRate * 10;
-                }
+                bgVideo.currentTime = targetTime;
+                bgVideo.playbackRate = baseRate;
+                videoSyncCooldown = 1.5;
             } else if (absTimeDiff > 25.0) {
                 if (timeDiff > 3.0) {
                     bgVideo.currentTime = targetTime;
                     bgVideo.playbackRate = baseRate;
                     videoSyncCooldown = 1.5;
                 } else {
-                    bgVideo.playbackRate = baseRate * 7;
+                    if (bgVideo.playbackRate !== baseRate * 5) {
+                        bgVideo.playbackRate = baseRate * 5;
+                    }
                 }
             } else if (absTimeDiff > 10.0) {
                 if (timeDiff > 0) {
@@ -4716,19 +4714,29 @@ function draw(ts = 0) {
                     bgVideo.playbackRate = baseRate;
                     videoSyncCooldown = 1.5;
                 } else {
-                    bgVideo.playbackRate = baseRate * 3;
+                    if (bgVideo.playbackRate !== baseRate * 3) {
+                        bgVideo.playbackRate = baseRate * 3;
+                    }
                 }
             } else if (absTimeDiff > 3.0) {
                 if (timeDiff > 0) {
-                    bgVideo.playbackRate = baseRate * Math.max(0.85, 1 - absTimeDiff * 0.1);
+                    if (bgVideo.playbackRate !== baseRate * 0.85) {
+                        bgVideo.playbackRate = baseRate * 0.85;
+                    }
                 } else {
-                    bgVideo.playbackRate = baseRate * Math.min(1.2, 1 + absTimeDiff * 0.1);
+                    if (bgVideo.playbackRate !== baseRate * 1.2) {
+                        bgVideo.playbackRate = baseRate * 1.2;
+                    }
                 }
-            } else if (absTimeDiff > 0.3) {
+            } else if (absTimeDiff > 0.5) {
                 if (timeDiff > 0) {
-                    bgVideo.playbackRate = baseRate * Math.max(0.95, 1 - absTimeDiff * 0.1);
+                    if (bgVideo.playbackRate !== baseRate * 0.95) {
+                        bgVideo.playbackRate = baseRate * 0.95;
+                    }
                 } else {
-                    bgVideo.playbackRate = baseRate * Math.min(1.05, 1 + absTimeDiff * 0.1);
+                    if (bgVideo.playbackRate !== baseRate * 1.05) {
+                        bgVideo.playbackRate = baseRate * 1.05;
+                    }
                 }
             } else {
                 if (Math.abs(bgVideo.playbackRate - baseRate) > 0.01) {
