@@ -14,7 +14,8 @@ jobs:
     name: Run PR Agent on Comment
     steps:
       - name: PR Agent Action
-        uses: Codium-ai/pr-agent@main
+        uses: qodo-ai/pr-agent@main
         env:
-          OPENAI_KEY: ${{ secrets.OPENAI_KEY }} # もしOpenAI等の鍵を使う場合。なければGitHubのモデル等が動きます
+          config.model: "google_ai_studio/gemini-3.5-flash"
+          GOOGLE_AI_STUDIO__GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
