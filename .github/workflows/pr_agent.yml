@@ -1,0 +1,20 @@
+name: Qodo Merge (PR-Agent)
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  pr_agent_job:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: write
+    name: Run PR Agent on Comment
+    steps:
+      - name: PR Agent Action
+        uses: Codium-ai/pr-agent@main
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }} # もしOpenAI等の鍵を使う場合。なければGitHubのモデル等が動きます
+          GITHUB_TOKEN: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
