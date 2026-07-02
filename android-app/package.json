@@ -13,7 +13,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@capacitor/cli": "^6.1.0"
+    "@capacitor/cli": "^8.4.1"
   },
   "dependencies": {
     "@capacitor/core": "^6.1.0",
