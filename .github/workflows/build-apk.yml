@@ -34,6 +34,9 @@ jobs:
           npm ci
           npx --package=@capacitor/cli cap sync
 
+      - name: Clear corrupted Gradle cache
+        run: rm -rf ~/.gradle/caches
+
       - name: Gradle でリリースビルドを実行
         working-directory: /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer/android-app/android
         run: |
