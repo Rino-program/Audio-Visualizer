@@ -1,0 +1,6 @@
+v1.0.11(11)的更新内容如下：
+
+- 【重要】 更新了 @capacitor/cli、tar 等依赖，Node.js 的最低要求版本已提升至 22 或更高版本。
+    PR（Dependabot）：https://github.com/Rino-program/Audio-Visualizer/pull/5
+
+- 调整了图片路径，并进一步减小了图片大小，以降低应用体积。

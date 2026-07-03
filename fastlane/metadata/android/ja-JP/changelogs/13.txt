@@ -1,0 +1,6 @@
+v1.0.13(13)の更新内容は以下の通りです:
+
+- [重要] @capacitor/cli,tarなどを更新し、Node.jsの必要バージョンが22以上になりました。
+    PR(dependabot): https://github.com/Rino-program/Audio-Visualizer/pull/5
+
+- 画像のパスを変更し、更に画像のサイズを下げて軽量化しました。

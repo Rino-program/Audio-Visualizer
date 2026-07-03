@@ -1,0 +1,6 @@
+The updates in v1.0.13 (13) are as follows:
+
+- [Important] Updated packages such as @capacitor/cli and tar, raising the required Node.js version to 22 or later.
+    PR (Dependabot): https://github.com/Rino-program/Audio-Visualizer/pull/5
+
+- Changed the image paths and further reduced the image sizes to make the app lighter.
