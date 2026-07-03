@@ -16,13 +16,13 @@ Binaries:
 Builds:
   - versionName: 1.0.13
     versionCode: 13
-    commit: 149061a0a5df7d57163735cd1dcea1d235fccff7
+    commit: aae1baf9ffbeec3f9d7d2c70309d15726ff48d86
     subdir: android-app/android/app
     sudo:
       - apt-get update
-      - apt-get install -y curl
-      - curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-      - apt-get install -y nodejs
+      - apt-get install -y wget xz-utils
+      - wget https://nodejs.org/dist/v22.11.0/node-v22.11.0-linux-x64.tar.xz
+      - tar -xJf node-v22.11.0-linux-x64.tar.xz -C /usr/local --strip-components=1
     gradle:
       - yes
     prebuild:
