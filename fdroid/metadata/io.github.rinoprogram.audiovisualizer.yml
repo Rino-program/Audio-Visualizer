@@ -19,7 +19,7 @@ Builds:
     commit: 149061a0a5df7d57163735cd1dcea1d235fccff7
     subdir: android-app/android/app
     sudo:
-      - pt-get update
+      - apt-get update
       - apt-get install -y curl
       - curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
       - apt-get install -y nodejs
