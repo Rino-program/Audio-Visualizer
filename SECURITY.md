@@ -11,10 +11,11 @@
 
 The following versions of this project are currently supported with security updates.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 1.0.x   | :white_check_mark: |
-| < 1.0   | :x:                |
+| Version  | Supported          |
+| -------- | ------------------ |
+| 1.1.x    | :white_check_mark: |
+| >= 1.0.7 | :white_check_mark: |
+| < 1.0.7  | :x:                |
 
 ### Reporting a Vulnerability
 
@@ -36,9 +37,10 @@ We will acknowledge your report as soon as possible and work on a fix. Thank you
 現在、以下のバージョンに対してセキュリティアップデートを提供しています。最新版へのアップデートを推奨します。
 
 | バージョン | サポート状況         |
-| ---------- | ------------------ |
-| 1.0.x      | :white_check_mark: |
-| < 1.0      | :x:                |
+| -------- | ------------------ |
+| 1.1.x    | :white_check_mark: |
+| >= 1.0.7 | :white_check_mark: |
+| < 1.0.7  | :x:                |
 
 ### 脆弱性の報告方法
 
