@@ -14,13 +14,15 @@ Binaries:
   https://github.com/Rino-program/Audio-Visualizer/releases/download/v%v/app-release.apk
 
 Builds:
-  - versionName: 1.0.11
-    versionCode: 11
-    commit: 575638c1aa8c5c87961b83663b0217999c5a7788
+  - versionName: 1.0.13
+    versionCode: 13
+    commit: 149061a0a5df7d57163735cd1dcea1d235fccff7
     subdir: android-app/android/app
     sudo:
-      - apt-get update
-      - apt-get install -y nodejs npm
+      - pt-get update
+      - apt-get install -y curl
+      - curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+      - apt-get install -y nodejs
     gradle:
       - yes
     prebuild:
@@ -34,5 +36,5 @@ AllowedAPKSigningKeys: c9812e0591a0182fff8323dd045557b8d1bcc33f8e3fcd25556782860
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 1.0.11
-CurrentVersionCode: 11
+CurrentVersion: 1.0.13
+CurrentVersionCode: 13
