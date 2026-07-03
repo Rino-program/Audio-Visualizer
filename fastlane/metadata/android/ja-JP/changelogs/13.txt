@@ -1,4 +1,4 @@
-v1.0.13(13)の更新内容は以下の通りです:
+v1.1.0(13)の更新内容は以下の通りです:
 
 - [重要] @capacitor/cli,tarなどを更新し、Node.jsの必要バージョンが22以上になりました。
     PR(dependabot): https://github.com/Rino-program/Audio-Visualizer/pull/5
