@@ -178,6 +178,7 @@ function startApplication() {
     // 起動後すぐに複数回実行
     setTimeout(forceCanvasFix, 50);
     setTimeout(forceCanvasFix, 700);
+    setTimeout(forceCanvasFix, 1500);
 }
 
 // 実行
@@ -1007,7 +1008,7 @@ async function init() {
             }
         }
     };
-    els.exportBtn.onclick = startExport;
+    // els.exportBtn.onclick = startExport;
     els.playlistToggle.onclick = togglePlaylist;
     // folderImportBtnは統合のため削除
     els.closePlaylistBtn.onclick = togglePlaylist;
@@ -4122,8 +4123,8 @@ function draw(ts = 0) {
                     bgVideo.playbackRate = baseRate;
                     videoSyncCooldown = 1.5;
                 } else {
-                    if (bgVideo.playbackRate !== baseRate * 5) {
-                        bgVideo.playbackRate = baseRate * 5;
+                    if (bgVideo.playbackRate !== baseRate * 7) {
+                        bgVideo.playbackRate = baseRate * 7;
                     }
                 }
             } else if (absTimeDiff > 10.0) {
@@ -4132,28 +4133,38 @@ function draw(ts = 0) {
                     bgVideo.playbackRate = baseRate;
                     videoSyncCooldown = 1.5;
                 } else {
-                    if (bgVideo.playbackRate !== baseRate * 3) {
-                        bgVideo.playbackRate = baseRate * 3;
+                    if (bgVideo.playbackRate !== baseRate * 5) {
+                        bgVideo.playbackRate = baseRate * 5;
                     }
                 }
             } else if (absTimeDiff > 3.0) {
                 if (timeDiff > 0) {
-                    if (bgVideo.playbackRate !== baseRate * 0.85) {
-                        bgVideo.playbackRate = baseRate * 0.85;
+                    if (bgVideo.playbackRate !== baseRate * 0.75) {
+                        bgVideo.playbackRate = baseRate * 0.75;
                     }
                 } else {
-                    if (bgVideo.playbackRate !== baseRate * 1.2) {
-                        bgVideo.playbackRate = baseRate * 1.2;
+                    if (bgVideo.playbackRate !== baseRate * 1.3) {
+                        bgVideo.playbackRate = baseRate * 1.3;
                     }
                 }
-            } else if (absTimeDiff > 0.2) {
+            } else if (absTimeDiff > 0.5) {
                 if (timeDiff > 0) {
-                    if (bgVideo.playbackRate !== baseRate * 0.95) {
-                        bgVideo.playbackRate = baseRate * 0.95;
+                    if (bgVideo.playbackRate !== baseRate * 0.90) {
+                        bgVideo.playbackRate = baseRate * 0.90;
                     }
                 } else {
                     if (bgVideo.playbackRate !== baseRate * 1.05) {
                         bgVideo.playbackRate = baseRate * 1.05;
+                    }
+                }
+            } else if (absTimeDiff > 0.1) {
+                if (timeDiff > 0) {
+                    if (bgVideo.playbackRate !== baseRate * 0.97) {
+                        bgVideo.playbackRate = baseRate * 0.97;
+                    }
+                } else {
+                    if (bgVideo.playbackRate !== baseRate * 1.03) {
+                        bgVideo.playbackRate = baseRate * 1.03;
                     }
                 }
             } else {

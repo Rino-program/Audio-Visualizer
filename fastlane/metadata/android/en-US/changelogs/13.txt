@@ -4,3 +4,9 @@ The updates in v1.1.0 (13) are as follows:
     PR (Dependabot): https://github.com/Rino-program/Audio-Visualizer/pull/5
 
 - Changed the image paths and further reduced the image sizes to make the app lighter.
+
+- Removed the Export button.
+    We determined that the behavior was unstable and the feature needs to be rebuilt from scratch.
+    For now, please record your screen using screen capture for the F-Droid version, or tools like OBS for the WEB version.
+    In future updates, we will be adding a UI show/hide toggle button to make screen capturing easier.
+    Please note that rebuilding the export feature will take some time (it may not be included in the v1.1.x series).
