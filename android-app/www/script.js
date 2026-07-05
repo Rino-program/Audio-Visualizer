@@ -4016,9 +4016,13 @@ function computeDisplayValues(rawFreq, dtSec) {
         else if (mode === 'plusminus') v = cur - prev[i];
         disp[i] = v;
         // sand update: always uses cur (raw level), not display
+        // computeDisplayValues 関数内（sandMode部分を以下に置き換え）
         if (state.settings.sandMode) {
-            if (cur >= sand[i]) sand[i] = cur;
-            else sand[i] = Math.max(0, sand[i] - state.settings.sandFallRate * dtSec);
+            if (cur >= sand[i]) {
+                sand[i] = disp[i];           // ← ここを display値に統一（重要）
+            } else {
+                sand[i] = Math.max(0, sand[i] - state.settings.sandFallRate * dtSec);
+            }
         } else {
             sand[i] = 0;
         }
@@ -4356,9 +4360,10 @@ function drawBarsFromDisplay(display, colors, maxH, drawH, drawStartY) {
         }
         // sand marker: use same color as bar
         if (state.settings.sandMode) {
-            const sh = state.sandHeights ? state.sandHeights[i] * maxH : 0;
+            const sandV = state.sandHeights[i] || 0;
+            const sh = Math.pow(Math.max(0, sandV), 1.15) * maxH;  // Barsの場合
             if (sh > 0) {
-                ctx.fillStyle = color; // use bar color, not white
+                ctx.fillStyle = color;
                 ctx.globalAlpha = 0.6;
                 const y = drawStartY + drawH - sh;
                 ctx.fillRect(i * bw + gap / 2, y - 2, bw - gap, 4);
@@ -4439,7 +4444,8 @@ function drawCircleFromDisplay(display, colors, maxH, drawH, drawStartY) {
         ctx.restore();
 
         if (state.settings.sandMode) {
-            const sh = state.sandHeights ? state.sandHeights[i] * maxH * 0.6 : 0;
+            const sandV = state.sandHeights ? state.sandHeights[i] : 0;
+            const sh = sandV * maxH * 0.6;   // Circleのバー長さに合わせる
             if (sh > 0) {
                 ctx.save();
                 ctx.translate(cx, cy);
