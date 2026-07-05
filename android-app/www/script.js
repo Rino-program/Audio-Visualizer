@@ -66,7 +66,7 @@ const state = {
         glowStrength: 20,
         glowEnabled: false,
         blurEnabled: false,
-        fftSize: 2048,
+        fftSize: 8192,
         opacity: 1.0,
         bgBlur: 0,
         mirror: false,
@@ -1749,7 +1749,9 @@ const QUALITY_PRESETS = {
     1024: { fftSize: 1024, barCount: 32 },
     2048: { fftSize: 2048, barCount: 64 },
     4096: { fftSize: 4096, barCount: 128 },
-    8192: { fftSize: 8192, barCount: 256 }
+    8192: { fftSize: 8192, barCount: 256 },
+    16384: { fftSize: 16384, barCount: 512 },
+    32768: { fftSize: 32768, barCount: 1024 }
 };
 
 function applyQualityPreset(nextFft) {
@@ -2542,7 +2544,7 @@ function applySettingsToUI() {
     $('smoothingValue').textContent = state.settings.smoothing.toFixed(2);
     $('sensitivitySlider').value = state.settings.sensitivity;
     $('sensitivityValue').textContent = state.settings.sensitivity.toFixed(1);
-    if (!QUALITY_PRESETS[state.settings.fftSize]) state.settings.fftSize = 2048;
+    if (!QUALITY_PRESETS[state.settings.fftSize]) state.settings.fftSize =  8192; // デフォルトに戻す
     applyQualityPreset(state.settings.fftSize);
     $('qualitySelect').value = state.settings.fftSize;
     $('barCountSelect').value = state.settings.barCount;
@@ -3963,7 +3965,7 @@ function getFilteredData() {
     return out;
 }
 function updateNumBars() {
-    const count = Math.max(16, Math.min(512, state.settings.barCount || 64));
+    const count = Math.max(16, Math.min(1024, state.settings.barCount || 64));
     state.settings.barCount = count;
 }
 function freqToIdx(f) { return state.audioCtx ? Math.round(f * state.analyser.fftSize / state.audioCtx.sampleRate) : 0; }
@@ -4000,52 +4002,28 @@ function ensureFrameBuffers(n) {
 function computeDisplayValues(rawFreq, dtSec) {
     const n = rawFreq.length;
     ensureFrameBuffers(n);
-    
     const disp = state.displayValues;
-    const prev = state.prevLevels;        // 既存のもの（changeMode用）
+    const prev = state.prevLevels;
     const sand = state.sandHeights;
     const cur_levels = state.curLevels;
-    const prevDisp = state.prevDisplay;   // 新規: temporal smoothing用
-
     const mode = state.settings.changeMode;
-
-    // 新パラメータ（後でsettingsに追加推奨）
-    const attack = 0.82;   // 0.7〜0.95（高いほど急上昇）
-    const decay  = 0.68;   // 0.5〜0.8（低いほど速く落ちる）
 
     for (let i = 0; i < n; i++) {
         const cur = Math.max(0, Math.min(1, rawFreq[i] / 255));
-        cur_levels[i] = cur;
-
-        // === 1. changeMode（差分）処理 ===
+        cur_levels[i] = cur; // store raw normalized level for sand
         let v = cur;
         if (mode === 'plus') v = Math.max(0, cur - prev[i]);
         else if (mode === 'plusminus') v = cur - prev[i];
-
-        // === 2. Temporal smoothing（attack/decay）で局所ピーク強調 ===
-        const pDisp = prevDisp[i];
-        if (cur > pDisp) {
-            v = pDisp + (cur - pDisp) * attack;   // 速い立ち上がり
-        } else {
-            v = pDisp * decay;                    // 速い減衰
-        }
-        v = Math.max(0, Math.min(1, v));          // クランプ
-
         disp[i] = v;
-        prevDisp[i] = v;   // 更新
-
-        // === 3. sandMode（既存ロジックを維持）===
+        // sand update: always uses cur (raw level), not display
         if (state.settings.sandMode) {
-            if (cur >= sand[i]) {
-                sand[i] = cur;
-            } else {
-                sand[i] = Math.max(0, sand[i] - state.settings.sandFallRate * dtSec);
-            }
+            if (cur >= sand[i]) sand[i] = cur;
+            else sand[i] = Math.max(0, sand[i] - state.settings.sandFallRate * dtSec);
         } else {
             sand[i] = 0;
         }
+        prev[i] = cur;
 
-        prev[i] = cur;  // changeMode用更新
     }
     return disp;
 }
