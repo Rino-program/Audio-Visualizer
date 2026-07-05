@@ -64,6 +64,8 @@ const state = {
         lowFreq: 20,
         highFreq: 16000,
         glowStrength: 20,
+        glowEnabled: false,
+        blurEnabled: false,
         fftSize: 2048,
         opacity: 1.0,
         bgBlur: 0,
@@ -1167,33 +1169,21 @@ async function init() {
                 e.preventDefault(); 
                 els.volSlider.value = Math.min(1, +els.volSlider.value + 0.1); 
                 updateVolume(); 
-                showOverlay(t('overlay.volumeUp', { value: Math.round(audio.volume * 100) }));
+                showOverlay('volumeUp', { value: Math.round(audio.volume * 100) });
                 break;
             case 'ArrowDown': 
                 e.preventDefault(); 
                 els.volSlider.value = Math.max(0, +els.volSlider.value - 0.1); 
                 updateVolume(); 
-                showOverlay(t('overlay.volumeDown', { value: Math.round(audio.volume * 100) }));
+                showOverlay('volumeDown', { value: Math.round(audio.volume * 100) });
                 break;
             case 'KeyH': e.preventDefault(); toggleUI(); break;
             case 'KeyV': 
                 state.settings.showVideo = !state.settings.showVideo; 
                 updateVideoVisibility(); 
                 applySettingsToUI(); 
-                showOverlay(state.settings.showVideo ? t('overlay.videoOn') : t('overlay.videoOff'));
+                showOverlay(state.settings.showVideo ? 'videoOn' : 'videoOff');
                 break;
-            case 'KeyL': {
-                // FPSサイクル: 30 → 60 → 120 → 無制限 → 30
-                const fpsSteps = [30, 60, 120, 0];
-                const curFps = state.settings.targetFps || 60;
-                const ci = fpsSteps.indexOf(curFps);
-                const nextFps = fpsSteps[(ci + 1) % fpsSteps.length];
-                state.settings.targetFps = nextFps;
-                state.settings.lowPowerMode = (nextFps <= 30);
-                applySettingsToUI();
-                showOverlay(t('overlay.fps', { fps: nextFps === 0 ? '∞' : nextFps })); 
-                break;
-            }
             case 'KeyR': 
                 state.settings.rainbow = !state.settings.rainbow; 
                 applySettingsToUI(); 
@@ -1215,7 +1205,7 @@ async function init() {
                 if (bgVideo.src) bgVideo.playbackRate = rates[ni];
                 syncVideoRateAfterChange();
                 const sel = $('speedSelect'); if (sel) sel.value = rates[ni];
-                showOverlay(t('overlay.playbackSpeed', { rate: rates[ni] }));
+                showOverlay('playbackSpeed: ' + rates[ni]);
                 break;
             }
             case 'BracketRight': {
@@ -1227,7 +1217,7 @@ async function init() {
                 if (bgVideo.src) bgVideo.playbackRate = rates[ni];
                 syncVideoRateAfterChange();
                 const sel = $('speedSelect'); if (sel) sel.value = rates[ni];
-                showOverlay(t('overlay.playbackSpeed', { rate: rates[ni] }));
+                showOverlay('playbackSpeed: ' + rates[ni]);
                 break;
             }
             case 'KeyM': 
@@ -2301,6 +2291,12 @@ function setupSettingsInputs() {
             $('glowValue').textContent = state.settings.glowStrength > 30 ? 'strong' : state.settings.glowStrength > 10 ? 'Medium' : 'weak';
         };
     }
+    const glowEnabledCheckbox = $('glowEnabledCheckbox');
+    if (glowEnabledCheckbox) {
+        glowEnabledCheckbox.onchange = e => { 
+            state.settings.glowEnabled = e.target.checked; 
+            };
+    }
     const rainbowCheckbox = $('rainbowCheckbox');
     if (rainbowCheckbox) {
         rainbowCheckbox.onchange = e => { state.settings.rainbow = e.target.checked; };
@@ -2314,6 +2310,13 @@ function setupSettingsInputs() {
         bgBlurSlider.oninput = e => {
             state.settings.bgBlur = +e.target.value;
             $('bgBlurValue').textContent = state.settings.bgBlur + 'px';
+            updateVideoVisibility();
+        };
+    }
+    const blurEnabledCheckbox = $('blurEnabledCheckbox');
+    if (blurEnabledCheckbox) {
+        blurEnabledCheckbox.onchange = e => {
+            state.settings.blurEnabled = e.target.checked;
             updateVideoVisibility();
         };
     }
@@ -2565,9 +2568,11 @@ function applySettingsToUI() {
         freqRangeSelectUI.value = matched;
     }
     $('glowSlider').value = state.settings.glowStrength;
+    $('glowEnabledCheckbox').checked = !!state.settings.glowEnabled;
     $('rainbowCheckbox').checked = state.settings.rainbow;
     $('mirrorCheckbox').checked = state.settings.mirror;
     $('bgBlurSlider').value = state.settings.bgBlur;
+    $('blurEnabledCheckbox').checked = !!state.settings.blurEnabled;
     $('bgBlurValue').textContent = state.settings.bgBlur + 'px';
     $('opacitySlider').value = state.settings.opacity;
     $('opacityValue').textContent = state.settings.opacity.toFixed(1);
@@ -3071,7 +3076,7 @@ function togglePlay() {
 function toggleShuffle() {
     state.settings.shuffle = !state.settings.shuffle;
     updateShuffleRepeatUI();
-    showOverlay(state.settings.shuffle ? t('overlay.shuffleOn') : t('overlay.shuffleOff'));
+    showOverlay(state.settings.shuffle ? 'shuffleOn' : 'shuffleOff');
 }
 
 function toggleRepeat() {
@@ -3833,13 +3838,18 @@ function toggleUI() {
     }
 }
 
-function showOverlay(msg, duration = 2000) {
+function showOverlay(msg, duration = 1200) {
     els.overlayMsg.textContent = msg;
     els.overlayMsg.classList.remove('hidden', 'fade-out');
+    
     if (duration > 0) {
-        setTimeout(() => {
+        if (els.overlayMsg.timeout) clearTimeout(els.overlayMsg.timeout);
+        
+        els.overlayMsg.timeout = setTimeout(() => {
             els.overlayMsg.classList.add('fade-out');
-            setTimeout(() => { els.overlayMsg.classList.add('hidden'); els.overlayMsg.classList.remove('fade-out'); }, 400);
+            setTimeout(() => {
+                els.overlayMsg.classList.add('hidden');
+            }, 200); // fade-outの時間
         }, duration);
     }
 }
@@ -4139,8 +4149,8 @@ function draw(ts = 0) {
                 }
             } else if (absTimeDiff > 3.0) {
                 if (timeDiff > 0) {
-                    if (bgVideo.playbackRate !== baseRate * 0.75) {
-                        bgVideo.playbackRate = baseRate * 0.75;
+                    if (bgVideo.playbackRate !== baseRate * 0.70) {
+                        bgVideo.playbackRate = baseRate * 0.70;
                     }
                 } else {
                     if (bgVideo.playbackRate !== baseRate * 1.3) {
@@ -4149,12 +4159,12 @@ function draw(ts = 0) {
                 }
             } else if (absTimeDiff > 0.5) {
                 if (timeDiff > 0) {
-                    if (bgVideo.playbackRate !== baseRate * 0.90) {
-                        bgVideo.playbackRate = baseRate * 0.90;
+                    if (bgVideo.playbackRate !== baseRate * 0.9) {
+                        bgVideo.playbackRate = baseRate * 0.9;
                     }
                 } else {
-                    if (bgVideo.playbackRate !== baseRate * 1.05) {
-                        bgVideo.playbackRate = baseRate * 1.05;
+                    if (bgVideo.playbackRate !== baseRate * 1.1) {
+                        bgVideo.playbackRate = baseRate * 1.1;
                     }
                 }
             } else if (absTimeDiff > 0.1) {
@@ -4270,7 +4280,7 @@ function computeEnergy(display) {
 function clamp01(v) { return Math.max(0, Math.min(1, v)); }
 
 function applyBackgroundBlur(px) {
-    const shouldBlur = state.settings.videoMode === 'background' && state.settings.bgBlur > 0 && state.settings.showVideo;
+    const shouldBlur = state.settings.videoMode === 'background' && state.settings.bgBlur > 0 && state.settings.showVideo && state.settings.blurEnabled;
     const safePx = shouldBlur ? Math.max(0, Math.min(state.settings.bgBlur, px)) : 0;
     if (Math.abs(safePx - appliedBlurPx) < 0.2) return;
     appliedBlurPx = safePx;
@@ -4303,9 +4313,11 @@ function drawBarsFromDisplay(display, colors, maxH, drawH, drawStartY) {
     const gap = n >= 256 ? Math.max(0.5, 2 - (n - 256) / 256) : (n >= 128 ? 1.5 : 2);
     // global glow based on max level
     let peak = 0; for (let i = 0; i < n; i++) { peak = Math.max(peak, Math.abs(display[i])); }
-    if (state.settings.glowStrength > 0) {
+    if (state.settings.glowEnabled && state.settings.glowStrength > 0) {
         ctx.shadowBlur = state.settings.glowStrength * Math.max(0.2, peak);
         ctx.shadowColor = state.settings.rainbow ? '#ffffff' : state.settings.fixedColor;
+    } else {
+        ctx.shadowBlur = 0;
     }
     for (let i = 0; i < n; i++) {
         const v = Math.max(0, display[i]); const h = v * maxH; const color = colors[i];
@@ -4326,13 +4338,38 @@ function drawBarsFromDisplay(display, colors, maxH, drawH, drawStartY) {
     ctx.shadowBlur = 0;
 }
 function drawWaveform(maxH, drawH, drawStartY) {
-    const glowEnabled = state.settings.glowStrength >= 5;
-    let startIdx = 0; for (let i = 0; i < state.bufLen - 1; i++) { if (state.timeData[i] < 128 && state.timeData[i+1] >= 128) { startIdx = i; break; } }
-    ctx.beginPath(); const slice = W / (state.bufLen - startIdx); const centerY = drawStartY + drawH / 2;
-    for (let i = startIdx; i < state.bufLen; i++) { const v = state.timeData[i] / 128 - 1; const y = centerY + v * maxH * 0.5; i === startIdx ? ctx.moveTo(0, y) : ctx.lineTo((i - startIdx) * slice, y); }
-    ctx.strokeStyle = state.settings.rainbow ? `hsl(${(Date.now() * 0.1) % 360}, 80%, 60%)` : state.settings.fixedColor; ctx.lineWidth = 3;
-    if (state.settings.glowStrength >= 5) { ctx.shadowBlur = state.settings.glowStrength * 0.7; ctx.shadowColor = ctx.strokeStyle; }
-    ctx.stroke(); ctx.shadowBlur = 0;
+    const glowEnabled = state.settings.glowEnabled && state.settings.glowStrength >= 5;  // ← 変更
+
+    let startIdx = 0;
+    for (let i = 0; i < state.bufLen - 1; i++) {
+        if (state.timeData[i] < 128 && state.timeData[i+1] >= 128) {
+            startIdx = i;
+            break;
+        }
+    }
+
+    ctx.beginPath();
+    const slice = W / (state.bufLen - startIdx);
+    const centerY = drawStartY + drawH / 2;
+
+    for (let i = startIdx; i < state.bufLen; i++) {
+        const v = state.timeData[i] / 128 - 1;
+        const y = centerY + v * maxH * 0.5;
+        i === startIdx ? ctx.moveTo(0, y) : ctx.lineTo((i - startIdx) * slice, y);
+    }
+
+    ctx.strokeStyle = state.settings.rainbow ?
+        `hsl(${(Date.now() * 0.1) % 360}, 80%, 60%)` :
+        state.settings.fixedColor;
+    ctx.lineWidth = 3;
+
+    if (glowEnabled) {
+        ctx.shadowBlur = state.settings.glowStrength * 0.7;
+        ctx.shadowColor = ctx.strokeStyle;
+    }
+
+    ctx.stroke();
+    ctx.shadowBlur = 0;
 }
 function drawDigitalBlocks(fd, maxH, drawH, drawStartY) {
     const cols = 32; const rows = 20; const cellW = W / cols; const cellH = drawH / rows;
@@ -4342,21 +4379,45 @@ function drawDigitalBlocks(fd, maxH, drawH, drawStartY) {
     }
 }
 function drawCircleFromDisplay(display, colors, maxH, drawH, drawStartY) {
-    const glowEnabled = state.settings.glowStrength >= 5;
-    const cx = W / 2, cy = drawStartY + drawH / 2; const r = Math.min(W, drawH) * 0.25; const n = display.length; const circumference = 2 * Math.PI * r; const barW = (circumference / n) * 0.8;
+    const glowEnabled = state.settings.glowEnabled && state.settings.glowStrength >= 5;  // ← 変更
+    
+    const cx = W / 2, cy = drawStartY + drawH / 2;
+    const r = Math.min(W, drawH) * 0.25;
+    const n = display.length;
+    const circumference = 2 * Math.PI * r;
+    const barW = (circumference / n) * 0.8;
     const angleOffset = ((state.settings.circleAngleOffset || 0) % 360) * Math.PI / 180;
+
     for (let i = 0; i < n; i++) {
-        const ang = (i / n) * Math.PI * 2 - Math.PI / 2 + angleOffset; const v = Math.max(0, display[i]); const len = v * maxH * 0.6;
-        ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang); const color = colors[i]; ctx.fillStyle = color;
-        if (glowEnabled && v > 0.3) { ctx.shadowBlur = state.settings.glowStrength * 0.7; ctx.shadowColor = color; }
-        ctx.fillRect(r, -barW/2, len, barW); ctx.restore();
+        const ang = (i / n) * Math.PI * 2 - Math.PI / 2 + angleOffset;
+        const v = Math.max(0, display[i]);
+        const len = v * maxH * 0.6;
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(ang);
+        const color = colors[i];
+        ctx.fillStyle = color;
+
+        if (glowEnabled && v > 0.3) {
+            ctx.shadowBlur = state.settings.glowStrength * 0.7;
+            ctx.shadowColor = color;
+        }
+
+        ctx.fillRect(r, -barW/2, len, barW);
+        ctx.restore();
+
         if (state.settings.sandMode) {
             const sh = state.sandHeights ? state.sandHeights[i] * maxH * 0.6 : 0;
             if (sh > 0) {
-                ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang);
-                ctx.fillStyle = color; // use bar color, not white
+                ctx.save();
+                ctx.translate(cx, cy);
+                ctx.rotate(ang);
+                ctx.fillStyle = color;
                 ctx.globalAlpha = 0.6;
-                ctx.beginPath(); ctx.arc(r + sh, 0, Math.max(1.5, barW * 0.3), 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath();
+                ctx.arc(r + sh, 0, Math.max(1.5, barW * 0.3), 0, Math.PI * 2);
+                ctx.fill();
                 ctx.globalAlpha = visualizerBaseAlpha;
                 ctx.restore();
             }
@@ -4587,7 +4648,7 @@ function drawMirrorBars(fd, maxH, drawH, drawStartY) {
     const n = fd.length; const bw = W / n; const cy = drawStartY + drawH / 2;
     for (let i = 0; i < n; i++) {
         const v = fd[i] / 255; const h = v * maxH * 0.5; const color = getColor(i, v, n);
-        if (glowEnabled && v > 0.3) { ctx.shadowBlur = state.settings.glowStrength * 0.7; ctx.shadowColor = color; }
+        if (state.settings.glowEnabled && glowEnabled && v > 0.3) { ctx.shadowBlur = state.settings.glowStrength * 0.7; ctx.shadowColor = color; }
         ctx.fillStyle = color; ctx.fillRect(i * bw + 1, cy - h, bw - 2, h); ctx.fillRect(i * bw + 1, cy, bw - 2, h); ctx.shadowBlur = 0;
     }
 }

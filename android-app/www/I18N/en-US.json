@@ -204,5 +204,7 @@
     "overlay.mode": "Mode: {mode}",
     "version.prefix": "Version",
     "resize": "Resize Canvas",
-    "btn.resizeCanvas": "Resize"
+    "btn.resizeCanvas": "Resize",
+    "label.blurToggle": "Enable Background Blur",
+    "label.glowToggle": "Enable Glow"
 }

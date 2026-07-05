@@ -16,13 +16,11 @@ Binaries:
 Builds:
   - versionName: 1.1.0
     versionCode: 13
-    commit: aae1baf9ffbeec3f9d7d2c70309d15726ff48d86
+    commit: 149da83d0efed164eb82feee7965b94e36c65cee
     subdir: android-app/android/app
     sudo:
       - apt-get update
-      - apt-get install -y wget xz-utils
-      - wget https://nodejs.org/dist/v22.11.0/node-v22.11.0-linux-x64.tar.xz
-      - tar -xJf node-v22.11.0-linux-x64.tar.xz -C /usr/local --strip-components=1
+      - apt-get install -y -t forky nodejs
     gradle:
       - yes
     prebuild:

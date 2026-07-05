@@ -24,6 +24,7 @@ https://github.com/Rino-program/Audio-Visualizer
 
 ## 注意事项
 - 支持的格式因设备型号和Android版本而异。
+- Glow和Blur非常消耗资源，会导致运行变慢。建议在常规使用时将其关闭（OFF）或将数值设为0来禁用。
 
 ## 联系我们
 如有意见或建议，请提交至 GitHub 仓库的 Issues 页面。

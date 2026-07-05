@@ -131,7 +131,7 @@
 
             <div class="tab-content active" id="tab-display">
                 <p style="font-size: 0.6rem; color: var(--text-muted); margin: 0;">
-                    <span data-i18n="version.prefix">バージョン</span>: v1.1.0
+                    <span data-i18n="version.prefix">バージョン</span>: v1.1.1 (Beta)
                 </p>
                 <div class="settings-section-title" data-i18n="section.system">システム / System</div>
                 <div class="setting-item">
@@ -230,7 +230,13 @@
                 </div>
                 <hr style="border-color: var(--glass-border); margin: 20px 0;">
                 <div class="setting-item">
-                    <label data-i18n="label.glow">発光強度 (Glow)</label>
+                    <label>
+                        <input type="checkbox" id="glowEnabledCheckbox" checked> 
+                        <span data-i18n="label.glowToggle">Glow（発光）を有効</span>
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label data-i18n="label.glow">発光 (Glow) を有効</label>
                     <div class="range-wrapper">
                         <input type="range" id="glowSlider" min="0" max="50" step="1">
                         <span id="glowValue" data-i18n="val.medium">Medium</span>
@@ -284,6 +290,12 @@
                 <div class="setting-item">
                     <label data-i18n="label.fixedColor">固定色</label>
                     <input type="color" id="fixedColorPicker">
+                </div>
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="blurEnabledCheckbox" checked> 
+                        <span data-i18n="label.blurToggle">背景ぼかし（Blur）を有効</span>
+                    </label>
                 </div>
                 <div class="setting-item">
                     <label><span data-i18n="label.bgBlur">背景ぼかし (Blur)</span> <small style="color: #888;" data-i18n="label.bgBlurHint">(※背景表示時のみ適用)</small></label>
@@ -492,7 +504,6 @@
                         <li><span data-i18n="shortcut.speed">再生速度ダウン / アップ</span> <span>[ / ]</span></li>
                         <li><span data-i18n="shortcut.toggleUI">UI表示切替</span> <span>H</span></li>
                         <li><span data-i18n="shortcut.toggleVideo">動画表示切替</span> <span>V</span></li>
-                        <li><span data-i18n="shortcut.powerSave">低電力モード切替</span> <span>L</span></li>
                         <li><span data-i18n="shortcut.shuffle">シャッフル切替</span> <span>S</span></li>
                         <li><span data-i18n="shortcut.repeat">リピート切替</span> <span>P</span></li>
                         <li><span data-i18n="shortcut.visualizer">ビジュアライザーモード切替</span> <span>M</span></li>

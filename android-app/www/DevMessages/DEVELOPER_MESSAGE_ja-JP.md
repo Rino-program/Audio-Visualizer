@@ -29,6 +29,7 @@ https://github.com/Rino-program/Audio-Visualizer
 
 ## 注意事項
 - 対応フォーマットは使用機種やAndroid バージョンによって異なります。
+- GlowとBlurはとても重く、動作が遅くなります。基本時にはOFFにするか値を0にして無効化する事をお勧めします。
 
 ## お問い合わせ
 

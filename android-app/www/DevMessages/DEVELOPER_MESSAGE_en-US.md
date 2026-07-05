@@ -24,6 +24,7 @@ The early release and beta versions are publicly available on GitHub Pages.Pleas
 
 ## Important Notes
 - Supported formats vary depending on the device model and Android version.
+- Glow and Blur are very resource-heavy and will significantly slow down performance. We recommend keeping them OFF or setting their values to 0 to disable them during normal use.
 
 ## Contact Us
 Please submit your comments and requests via the Issues section of the GitHub repository.
