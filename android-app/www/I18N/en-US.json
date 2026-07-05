@@ -206,5 +206,6 @@
     "resize": "Resize Canvas",
     "btn.resizeCanvas": "Resize",
     "label.blurToggle": "Enable Background Blur",
-    "label.glowToggle": "Enable Glow"
+    "label.glowToggle": "Enable Glow",
+    "version.code": "Version Code"
 }

@@ -206,5 +206,6 @@
     "resize": "重新设置 Canvas 尺寸",
     "btn.resizeCanvas": "重新设置",
     "label.blurToggle": "启用背景模糊 (Blur)",
-    "label.glowToggle": "启用发光 (Glow)"
+    "label.glowToggle": "启用发光 (Glow)",
+    "version.code": "版本代码"
 }

@@ -3939,8 +3939,12 @@ function getFilteredData() {
     for (let i = 0; i < state.settings.barCount; i++) {
         const t0 = i / state.settings.barCount;
         const t1 = (i + 1) / state.settings.barCount;
-        const startIdx = loIdx + Math.floor(Math.pow(t0, 0.6) * range);
-        const endIdx = Math.min(loIdx + Math.floor(Math.pow(t1, 0.6) * range), hiIdx - 1);
+        // ★ 低音を広く・高音を狭く（指数を大きくする）
+        // 0.6 → 0.75〜0.85 がおすすめ
+        //const exponent = 0.9;   // 調整ポイント（0.65=低音寄り控えめ、0.85=かなり低音重視）
+        
+        const startIdx = loIdx + Math.floor(t0 * range);
+        const endIdx = Math.min(loIdx + Math.floor(t1 * range), hiIdx - 1);
         
         if (endIdx >= startIdx) {
             let sum = 0;
@@ -3951,7 +3955,7 @@ function getFilteredData() {
                 if (v > maxVal) maxVal = v;
             }
             const avg = sum / (endIdx - startIdx + 1);
-            out[i] = Math.round(avg * 0.7 + maxVal * 0.3);
+            out[i] = Math.round(avg * 0.3 + maxVal * 0.7);
         } else {
             out[i] = state.freqData[Math.min(startIdx, state.bufLen - 1)];
         }
@@ -3982,29 +3986,66 @@ function ensureFrameBuffers(n) {
     if (!state.curLevels || state.curLevels.length !== n) state.curLevels = new Float32Array(n);
 }
 
+// ============== Display value computation (changeMode + sand + 新decay) ==============
+function ensureFrameBuffers(n) {
+    if (!state.displayValues || state.displayValues.length !== n) state.displayValues = new Float32Array(n);
+    if (!state.prevLevels || state.prevLevels.length !== n) state.prevLevels = new Float32Array(n);
+    if (!state.sandHeights || state.sandHeights.length !== n) state.sandHeights = new Float32Array(n);
+    if (!state.curLevels || state.curLevels.length !== n) state.curLevels = new Float32Array(n);
+    if (!state.prevDisplay || state.prevDisplay.length !== n) {  // ← 追加
+        state.prevDisplay = new Float32Array(n);
+    }
+}
+
 function computeDisplayValues(rawFreq, dtSec) {
     const n = rawFreq.length;
     ensureFrameBuffers(n);
+    
     const disp = state.displayValues;
-    const prev = state.prevLevels;
+    const prev = state.prevLevels;        // 既存のもの（changeMode用）
     const sand = state.sandHeights;
     const cur_levels = state.curLevels;
+    const prevDisp = state.prevDisplay;   // 新規: temporal smoothing用
+
     const mode = state.settings.changeMode;
+
+    // 新パラメータ（後でsettingsに追加推奨）
+    const attack = 0.82;   // 0.7〜0.95（高いほど急上昇）
+    const decay  = 0.68;   // 0.5〜0.8（低いほど速く落ちる）
+
     for (let i = 0; i < n; i++) {
         const cur = Math.max(0, Math.min(1, rawFreq[i] / 255));
-        cur_levels[i] = cur; // store raw normalized level for sand
+        cur_levels[i] = cur;
+
+        // === 1. changeMode（差分）処理 ===
         let v = cur;
         if (mode === 'plus') v = Math.max(0, cur - prev[i]);
         else if (mode === 'plusminus') v = cur - prev[i];
+
+        // === 2. Temporal smoothing（attack/decay）で局所ピーク強調 ===
+        const pDisp = prevDisp[i];
+        if (cur > pDisp) {
+            v = pDisp + (cur - pDisp) * attack;   // 速い立ち上がり
+        } else {
+            v = pDisp * decay;                    // 速い減衰
+        }
+        v = Math.max(0, Math.min(1, v));          // クランプ
+
         disp[i] = v;
-        // sand update: always uses cur (raw level), not display
+        prevDisp[i] = v;   // 更新
+
+        // === 3. sandMode（既存ロジックを維持）===
         if (state.settings.sandMode) {
-            if (cur >= sand[i]) sand[i] = cur;
-            else sand[i] = Math.max(0, sand[i] - state.settings.sandFallRate * dtSec);
+            if (cur >= sand[i]) {
+                sand[i] = cur;
+            } else {
+                sand[i] = Math.max(0, sand[i] - state.settings.sandFallRate * dtSec);
+            }
         } else {
             sand[i] = 0;
         }
-        prev[i] = cur;
+
+        prev[i] = cur;  // changeMode用更新
     }
     return disp;
 }
@@ -4320,9 +4361,21 @@ function drawBarsFromDisplay(display, colors, maxH, drawH, drawStartY) {
         ctx.shadowBlur = 0;
     }
     for (let i = 0; i < n; i++) {
-        const v = Math.max(0, display[i]); const h = v * maxH; const color = colors[i];
+        let v = Math.max(0, display[i]);
+        v = Math.pow(v, 1.15);  // ★ 低レベル強調でピークが目立つように
+        const h = v * maxH;
+        const color = colors[i];
+        
         ctx.fillStyle = color;
-        ctx.fillRect(i * bw + gap / 2, drawStartY + drawH - h, bw - gap, h);
+        ctx.fillRect(i * bw + gap/2, drawStartY + drawH - h, bw - gap, h);
+        
+        // ピーク強調（オプション）
+        if (v > 0.7) {
+            ctx.fillStyle = '#ffffff';
+            ctx.globalAlpha = 0.4;
+            ctx.fillRect(i * bw + gap/2, drawStartY + drawH - h, bw - gap, 4); // トップライン
+            ctx.globalAlpha = visualizerBaseAlpha;
+        }
         // sand marker: use same color as bar
         if (state.settings.sandMode) {
             const sh = state.sandHeights ? state.sandHeights[i] * maxH : 0;

@@ -219,5 +219,6 @@
     "resize": "Canvasサイズを再設定する",
     "btn.resizeCanvas": "再設定",
     "label.blurToggle": "背景ぼかし（Blur）を有効",
-    "label.glowToggle": "Glow（発光）を有効"
+    "label.glowToggle": "Glow（発光）を有効",
+    "version.code": "バージョンコード"
 }
