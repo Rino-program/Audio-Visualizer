@@ -207,5 +207,7 @@
     "btn.resizeCanvas": "Resize",
     "label.blurToggle": "Enable Background Blur",
     "label.glowToggle": "Enable Glow",
-    "version.code": "Version Code"
+    "version.code": "Version Code",
+    "overlay.fullscreenFailed": "Failed to enter fullscreen",
+    "label.showFullscreenBtn": "Show Fullscreen Button"
 }

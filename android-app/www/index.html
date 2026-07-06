@@ -112,6 +112,10 @@
         <button id="toggleUIBtn" class="icon-btn" data-i18n-title="btn.toggleUI" data-i18n-aria="aria.toggleUI" title="UI表示切替 (H)" aria-label="UI表示を切り替える">
             <img src="./img/audio-visualizer-icon-btn240.png" alt="UI切替" class="btn-icon">
         </button>
+        <!-- 新規追加: 全画面ボタン -->
+        <button id="fullscreenBtn" class="icon-btn" title="全画面 (F)" aria-label="全画面表示">
+            ⛶
+        </button>
     </div>
 
     <div id="settingsModal" class="modal">
@@ -131,7 +135,7 @@
 
             <div class="tab-content active" id="tab-display">
                 <p style="font-size: 0.6rem; color: var(--text-muted); margin: 0;">
-                    <span data-i18n="version.prefix">バージョン</span>: v1.1.1 (Beta)
+                    <span data-i18n="version.prefix">バージョン</span>: v1.1.1
                     <span data-i18n="version.code">バージョンコード</span>: 14
                 </p>
                 <div class="settings-section-title" data-i18n="section.system">システム / System</div>
@@ -203,6 +207,12 @@
                 <div class="setting-item">
                     <label>
                         <input type="checkbox" id="autoHideUICheckbox" checked> <span data-i18n="label.autoHideUI">UI自動非表示</span>
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="showFullscreenBtnCheckbox"> 
+                        <span data-i18n="label.showFullscreenBtn">全画面ボタンを表示</span>
                     </label>
                 </div>
                 <div class="setting-item">

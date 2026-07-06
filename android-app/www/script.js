@@ -96,6 +96,8 @@ const state = {
         renderMode: 'auto', // 'auto', 'gpu', 'cpu'
         // UI auto-hide settings
         autoHideUI: true,
+        // fullscreen button visibility
+        showFullscreenButton: false,
         // Android: 最後に選択したパス
         lastSelectedPath: '',
         // Volume persistence
@@ -967,6 +969,10 @@ async function init() {
         ? '<img src="./img/audio-visualizer-icon-btn240.png" alt="表示" class="btn-icon">' 
         : '<img src="./img/audio-visualizer-icon-btn240.png" alt="非表示" class="btn-icon">';
 
+    // 既存の els 定義の近く
+    els.toggleUIBtn = document.getElementById('toggleUIBtn');
+    els.fullscreenBtn = document.getElementById('fullscreenBtn');
+
     els.openSettingsBtn.onclick = openSettings;
     els.closeSettingsBtn.onclick = closeSettings;
     els.saveSettingsBtn.onclick = saveSettings;
@@ -1064,6 +1070,10 @@ async function init() {
     els.sourceFileBtn.onclick = () => setInputSource('file');
     els.sourceMicBtn.onclick = () => setInputSource('mic');
     
+    if (els.fullscreenBtn) {
+        els.fullscreenBtn.onclick = toggleFullscreen;
+    }
+
     // Mic Device Select
     els.micDeviceSelect.onchange = e => {
         state.micDeviceId = e.target.value;
@@ -2483,6 +2493,16 @@ function setupSettingsInputs() {
         });
     });
 
+    // fullscreen toggle button
+    const showFullscreenCheckbox = $('showFullscreenBtnCheckbox');
+    if (showFullscreenCheckbox) {
+        showFullscreenCheckbox.onchange = e => {
+            state.settings.showFullscreenButton = e.target.checked;
+            applySettingsToUI();
+            saveSettingsToStorage();
+        };
+    }
+
     setupPresets();
 }
 
@@ -2620,6 +2640,11 @@ function applySettingsToUI() {
         const el = $(id);
         if (el) el.value = val;
     });
+
+    // 新規追加: 全画面ボタンの表示制御
+    if (els.fullscreenBtn) {
+        els.fullscreenBtn.style.display = state.settings.showFullscreenButton ? 'flex' : 'none';
+    }
 }
 
 function openSettings() { 
@@ -2900,83 +2925,66 @@ async function setInputSource(source) {
 async function startMic() {
     initAudioContext();
     
-    // Android/Chrome requires user gesture and sometimes multiple resume calls
+    // AudioContext復帰（Android 14で頻発）
     if (state.audioCtx.state === 'suspended') {
-        await state.audioCtx.resume();
+        try { await state.audioCtx.resume(); } catch(e) { console.warn(e); }
     }
     
-    stopMic(); // Clean up previous
-    
+    stopMic(); // クリーンアップ
+
     try {
-        // Android Capacitor環境では事前に権限を要求
-        if (isNativeCapacitor()) {
-            try {
-                const Permissions = window.Capacitor?.Plugins?.Permissions;
-                if (Permissions && typeof Permissions.request === 'function') {
-                    const permResult = await Permissions.request({ permissions: ['microphone'] });
-                    console.log('Permission result:', permResult);
-                    if (permResult?.microphone === 'denied') {
-                        throw { name: 'NotAllowedError', message: 'マイク権限が拒否されました' };
-                    }
-                }
-            } catch (permErr) {
-                console.warn('Permissions plugin error:', permErr);
-                // プラグインがない場合はgetUserMediaに任せる
-            }
-        }
-        
-        // 一度権限確認のためにラベルなしでデバイスを列挙
-        await navigator.mediaDevices.enumerateDevices();
-        
+        // Android 14+ 対策：事前デバイス列挙で権限プロンプトを誘導
+        await navigator.mediaDevices.enumerateDevices().catch(() => {});
+
         const constraints = {
             audio: state.micDeviceId 
                 ? { deviceId: { exact: state.micDeviceId } } 
                 : {
-                    echoCancellation: false,  // エコーキャンセル無効（ビジュアライザーには不要）
-                    noiseSuppression: false,  // ノイズ抑制無効
-                    autoGainControl: false    // 自動ゲイン無効
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false,
+                    sampleRate: 44100,     // 安定性向上
+                    channelCount: 1        // モノラルでシンプルに
                   }
         };
+
+        console.log('[Mic] Requesting with constraints:', constraints);
         
-        console.log('Requesting mic with constraints:', constraints);
         state.micStream = await navigator.mediaDevices.getUserMedia(constraints);
-        console.log('Mic stream obtained:', state.micStream.id);
         
-        // ストリームのトラック情報をログ出力
-        const tracks = state.micStream.getAudioTracks();
-        console.log('Audio tracks:', tracks.length);
-        tracks.forEach((t, i) => {
-            console.log(`Track ${i}: label=${t.label}, enabled=${t.enabled}, muted=${t.muted}, readyState=${t.readyState}`);
-        });
-        
+        if (!state.micStream?.getAudioTracks().length) {
+            throw new Error('No audio track received');
+        }
+
         state.micSource = state.audioCtx.createMediaStreamSource(state.micStream);
         
-        // Disconnect file source if any
-        if (state.fileSource) {
-            try { state.fileSource.disconnect(); } catch(e) {}
-        }
+        // ファイルソースを切断
+        if (state.fileSource) try { state.fileSource.disconnect(); } catch(e){}
         
         state.micSource.connect(state.eqFilters[0]);
-        state.gainNode.gain.value = 0; // Prevent feedback
-        
-        // Double check context state
+        if (state.gainNode) state.gainNode.gain.value = 0; // フィードバック防止
+
+        // 最終確認
         if (state.audioCtx.state !== 'running') {
             await state.audioCtx.resume();
         }
-        
-        console.log('AudioContext state after mic start:', state.audioCtx.state);
-        console.log('Analyser connected, bufLen:', state.bufLen);
-        
-        showOverlay(t('overlay.micStarted'));
+
+        console.log('[Mic] Success - Context state:', state.audioCtx.state);
+        showOverlay(t('overlay.micStarted') || 'マイク入力開始');
+
     } catch (e) {
-        console.error('Mic error:', e);
+        console.error('[Mic] Failed:', e);
         let msg = 'マイクアクセスに失敗しました';
-        if (e.name === 'NotAllowedError') msg = 'マイク権限が拒否されました';
-        else if (e.name === 'NotFoundError') msg = 'マイクが見つかりません';
         
-        showOverlay(t('overlay.warn', { msg }));
-        alert(`${msg}: ${e.message}`);
-        setInputSource('file');
+        if (e.name === 'NotAllowedError' || String(e).includes('denied') || String(e).includes('Permission')) {
+            msg = 'マイク権限が拒否されました。';
+        } else if (e.name === 'NotFoundError') {
+            msg = 'マイクデバイスが見つかりません。';
+        }
+        
+        showOverlay(msg);
+        alert(msg);
+        setInputSource('file'); // 安全にフォールバック
     }
 }
 
@@ -3837,6 +3845,17 @@ function toggleUI() {
     } else if (state.settings.autoHideUI) {
         // 少し遅延させて即時リセットを防ぐ
         setTimeout(resetUITimeout, 100);
+    }
+}
+
+function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+            console.warn('Fullscreen failed:', err);
+            showOverlay(t('overlay.fullscreenFailed'));
+        });
+    } else {
+        document.exitFullscreen();
     }
 }
 

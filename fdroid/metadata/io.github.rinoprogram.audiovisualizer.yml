@@ -14,8 +14,8 @@ Binaries:
   https://github.com/Rino-program/Audio-Visualizer/releases/download/v%v/app-release.apk
 
 Builds:
-  - versionName: 1.1.0
-    versionCode: 13
+  - versionName: 1.1.1
+    versionCode: 14
     commit: 149da83d0efed164eb82feee7965b94e36c65cee
     subdir: android-app/android/app
     sudo:
@@ -34,5 +34,5 @@ AllowedAPKSigningKeys: c9812e0591a0182fff8323dd045557b8d1bcc33f8e3fcd25556782860
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 1.1.0
-CurrentVersionCode: 13
+CurrentVersion: 1.1.1
+CurrentVersionCode: 14

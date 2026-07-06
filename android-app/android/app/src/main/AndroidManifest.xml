@@ -52,6 +52,9 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Android 14+ で推奨: フォアグラウンドサービス宣言（マイク継続のため） -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />  <!-- Android 14+ -->
     <!-- Storage permissions for accessing local files -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
