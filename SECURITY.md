@@ -14,8 +14,7 @@ The following versions of this project are currently supported with security upd
 | Version  | Supported          |
 | -------- | ------------------ |
 | 1.1.x    | :white_check_mark: |
-| 1.0.x (>= 1.0.7) | :white_check_mark: |
-| 1.0.x (< 1.0.7)  | :x:                |
+| 1.0.x    | :x:                |
 
 ### Reporting a Vulnerability
 
@@ -39,8 +38,7 @@ We will acknowledge your report as soon as possible and work on a fix. Thank you
 | バージョン | サポート状況         |
 | -------- | ------------------ |
 | 1.1.x    | :white_check_mark: |
-| 1.0.x (>= 1.0.7) | :white_check_mark: |
-| 1.0.x (< 1.0.7) | :x:                |
+| 1.0.x    | :x:                |
 
 ### 脆弱性の報告方法
 
