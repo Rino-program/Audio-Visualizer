@@ -38,9 +38,11 @@ macOS / Linux では `./gradlew assembleRelease` を使います。
 ローカルで作成した release APK は [android-app/android/app/build/outputs/apk/release/app-release.apk](android-app/android/app/build/outputs/apk/release/app-release.apk) に出力されます。
 
 ## ライセンスとお願いについて
+
 本アプリはMITライセンスのもとで公開されているオープンソースソフトウェアです。どなたでも自由に利用、改変、再配布していただけます。
 
 ## 製作者からのお願い（任意）
+
 もしこのアプリを何かの作品に使ったり、気に入っていただけたりしたら、そのことをX（旧Twitter）でハッシュタグ #AudioVisualizerFDroid をつけてポストしていただくか、製作者の @Rinoprogram までお知らせいただけると、開発の大きな励みになり、とても嬉しいです！
 （※これは義務ではありませんので、もちろん報告なしで自由に使っていただいても構いません！）
 

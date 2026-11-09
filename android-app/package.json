@@ -9,7 +9,12 @@
     "build": "npx cap sync && cd android && gradlew.bat assembleDebug",
     "build-release": "npx cap sync && cd android && gradlew.bat assembleRelease"
   },
-  "keywords": ["audio", "visualizer", "android", "capacitor"],
+  "keywords": [
+    "audio",
+    "visualizer",
+    "android",
+    "capacitor"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {

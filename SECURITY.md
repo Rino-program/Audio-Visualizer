@@ -5,16 +5,17 @@
 ---
 
 <a name="english"></a>
+
 ## English
 
 ### Supported Versions
 
 The following versions of this project are currently supported with security updates.
 
-| Version  | Supported          |
-| -------- | ------------------ |
-| 1.1.x    | :white_check_mark: |
-| 1.0.x    | :x:                |
+| Version | Supported          |
+| ------- | ------------------ |
+| 1.1.x   | :white_check_mark: |
+| 1.0.x   | :x:                |
 
 ### Reporting a Vulnerability
 
@@ -29,16 +30,17 @@ We will acknowledge your report as soon as possible and work on a fix. Thank you
 ---
 
 <a name="日本語"></a>
+
 ## 日本語
 
 ### サポートされているバージョン
 
 現在、以下のバージョンに対してセキュリティアップデートを提供しています。最新版へのアップデートを推奨します。
 
-| バージョン | サポート状況         |
-| -------- | ------------------ |
-| 1.1.x    | :white_check_mark: |
-| 1.0.x    | :x:                |
+| バージョン | サポート状況       |
+| ---------- | ------------------ |
+| 1.1.x      | :white_check_mark: |
+| 1.0.x      | :x:                |
 
 ### 脆弱性の報告方法
 
