@@ -1,0 +1,35 @@
+# .github/workflows/auto-format.yml
+name: Auto Format with Prettier
+
+on:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: # ← これがあることで、いつでも手動で全コード実行できます！
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # PRのブランチ、または手動実行したブランチ（main）を取得
+          ref: ${{ github.head_ref || github.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run Prettier
+        run: |
+          # 全コードを一括整形
+          npx prettier --write "**/*.{js,jsx,ts,tsx,html,css,json,md}" --ignore-path .gitignore
+
+      - name: Commit and Push changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "style: auto format all code with Prettier [skip ci]"
