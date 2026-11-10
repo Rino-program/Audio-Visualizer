@@ -20,11 +20,14 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@capacitor/cli": "^8.6.0"
+    "@capacitor/cli": "8.5.1"
   },
   "dependencies": {
-    "@capacitor/core": "^8.6.0",
-    "@capacitor/android": "^8.6.0",
+    "@capacitor/android": "8.5.1",
+    "@capacitor/core": "8.5.1",
     "@capawesome/capacitor-file-picker": "^8.1.1"
+  },
+  "overrides": {
+    "xcode": "4.0.0"
   }
 }

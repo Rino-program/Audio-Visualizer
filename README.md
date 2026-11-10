@@ -29,7 +29,7 @@ npx cap sync
 ## ビルド
 
 ```bash
-cd android
+cd android-app/android
 .\gradlew.bat assembleRelease
 ```
 
@@ -38,9 +38,18 @@ macOS / Linux では `./gradlew assembleRelease` を使います。
 または、`android-app` ディレクトリで `npm run build-release`（Windows）、
 `npm run build-release:unix`（macOS / Linux）を実行できます。
 
-ローカルで作成した release APK は [android-app/android/app/build/outputs/apk/release/app-release.apk](android-app/android/app/build/outputs/apk/release/app-release.apk) に出力されます。
+keystore.properties がない場合、release APK は未署名の `app-release-unsigned.apk` として出力されます。配布用 APK はリリース鍵で署名してください。
 
-配布用 APK を作成する場合は、`android-app/android/keystore.properties` に既存のリリース鍵の情報を設定してください。設定がない場合、Gradle は debug 鍵で署名するため、既存の配布 APK の更新には使用できません。
+配布用 APK を作成する場合は、`android-app/android/keystore.properties` に既存のリリース鍵の情報を設定してください。
+
+デバッグ APK は次のコマンドで作成できます。
+
+```bash
+cd android-app/android
+.\gradlew.bat assembleDebug
+```
+
+macOS / Linux では `./gradlew assembleDebug` を使います。
 
 ## ライセンスとお願いについて
 

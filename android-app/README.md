@@ -22,7 +22,7 @@ npx cap sync
 ## ビルド
 
 ```bash
-cd android
+cd android-app/android
 .\gradlew.bat assembleRelease
 ```
 
@@ -34,7 +34,8 @@ macOS / Linux では `./gradlew assembleRelease` を使います。
 ## 注意
 
 - Release ビルドの配布時は署名設定を確認してください
-- 配布用 APK は、既存のリリース鍵を `android/keystore.properties` に設定してからビルドしてください。未設定の場合は debug 鍵で署名され、既存の配布 APK を更新できません
+- keystore.properties がない場合、release APK は未署名の `app-release-unsigned.apk` として出力されます。配布用 APK は、既存のリリース鍵を `android/keystore.properties` に設定してからビルドしてください
+- デバッグ APK は `.\gradlew.bat assembleDebug`（Windows）または `./gradlew assembleDebug`（macOS / Linux）で作成できます
 - F-Droid 向けには生成物を含めず、ソースから再ビルドします
 
 ## 権限・プライバシー（F-Droid向け）

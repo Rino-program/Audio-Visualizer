@@ -292,18 +292,23 @@ function debounce(fn, ms) {
 let nativeMediaPlugin = null;
 let nativeMediaListenerInstalled = false;
 let lastNativeMediaSync = { title: null, artist: null, isPlaying: null };
+const nativePluginCache = {};
+let folderImportQueue = Promise.resolve();
+let isClearingLibrary = false;
+
+function getRegisteredNativePlugin(name) {
+  if (!isNativeCapacitor()) return null;
+  if (nativePluginCache[name]) return nativePluginCache[name];
+  const registerPlugin = window.Capacitor?.registerPlugin;
+  if (typeof registerPlugin === "function") {
+    nativePluginCache[name] = registerPlugin(name);
+    return nativePluginCache[name];
+  }
+  return window.Capacitor?.Plugins?.[name] || null;
+}
 
 function getNativeMediaPlugin() {
-  try {
-    if (
-      window.Capacitor &&
-      window.Capacitor.Plugins &&
-      window.Capacitor.Plugins.MediaNotification
-    ) {
-      return window.Capacitor.Plugins.MediaNotification;
-    }
-  } catch (e) {}
-  return null;
+  return getRegisteredNativePlugin("MediaNotification");
 }
 
 async function ensureNativeMediaListener() {
@@ -1986,8 +1991,7 @@ async function openNativeFilePicker() {
     return;
   }
 
-  const plugins = window.Capacitor?.Plugins;
-  const filePicker = plugins?.FilePicker;
+  const filePicker = getRegisteredNativePlugin("FilePicker");
 
   if (!filePicker || typeof filePicker.pickFiles !== "function") {
     alert(t("alert.filePickerMissing"));
@@ -2078,13 +2082,19 @@ async function openNativeFilePicker() {
 }
 
 async function openNativeFolderImport() {
+  if (isClearingLibrary) return;
+  const request = folderImportQueue.then(() => performNativeFolderImport());
+  folderImportQueue = request.catch(() => {});
+  return request;
+}
+
+async function performNativeFolderImport() {
   if (!isNativeCapacitor()) {
     showOverlay(t("overlay.androidOnly"));
     return;
   }
 
-  const plugins = window.Capacitor?.Plugins;
-  const folderImport = plugins?.LocalFolderImport;
+  const folderImport = getRegisteredNativePlugin("LocalFolderImport");
   if (!folderImport || typeof folderImport.pickAudioFolder !== "function") {
     // Fallback to file picker if plugin not available
     console.warn(
@@ -2286,7 +2296,7 @@ async function deleteAllLocalTrackStorage(tracks) {
 
   if (appPaths.length > 0 && isNativeCapacitor()) {
     try {
-      const folderImport = window.Capacitor?.Plugins?.LocalFolderImport;
+      const folderImport = getRegisteredNativePlugin("LocalFolderImport");
       if (
         folderImport &&
         typeof folderImport.deleteImportedFiles === "function"
@@ -3440,12 +3450,14 @@ async function enumerateMicDevices() {
   try {
     const devices = await navigator.mediaDevices.enumerateDevices();
     const mics = devices.filter((d) => d.kind === "audioinput");
-    els.micDeviceSelect.innerHTML = mics
-      .map(
-        (m) =>
-          `<option value="${m.deviceId}">${m.label || "マイク " + m.deviceId.slice(0, 5)}</option>`,
-      )
-      .join("");
+    const fragment = document.createDocumentFragment();
+    mics.forEach((m) => {
+      const option = document.createElement("option");
+      option.value = m.deviceId;
+      option.textContent = m.label || `マイク ${m.deviceId.slice(0, 5)}`;
+      fragment.appendChild(option);
+    });
+    els.micDeviceSelect.replaceChildren(fragment);
   } catch (e) {
     console.warn("Device enumeration failed", e);
   }
@@ -3880,32 +3892,59 @@ function renderPlaylist() {
     .filter((track) => track.name.toLowerCase().includes(query));
 
   if (state.playlist.length === 0) {
-    els.playlistItems.innerHTML = `<div class="playlist-empty">${t("playlist.empty")}</div>`;
+    const empty = document.createElement("div");
+    empty.className = "playlist-empty";
+    empty.textContent = t("playlist.empty");
+    els.playlistItems.replaceChildren(empty);
     return;
   }
 
   if (filtered.length === 0) {
-    els.playlistItems.innerHTML = `<div class="playlist-empty">${t("playlist.notFound")}</div>`;
+    const empty = document.createElement("div");
+    empty.className = "playlist-empty";
+    empty.textContent = t("playlist.notFound");
+    els.playlistItems.replaceChildren(empty);
     return;
   }
 
-  els.playlistItems.innerHTML = filtered
-    .map(
-      (track) => `
-        <div class="playlist-item ${track.originalIndex === state.currentIndex ? "active" : ""}" data-index="${track.originalIndex}" draggable="true">
-            <div class="drag-handle" title="ドラッグして移動">☰</div>
-            <div class="track-info">
-                <span class="name">${track.originalIndex + 1}. ${escapeHtml(track.name)}</span>
-            </div>
-            <div class="item-actions">
-                <button class="move-btn up" data-index="${track.originalIndex}" title="上に移動">▲</button>
-                <button class="move-btn down" data-index="${track.originalIndex}" title="下に移動">▼</button>
-                <button class="remove-btn" data-index="${track.originalIndex}" title="削除">✖</button>
-            </div>
-        </div>
-    `,
-    )
-    .join("");
+  const fragment = document.createDocumentFragment();
+  filtered.forEach((track) => {
+    const item = document.createElement("div");
+    item.className = `playlist-item${track.originalIndex === state.currentIndex ? " active" : ""}`;
+    item.dataset.index = String(track.originalIndex);
+    item.draggable = true;
+
+    const dragHandle = document.createElement("div");
+    dragHandle.className = "drag-handle";
+    dragHandle.title = "ドラッグして移動";
+    dragHandle.textContent = "☰";
+
+    const trackInfo = document.createElement("div");
+    trackInfo.className = "track-info";
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = `${track.originalIndex + 1}. ${track.name}`;
+    trackInfo.appendChild(name);
+
+    const actions = document.createElement("div");
+    actions.className = "item-actions";
+    for (const [className, title, text] of [
+      ["move-btn up", "上に移動", "▲"],
+      ["move-btn down", "下に移動", "▼"],
+      ["remove-btn", "削除", "✖"],
+    ]) {
+      const button = document.createElement("button");
+      button.className = className;
+      button.dataset.index = String(track.originalIndex);
+      button.title = title;
+      button.textContent = text;
+      actions.appendChild(button);
+    }
+
+    item.append(dragHandle, trackInfo, actions);
+    fragment.appendChild(item);
+  });
+  els.playlistItems.replaceChildren(fragment);
 
   // ドラッグ&ドロップ処理
   setupPlaylistDragDrop();
@@ -3966,7 +4005,7 @@ async function deleteLibraryEntry(ref) {
     if (ref.startsWith("idb:")) {
       await idbDeleteLocalFile(ref.slice("idb:".length));
     } else if (ref.startsWith("app:") && isNativeCapacitor()) {
-      const folderImport = window.Capacitor?.Plugins?.LocalFolderImport;
+      const folderImport = getRegisteredNativePlugin("LocalFolderImport");
       if (
         folderImport &&
         typeof folderImport.deleteImportedFiles === "function"
@@ -3991,8 +4030,14 @@ async function deleteAllLibraryEntries() {
   }
   const ok = confirm(t("confirm.deleteStoredFiles"));
   if (!ok) return;
-  for (const ref of refs) {
-    await deleteLibraryEntry(ref);
+  isClearingLibrary = true;
+  try {
+    await folderImportQueue;
+    for (const ref of refs) {
+      await deleteLibraryEntry(ref);
+    }
+  } finally {
+    isClearingLibrary = false;
   }
   showOverlay(t("overlay.allDeleted"));
   renderStorageList();
@@ -4002,39 +4047,61 @@ function renderStorageList() {
   if (!els.storageList) return;
   const refs = Object.keys(library);
   if (refs.length === 0) {
-    els.storageList.innerHTML = `<div class="hint">${t("storage.empty")}</div>`;
+    const empty = document.createElement("div");
+    empty.className = "hint";
+    empty.textContent = t("storage.empty");
+    els.storageList.replaceChildren(empty);
     if (els.storageSummary) els.storageSummary.textContent = "";
     return;
   }
-  const rows = refs
-    .map((ref) => {
-      const item = library[ref] || {};
-      const size = item.sizeBytes ? formatBytes(item.sizeBytes) : "不明";
-      const typeLabel = item.type === "app" ? "端末" : "内部";
-      return `
-            <div class="storage-item" data-ref="${ref}" style="padding: 6px 8px; gap: 8px;">
-                <div class="storage-meta" style="flex: 1; min-width: 0;">
-                    <strong style="display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.85rem;">${escapeHtml(item.name || ref)}</strong>
-                    <span class="hint" style="font-size: 0.7rem;">${typeLabel} | ${size}</span>
-                </div>
-                <button class="icon-btn danger" data-delete="${ref}" style="width: 32px; height: 32px; font-size: 0.9rem; flex-shrink: 0;">🗑️</button>
-            </div>`;
-    })
-    .join("");
-  els.storageList.innerHTML = rows;
-  els.storageList.querySelectorAll("button[data-delete]").forEach((btn) => {
-    btn.onclick = () => deleteLibraryEntry(btn.dataset.delete);
+  const fragment = document.createDocumentFragment();
+  refs.forEach((ref) => {
+    const item = library[ref] || {};
+    const size = item.sizeBytes ? formatBytes(item.sizeBytes) : "不明";
+    const typeLabel = item.type === "app" ? "端末" : "内部";
+    const row = document.createElement("div");
+    row.className = "storage-item";
+    row.dataset.ref = ref;
+    row.style.cssText = "padding: 6px 8px; gap: 8px;";
+
+    const meta = document.createElement("div");
+    meta.className = "storage-meta";
+    meta.style.cssText = "flex: 1; min-width: 0;";
+    const name = document.createElement("strong");
+    name.textContent = item.name || ref;
+    name.style.cssText =
+      "display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.85rem;";
+    const details = document.createElement("span");
+    details.className = "hint";
+    details.textContent = `${typeLabel} | ${size}`;
+    details.style.fontSize = "0.7rem";
+    meta.append(name, details);
+
+    const button = document.createElement("button");
+    button.className = "icon-btn danger";
+    button.dataset.delete = ref;
+    button.textContent = "🗑️";
+    button.style.cssText =
+      "width: 32px; height: 32px; font-size: 0.9rem; flex-shrink: 0;";
+    button.onclick = () => deleteLibraryEntry(ref);
+    row.append(meta, button);
+    fragment.appendChild(row);
   });
+  els.storageList.replaceChildren(fragment);
   if (els.storageSummary) {
     const totalBytes = refs.reduce(
       (s, r) => s + (library[r]?.sizeBytes || 0),
       0,
     );
-    els.storageSummary.innerHTML = `
-            <div style="display: flex; justify-content: space-between; font-weight: 600; margin-top: 8px; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 8px; font-size: 0.85rem;">
-                <span>計 ${refs.length} 件</span>
-                <span>合計: ${totalBytes ? formatBytes(totalBytes) : "0B"}</span>
-            </div>`;
+    const summary = document.createElement("div");
+    summary.style.cssText =
+      "display: flex; justify-content: space-between; font-weight: 600; margin-top: 8px; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 8px; font-size: 0.85rem;";
+    const count = document.createElement("span");
+    count.textContent = `計 ${refs.length} 件`;
+    const total = document.createElement("span");
+    total.textContent = `合計: ${totalBytes ? formatBytes(totalBytes) : "0B"}`;
+    summary.append(count, total);
+    els.storageSummary.replaceChildren(summary);
   }
 }
 
@@ -4334,7 +4401,7 @@ async function removeFromPlaylist(index) {
       isNativeCapacitor()
     ) {
       try {
-        const folderImport = window.Capacitor?.Plugins?.LocalFolderImport;
+        const folderImport = getRegisteredNativePlugin("LocalFolderImport");
         if (
           folderImport &&
           typeof folderImport.deleteImportedFiles === "function"

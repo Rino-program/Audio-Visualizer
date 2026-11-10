@@ -24,7 +24,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
-@CapacitorPlugin(name = "LocalFolderImport")
+@CapacitorPlugin(name = "LocalFolderImport", requestCodes = { 9101 })
 public class LocalFolderImportPlugin extends Plugin {
     private static final Set<String> ALLOWED_EXT = new HashSet<>(Arrays.asList(
             "mp3", "wav", "m4a", "aac", "mp4", "webm", "mkv", "mov", "ogg", "flac", "opus"
