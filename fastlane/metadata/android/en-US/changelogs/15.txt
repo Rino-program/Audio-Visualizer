@@ -1,0 +1,5 @@
+The updates in v1.1.2 (15) are as follows:
+
+- Internal dependencies were updated following vulnerability reports from Dependabot.
+
+- All code was mechanically formatted with Prettier.
