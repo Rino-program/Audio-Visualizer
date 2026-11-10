@@ -11,6 +11,7 @@ permissions:
 
 jobs:
   format:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -27,9 +28,9 @@ jobs:
       - name: Run Prettier
         run: |
           # 全コードを一括整形
-          npx prettier --write "**/*.{js,jsx,ts,tsx,html,css,json,md}" --ignore-path .gitignore
+          npx prettier --write "**/*.{js,jsx,ts,tsx,html,css,json,md}" --ignore-path .gitignore --ignore-path .prettierignore
 
       - name: Commit and Push changes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "style: auto format all code with Prettier [skip ci]"
+          commit_message: "style: auto format all code with Prettier"

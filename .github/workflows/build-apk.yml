@@ -1,7 +1,6 @@
 name: Build Android APK (Reproducible)
 permissions:
   contents: read
-  pull-requests: write
 
 on:
   workflow_dispatch:
@@ -28,8 +27,8 @@ jobs:
       - name: F-Droidと完全に同じ絶対パスの環境を構築
         run: |
           sudo mkdir -p /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer
-          sudo chown -R $USER:$USER /builds/
-          cp -a $GITHUB_WORKSPACE/. /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer/
+          sudo chown -R "$USER:$USER" /builds/
+          cp -a "$GITHUB_WORKSPACE/." /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer/
 
       - name: 依存関係のインストールと Capacitor 同期
         working-directory: /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer/android-app
@@ -59,7 +58,9 @@ jobs:
           BUILD_TOOLS_VERSION: "34.0.0"
 
       - name: ファイル名を app-release.apk に戻す
-        run: mv ${{ steps.sign_app.outputs.signedReleaseFile }} /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer/android-app/android/app/build/outputs/apk/release/app-release.apk
+        env:
+          SIGNED_RELEASE_FILE: ${{ steps.sign_app.outputs.signedReleaseFile }}
+        run: mv "$SIGNED_RELEASE_FILE" /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer/android-app/android/app/build/outputs/apk/release/app-release.apk
 
       - name: 出来上がった APK を保存（アーティファクト）
         uses: actions/upload-artifact@v4

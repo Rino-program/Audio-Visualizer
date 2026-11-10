@@ -88,6 +88,11 @@ public class LocalFolderImportPlugin extends Plugin {
             // ignore
         }
 
+        final int selectedMaxFiles = maxFiles;
+        getBridge().execute(() -> importTree(call, treeUri, selectedMaxFiles));
+    }
+
+    private void importTree(PluginCall call, Uri treeUri, int maxFiles) {
         JSArray out = new JSArray();
         int scanned = 0;
 
@@ -226,7 +231,7 @@ public class LocalFolderImportPlugin extends Plugin {
             try {
                 File f = new File(p);
                 String canon = f.getCanonicalPath();
-                if (!canon.startsWith(base)) continue;
+                if (!canon.equals(base) && !canon.startsWith(base + File.separator)) continue;
                 if (f.exists() && f.isFile() && f.delete()) deleted++;
             } catch (Exception ignored) {
                 // ignore

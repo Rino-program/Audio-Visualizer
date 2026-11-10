@@ -9,7 +9,7 @@
 - イコライザー
 - プレイリスト管理
 - 設定の保存
-- ビジュアライザーの録画・書き出し
+- ビジュアライザーの録画・書き出し（現在未対応）
 
 ## セットアップ
 
@@ -22,15 +22,19 @@ npx cap sync
 ## ビルド
 
 ```bash
-cd android-app/android
+cd android
 .\gradlew.bat assembleRelease
 ```
 
 macOS / Linux では `./gradlew assembleRelease` を使います。
 
+または、`android-app` ディレクトリで `npm run build-release`（Windows）、
+`npm run build-release:unix`（macOS / Linux）を実行できます。
+
 ## 注意
 
 - Release ビルドの配布時は署名設定を確認してください
+- 配布用 APK は、既存のリリース鍵を `android/keystore.properties` に設定してからビルドしてください。未設定の場合は debug 鍵で署名され、既存の配布 APK を更新できません
 - F-Droid 向けには生成物を含めず、ソースから再ビルドします
 
 ## 権限・プライバシー（F-Droid向け）
