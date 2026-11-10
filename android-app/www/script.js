@@ -4036,7 +4036,6 @@ function renderStorageList() {
                 <span>合計: ${totalBytes ? formatBytes(totalBytes) : "0B"}</span>
             </div>`;
   }
-
 }
 
 let draggedIndex = -1;
