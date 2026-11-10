@@ -3895,7 +3895,7 @@ function renderPlaylist() {
         <div class="playlist-item ${track.originalIndex === state.currentIndex ? "active" : ""}" data-index="${track.originalIndex}" draggable="true">
             <div class="drag-handle" title="ドラッグして移動">☰</div>
             <div class="track-info">
-                <span class="name">${track.originalIndex + 1}. ${track.name}</span>
+                <span class="name">${track.originalIndex + 1}. ${escapeHtml(track.name)}</span>
             </div>
             <div class="item-actions">
                 <button class="move-btn up" data-index="${track.originalIndex}" title="上に移動">▲</button>
@@ -3910,6 +3910,15 @@ function renderPlaylist() {
   // ドラッグ&ドロップ処理
   setupPlaylistDragDrop();
   updatePlaylistCount();
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function removeTracksByLocalRefs(refs) {
@@ -4005,7 +4014,7 @@ function renderStorageList() {
       return `
             <div class="storage-item" data-ref="${ref}" style="padding: 6px 8px; gap: 8px;">
                 <div class="storage-meta" style="flex: 1; min-width: 0;">
-                    <strong style="display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.85rem;">${item.name || ref}</strong>
+                    <strong style="display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.85rem;">${escapeHtml(item.name || ref)}</strong>
                     <span class="hint" style="font-size: 0.7rem;">${typeLabel} | ${size}</span>
                 </div>
                 <button class="icon-btn danger" data-delete="${ref}" style="width: 32px; height: 32px; font-size: 0.9rem; flex-shrink: 0;">🗑️</button>
@@ -4027,6 +4036,7 @@ function renderStorageList() {
                 <span>合計: ${totalBytes ? formatBytes(totalBytes) : "0B"}</span>
             </div>`;
   }
+
 }
 
 let draggedIndex = -1;

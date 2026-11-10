@@ -7,7 +7,9 @@
     "dev": "npx cap open android",
     "sync": "npx cap sync",
     "build": "npx cap sync && cd android && gradlew.bat assembleDebug",
-    "build-release": "npx cap sync && cd android && gradlew.bat assembleRelease"
+    "build:unix": "npx cap sync && cd android && ./gradlew assembleDebug",
+    "build-release": "npx cap sync && cd android && gradlew.bat assembleRelease",
+    "build-release:unix": "npx cap sync && cd android && ./gradlew assembleRelease"
   },
   "keywords": [
     "audio",
@@ -18,11 +20,11 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@capacitor/cli": "^8.4.1"
+    "@capacitor/cli": "^8.6.0"
   },
   "dependencies": {
-    "@capacitor/core": "^6.1.0",
-    "@capacitor/android": "^6.2.2",
-    "@capawesome/capacitor-file-picker": "^6.0.1"
+    "@capacitor/core": "^8.6.0",
+    "@capacitor/android": "^8.6.0",
+    "@capawesome/capacitor-file-picker": "^8.1.1"
   }
 }
