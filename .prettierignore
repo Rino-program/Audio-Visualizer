@@ -1,0 +1,6 @@
+# .prettierignore
+package-lock.json
+android-app/package-lock.json
+node_modules/
+dist/
+android/

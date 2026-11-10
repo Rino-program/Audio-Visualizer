@@ -1,0 +1,7 @@
+The update details for v1.0.12(12) are as follows:
+
+- Improved the accuracy of audio and video synchronization.
+
+- Moved translation data from android-app/www/script.js to android-app/www/I18N/{lang}.json.
+
+- Moved DEVELOPER_MESSAGE_{lang}.md from android-app/www to android-app/www/DevMessages.

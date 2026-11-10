@@ -1,0 +1,21 @@
+name: Qodo Merge (PR-Agent)
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  pr_agent_job:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: write
+    name: Run PR Agent on Comment
+    steps:
+      - name: PR Agent Action
+        uses: qodo-ai/pr-agent@main
+        env:
+          config.model: "gemini-3.5-flash"
+          GOOGLE_AI_STUDIO__GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

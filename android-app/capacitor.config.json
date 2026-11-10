@@ -1,0 +1,12 @@
+{
+  "appId": "io.github.rinoprogram.audiovisualizer",
+  "appName": "Audio Visualizer",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "backgroundColor": "#000000"
+  }
+}

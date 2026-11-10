@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Build outputs
+dist/
+release/
+release-build/
+build/
+android-app/android/app/build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Backup files
+*.bak
+
+# Android signing / Firebase (never commit)
+/android-app/android/keystore.properties
+/android-app/android/app/google-services.json
+key/*
+*.jks
+*.keystore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Source maps
+android-app/www/*.map
+pc-app/public/*.map
+
+# Logs
+npm-debug.log
+yarn-debug.log

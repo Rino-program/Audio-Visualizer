@@ -1,0 +1,14 @@
+The update contents for v1.1.1(14) are as follows:
+
+- Changes related to Bars height calculation and improved accuracy
+  Previously, the average value was heavily mixed into the height of each bar,
+  but with this change, that influence is reduced, improving visual accuracy.
+
+- Enhanced microphone input permissions
+
+- Partially fixed missing translations for showOverlay
+
+- Adjusted synchronization threshold and multiplier
+
+- Added a full-screen button
+  You can choose whether to show this button from the settings.

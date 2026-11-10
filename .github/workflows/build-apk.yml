@@ -1,0 +1,68 @@
+name: Build Android APK (Reproducible)
+permissions:
+  contents: read
+  pull-requests: write
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: リポジトリのコードを取得
+        uses: actions/checkout@v4
+
+      - name: Node.js のセットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Java (JDK 21) のセットアップ
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: F-Droidと完全に同じ絶対パスの環境を構築
+        run: |
+          sudo mkdir -p /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer
+          sudo chown -R $USER:$USER /builds/
+          cp -a $GITHUB_WORKSPACE/. /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer/
+
+      - name: 依存関係のインストールと Capacitor 同期
+        working-directory: /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer/android-app
+        run: |
+          npm ci
+          npx --package=@capacitor/cli cap sync
+
+      - name: Clear corrupted Gradle cache
+        run: rm -rf ~/.gradle/caches
+
+      - name: Gradle でリリースビルドを実行
+        working-directory: /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer/android-app/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Android アプリに署名
+        uses: r0adkll/sign-android-release@v1
+        id: sign_app
+        with:
+          releaseDirectory: /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer/android-app/android/app/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          alias: ${{ secrets.ANDROID_KEY_ALIAS }}
+          keyStorePassword: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        env:
+          BUILD_TOOLS_VERSION: "34.0.0"
+
+      - name: ファイル名を app-release.apk に戻す
+        run: mv ${{ steps.sign_app.outputs.signedReleaseFile }} /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer/android-app/android/app/build/outputs/apk/release/app-release.apk
+
+      - name: 出来上がった APK を保存（アーティファクト）
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu-release-signed-apk
+          path: /builds/Rino-program/fdroiddata/build/io.github.rinoprogram.audiovisualizer/android-app/android/app/build/outputs/apk/release/app-release.apk

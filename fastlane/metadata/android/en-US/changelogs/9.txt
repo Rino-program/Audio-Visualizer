@@ -1,0 +1,8 @@
+What's New in v1.0.9
+
+- Fixed unintended line spacing (extra blank space) caused by display environments such as white-space: pre-wrap;, and optimized margins for all UI elements.
+- Improved untranslated text related to glow intensity settings.
+- Added information regarding Early Release and Beta distribution.
+- Changed the UI toggle button icon size from 2048×2048 to 360×360.
+- Fixed an issue where UI toggle button interactions and automatic UI hide detection could overlap during touch operations, causing unstable UI visibility switching.
+- Fixed an issue where the video window or UI could shift toward the top-left corner when switching between portrait and landscape orientations. The video window position is now saved as a percentage of the screen size instead of pixels, and is automatically repositioned within the viewport when the screen is rotated or resized. (Pending real-device verification.)

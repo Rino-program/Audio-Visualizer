@@ -1,0 +1,16 @@
+The updates for v1.0.11(11) are as follows:
+
+- The timing for recalculating the Canvas size is no longer executed periodically.
+    We expect this to resolve the issue where the Canvas display gets cut off.
+
+- Added a button to the settings to allow recalculating the Canvas size at any timing.
+    This setting was added as an alternative since periodic execution has been removed as mentioned above.
+
+- The background playback feature has been removed.
+    This is because it did not work properly, and we determined that background playback is not necessary for an Audio-Visualizer.
+
+- Removed the module added in v1.0.10(10) to reduce the data size.
+    This resolves the issue where the apk file had become too heavy.
+
+- Added a method and threshold to better align and adjust the timing of video and audio.
+    By making the condition for triggering seek stricter, the delay during seeking will be improved.
