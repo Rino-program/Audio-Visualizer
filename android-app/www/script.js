@@ -4023,8 +4023,7 @@ async function deleteLibraryEntry(ref) {
 }
 
 async function deleteAllLibraryEntries() {
-  const refs = Object.keys(library);
-  if (refs.length === 0) {
+  if (Object.keys(library).length === 0) {
     showOverlay(t("overlay.deleteNone"));
     return;
   }
@@ -4033,6 +4032,7 @@ async function deleteAllLibraryEntries() {
   isClearingLibrary = true;
   try {
     await folderImportQueue;
+    const refs = Object.keys(library);
     for (const ref of refs) {
       await deleteLibraryEntry(ref);
     }
