@@ -2103,6 +2103,9 @@ async function openNativeFolderImport() {
   return request;
 }
 
+/**
+ * Imports a selected Android folder while preserving unacknowledged results.
+ */
 async function performNativeFolderImport() {
   if (!isNativeCapacitor()) {
     showOverlay(t("overlay.androidOnly"));
@@ -2120,6 +2123,15 @@ async function performNativeFolderImport() {
   }
 
   try {
+    if (typeof folderImport.getPendingImport === "function") {
+      const pending = await folderImport.getPendingImport();
+      if (pending?.importId) {
+        console.warn("A folder import result is still pending.");
+        showOverlay(t("overlay.fileSelectFailed"));
+        return;
+      }
+    }
+
     showOverlay(t("overlay.selectFolder"));
     const result = await folderImport.pickAudioFolder({});
     const files = Array.isArray(result?.files) ? result.files : [];
@@ -2203,6 +2215,9 @@ function addImportedFolderFiles(files) {
   }
 }
 
+/**
+ * Restores a folder import persisted by the native plugin after recreation.
+ */
 async function restorePendingFolderImport() {
   const folderImport = getRegisteredNativePlugin("LocalFolderImport");
   if (!folderImport || typeof folderImport.getPendingImport !== "function")
@@ -3085,6 +3100,9 @@ function closeSettings() {
   const persistentControls = document.getElementById("persistentControls");
   if (persistentControls) persistentControls.style.display = "";
 }
+/**
+ * Persists settings and closes the settings dialog only after success.
+ */
 function saveSettings() {
   const langSelect = document.getElementById("langSelect");
   if (langSelect) {
@@ -3095,9 +3113,13 @@ function saveSettings() {
 
   updateLanguageUI(); // 保存時にも確実に反映
   loadDeveloperMessage();
-  saveSettingsToStorage();
+  if (!saveSettingsToStorage()) {
+    showOverlay(t("overlay.fileSelectFailed"));
+    return false;
+  }
   closeSettings();
   showOverlay(t("overlay.settingsSaved"));
+  return true;
 }
 
 function switchTab(tabId) {
