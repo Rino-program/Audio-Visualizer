@@ -23,6 +23,8 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @CapacitorPlugin(name = "LocalFolderImport", requestCodes = { 9101 })
 public class LocalFolderImportPlugin extends Plugin {
@@ -38,6 +40,7 @@ public class LocalFolderImportPlugin extends Plugin {
 
     private static final int REQUEST_CODE_PICK_DIRECTORY = 9101;
     private PluginCall pendingPickCall;
+    private final ExecutorService importExecutor = Executors.newSingleThreadExecutor();
 
     @PluginMethod
     public void pickAudioFolder(PluginCall call) {
@@ -89,7 +92,13 @@ public class LocalFolderImportPlugin extends Plugin {
         }
 
         final int selectedMaxFiles = maxFiles;
-        getBridge().execute(() -> importTree(call, treeUri, selectedMaxFiles));
+        importExecutor.execute(() -> importTree(call, treeUri, selectedMaxFiles));
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        importExecutor.shutdownNow();
+        super.handleOnDestroy();
     }
 
     private void importTree(PluginCall call, Uri treeUri, int maxFiles) {

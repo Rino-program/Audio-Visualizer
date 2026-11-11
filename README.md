@@ -20,6 +20,11 @@ Android 向けのローカル再生オーディオビジュアライザーです
 
 ## セットアップ
 
+必要な環境:
+
+- Node.js 22 以上（Capacitor CLI 8.5.1）
+- JDK 21（Androidビルド）
+
 ```bash
 cd android-app
 npm ci
@@ -41,6 +46,18 @@ macOS / Linux では `./gradlew assembleRelease` を使います。
 keystore.properties がない場合、release APK は未署名の `app-release-unsigned.apk` として出力されます。配布用 APK はリリース鍵で署名してください。
 
 配布用 APK を作成する場合は、`android-app/android/keystore.properties` に既存のリリース鍵の情報を設定してください。
+
+`keystore.properties` は `android-app/android/app/build.gradle` から読み込まれ、`storeFile` は
+`android-app/android` を基準に解決されます。設定例:
+
+```properties
+storeFile=release.keystore
+storePassword=your-store-password
+keyAlias=your-key-alias
+keyPassword=your-key-password
+```
+
+秘密情報をリポジトリへコミットしないでください。
 
 デバッグ APK は次のコマンドで作成できます。
 

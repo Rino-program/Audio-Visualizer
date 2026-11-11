@@ -13,6 +13,11 @@
 
 ## セットアップ
 
+必要な環境:
+
+- Node.js 22 以上（Capacitor CLI 8.5.1）
+- JDK 21（Androidビルド）
+
 ```bash
 cd android-app
 npm ci
@@ -35,6 +40,9 @@ macOS / Linux では `./gradlew assembleRelease` を使います。
 
 - Release ビルドの配布時は署名設定を確認してください
 - keystore.properties がない場合、release APK は未署名の `app-release-unsigned.apk` として出力されます。配布用 APK は、既存のリリース鍵を `android/keystore.properties` に設定してからビルドしてください
+- `keystore.properties` の `storeFile` は `android-app/android` を基準に解決されます。キー名は `storeFile`、`storePassword`、`keyAlias`、`keyPassword` です
+- 設定例: `storeFile=release.keystore`、`storePassword=your-store-password`、`keyAlias=your-key-alias`、`keyPassword=your-key-password`
+- 秘密情報をリポジトリへコミットしないでください
 - デバッグ APK は `.\gradlew.bat assembleDebug`（Windows）または `./gradlew assembleDebug`（macOS / Linux）で作成できます
 - F-Droid 向けには生成物を含めず、ソースから再ビルドします
 

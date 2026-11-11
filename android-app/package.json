@@ -20,11 +20,11 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@capacitor/cli": "8.5.1"
+    "@capacitor/cli": "8.5.3"
   },
   "dependencies": {
-    "@capacitor/android": "8.5.1",
-    "@capacitor/core": "8.5.1",
+    "@capacitor/android": "8.5.3",
+    "@capacitor/core": "8.5.3",
     "@capawesome/capacitor-file-picker": "^8.1.1"
   },
   "overrides": {
