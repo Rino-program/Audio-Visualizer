@@ -47,8 +47,7 @@ keystore.properties がない場合、release APK は未署名の `app-release-u
 
 配布用 APK を作成する場合は、`android-app/android/keystore.properties` に既存のリリース鍵の情報を設定してください。
 
-`keystore.properties` は `android-app/android/app/build.gradle` から読み込まれ、`storeFile` は
-`android-app/android` を基準に解決されます。設定例:
+`keystore.properties` は `android-app/android/app/build.gradle` から読み込まれ、`storeFile` は `android-app/android/app` を基準に解決されます。設定例:
 
 ```properties
 storeFile=release.keystore

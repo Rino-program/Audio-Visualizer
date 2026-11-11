@@ -17,6 +17,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -39,6 +40,7 @@ public class LocalFolderImportPlugin extends Plugin {
     private static final int DEFAULT_MAX_FILES = 2000;
 
     private static final int REQUEST_CODE_PICK_DIRECTORY = 9101;
+    private static final String PENDING_IMPORT_FILE = "pending-folder-import.json";
     private PluginCall pendingPickCall;
     private final ExecutorService importExecutor = Executors.newSingleThreadExecutor();
 
@@ -204,7 +206,54 @@ public class LocalFolderImportPlugin extends Plugin {
         JSObject ret = new JSObject();
         ret.put("files", out);
         ret.put("scanned", scanned);
+        ret.put("importId", UUID.randomUUID().toString());
+        if (!savePendingImport(ret)) {
+            call.reject("Failed to save folder import result");
+            return;
+        }
         call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void getPendingImport(PluginCall call) {
+        File pending = new File(getContext().getFilesDir(), PENDING_IMPORT_FILE);
+        if (!pending.isFile()) {
+            call.resolve(new JSObject());
+            return;
+        }
+        try {
+            byte[] data = java.nio.file.Files.readAllBytes(pending.toPath());
+            call.resolve(new JSObject(new String(data, StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            call.reject("Failed to read pending folder import", e);
+        }
+    }
+
+    @PluginMethod
+    public void acknowledgePendingImport(PluginCall call) {
+        File pending = new File(getContext().getFilesDir(), PENDING_IMPORT_FILE);
+        if (pending.exists() && !pending.delete()) {
+            call.reject("Failed to remove pending folder import");
+            return;
+        }
+        call.resolve();
+    }
+
+    private boolean savePendingImport(JSObject result) {
+        File pending = new File(getContext().getFilesDir(), PENDING_IMPORT_FILE);
+        File temporary = new File(pending.getPath() + ".tmp");
+        try (FileOutputStream out = new FileOutputStream(temporary)) {
+            out.write(result.toString().getBytes(StandardCharsets.UTF_8));
+            out.flush();
+            if (!temporary.renameTo(pending)) {
+                temporary.delete();
+                return false;
+            }
+            return true;
+        } catch (Exception e) {
+            temporary.delete();
+            return false;
+        }
     }
 
     @PluginMethod

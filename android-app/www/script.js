@@ -861,6 +861,7 @@ async function init() {
   loadDeveloperMessage();
   library = loadLibraryFromStorage();
   await loadPlaylistFromStorage();
+  await restorePendingFolderImport();
   rebuildLibraryFromPlaylist();
   renderStorageList();
 
@@ -2129,31 +2130,8 @@ async function performNativeFolderImport() {
 
     showOverlay(t("overlay.importingFiles", { count: files.length }));
 
-    for (const f of files) {
-      const name = typeof f?.name === "string" ? f.name : "";
-      const path = typeof f?.path === "string" ? f.path : "";
-      if (!name || !path) continue;
-      const isVideo = !!f?.isVideo;
-      state.playlist.push({
-        name,
-        url: undefined, // URLは再生時に生成
-        source: "local",
-        isVideo,
-        localRef: `app:${path}`,
-        size: f?.size || 0,
-        addedOrder: state.addedOrderCounter++,
-      });
-      // 保存設定がONの場合のみライブラリに登録
-      if (state.settings.storeLocalFiles) {
-        upsertLibraryEntry({
-          ref: `app:${path}`,
-          type: "app",
-          name,
-          sizeBytes: f?.size || 0,
-          isVideo,
-        });
-      }
-    }
+    addImportedFolderFiles(files);
+    await folderImport.acknowledgePendingImport({ importId: result.importId });
 
     renderPlaylist();
     if (state.currentIndex === -1) {
@@ -2177,6 +2155,49 @@ async function performNativeFolderImport() {
     );
     await openNativeFilePicker();
   }
+}
+
+function addImportedFolderFiles(files) {
+  for (const f of files) {
+    const name = typeof f?.name === "string" ? f.name : "";
+    const path = typeof f?.path === "string" ? f.path : "";
+    if (!name || !path) continue;
+    const localRef = `app:${path}`;
+    if (state.playlist.some((track) => track?.localRef === localRef)) continue;
+    const isVideo = !!f?.isVideo;
+    state.playlist.push({
+      name,
+      url: undefined,
+      source: "local",
+      isVideo,
+      localRef,
+      size: f?.size || 0,
+      addedOrder: state.addedOrderCounter++,
+    });
+    if (state.settings.storeLocalFiles) {
+      upsertLibraryEntry({
+        ref: localRef,
+        type: "app",
+        name,
+        sizeBytes: f?.size || 0,
+        isVideo,
+      });
+    }
+  }
+}
+
+async function restorePendingFolderImport() {
+  const folderImport = getRegisteredNativePlugin("LocalFolderImport");
+  if (!folderImport || typeof folderImport.getPendingImport !== "function") return;
+  const result = await folderImport.getPendingImport();
+  const files = Array.isArray(result?.files) ? result.files : [];
+  if (files.length === 0 || !result?.importId) return;
+
+  addImportedFolderFiles(files);
+  await folderImport.acknowledgePendingImport({ importId: result.importId });
+  renderPlaylist();
+  saveSettingsToStorage();
+  renderStorageList();
 }
 
 // ============== PLAYLIST PERSISTENCE (LocalStorage + IndexedDB) ==============
