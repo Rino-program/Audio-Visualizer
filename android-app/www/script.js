@@ -292,18 +292,23 @@ function debounce(fn, ms) {
 let nativeMediaPlugin = null;
 let nativeMediaListenerInstalled = false;
 let lastNativeMediaSync = { title: null, artist: null, isPlaying: null };
+const nativePluginCache = {};
+let folderImportQueue = Promise.resolve();
+let isClearingLibrary = false;
+
+function getRegisteredNativePlugin(name) {
+  if (!isNativeCapacitor()) return null;
+  if (nativePluginCache[name]) return nativePluginCache[name];
+  const registerPlugin = window.Capacitor?.registerPlugin;
+  if (typeof registerPlugin === "function") {
+    nativePluginCache[name] = registerPlugin(name);
+    return nativePluginCache[name];
+  }
+  return window.Capacitor?.Plugins?.[name] || null;
+}
 
 function getNativeMediaPlugin() {
-  try {
-    if (
-      window.Capacitor &&
-      window.Capacitor.Plugins &&
-      window.Capacitor.Plugins.MediaNotification
-    ) {
-      return window.Capacitor.Plugins.MediaNotification;
-    }
-  } catch (e) {}
-  return null;
+  return getRegisteredNativePlugin("MediaNotification");
 }
 
 async function ensureNativeMediaListener() {
@@ -856,6 +861,12 @@ async function init() {
   loadDeveloperMessage();
   library = loadLibraryFromStorage();
   await loadPlaylistFromStorage();
+  try {
+    await restorePendingFolderImport();
+  } catch (error) {
+    console.error("Pending folder import restore failed:", error);
+    showOverlay(t("overlay.fileSelectFailed"));
+  }
   rebuildLibraryFromPlaylist();
   renderStorageList();
 
@@ -1835,51 +1846,60 @@ function loadSettings() {
 }
 
 function saveSettingsToStorage() {
-  if (state.settings.persistSettings) {
+  try {
+    if (state.settings.persistSettings) {
+      localStorage.setItem(
+        "audioVisualizerSettingsV7",
+        JSON.stringify(state.settings),
+      );
+    }
+    // プレイリスト情報（ローカルは参照キー(localRef)を保存、URLなし）
+    const playlistData = state.playlist
+      .map((track) => {
+        // storeLocalFilesがOFFの場合：
+        // - uri:形式は一時的な権限なので保存しない（再起動後アクセス不可）
+        // - app:形式（コピー済み）とpath:形式（永続パス）のみ保存可能
+        if (track.source === "local" && !state.settings.storeLocalFiles) {
+          // app:とpath:以外は保存しない
+          if (
+            !track.localRef?.startsWith("app:") &&
+            !track.localRef?.startsWith("path:")
+          ) {
+            return null;
+          }
+        }
+        // storeLocalFilesがONの場合：idb:形式以外は保存しない（uri:は永続権限がない）
+        if (track.source === "local" && state.settings.storeLocalFiles) {
+          if (
+            !track.localRef?.startsWith("idb:") &&
+            !track.localRef?.startsWith("app:") &&
+            !track.localRef?.startsWith("path:")
+          ) {
+            return null;
+          }
+        }
+        return {
+          name: track.name,
+          source: track.source,
+          isVideo: track.isVideo,
+          localRef: track.localRef || null,
+        };
+      })
+      .filter(Boolean);
     localStorage.setItem(
-      "audioVisualizerSettingsV7",
-      JSON.stringify(state.settings),
+      "audioVisualizerPlaylistV7",
+      JSON.stringify(playlistData),
     );
+    // 後方互換
+    localStorage.setItem(
+      "audioVisualizerPlaylist",
+      JSON.stringify(playlistData),
+    );
+    return true;
+  } catch (error) {
+    console.error("Playlist settings save failed:", error);
+    return false;
   }
-  // プレイリスト情報（ローカルは参照キー(localRef)を保存、URLなし）
-  const playlistData = state.playlist
-    .map((track) => {
-      // storeLocalFilesがOFFの場合：
-      // - uri:形式は一時的な権限なので保存しない（再起動後アクセス不可）
-      // - app:形式（コピー済み）とpath:形式（永続パス）のみ保存可能
-      if (track.source === "local" && !state.settings.storeLocalFiles) {
-        // app:とpath:以外は保存しない
-        if (
-          !track.localRef?.startsWith("app:") &&
-          !track.localRef?.startsWith("path:")
-        ) {
-          return null;
-        }
-      }
-      // storeLocalFilesがONの場合：idb:形式以外は保存しない（uri:は永続権限がない）
-      if (track.source === "local" && state.settings.storeLocalFiles) {
-        if (
-          !track.localRef?.startsWith("idb:") &&
-          !track.localRef?.startsWith("app:") &&
-          !track.localRef?.startsWith("path:")
-        ) {
-          return null;
-        }
-      }
-      return {
-        name: track.name,
-        source: track.source,
-        isVideo: track.isVideo,
-        localRef: track.localRef || null,
-      };
-    })
-    .filter(Boolean);
-  localStorage.setItem(
-    "audioVisualizerPlaylistV7",
-    JSON.stringify(playlistData),
-  );
-  // 後方互換
-  localStorage.setItem("audioVisualizerPlaylist", JSON.stringify(playlistData));
 }
 
 function loadLibraryFromStorage() {
@@ -1986,8 +2006,7 @@ async function openNativeFilePicker() {
     return;
   }
 
-  const plugins = window.Capacitor?.Plugins;
-  const filePicker = plugins?.FilePicker;
+  const filePicker = getRegisteredNativePlugin("FilePicker");
 
   if (!filePicker || typeof filePicker.pickFiles !== "function") {
     alert(t("alert.filePickerMissing"));
@@ -2078,13 +2097,22 @@ async function openNativeFilePicker() {
 }
 
 async function openNativeFolderImport() {
+  if (isClearingLibrary) return;
+  const request = folderImportQueue.then(() => performNativeFolderImport());
+  folderImportQueue = request.catch(() => {});
+  return request;
+}
+
+/**
+ * Imports a selected Android folder while preserving unacknowledged results.
+ */
+async function performNativeFolderImport() {
   if (!isNativeCapacitor()) {
     showOverlay(t("overlay.androidOnly"));
     return;
   }
 
-  const plugins = window.Capacitor?.Plugins;
-  const folderImport = plugins?.LocalFolderImport;
+  const folderImport = getRegisteredNativePlugin("LocalFolderImport");
   if (!folderImport || typeof folderImport.pickAudioFolder !== "function") {
     // Fallback to file picker if plugin not available
     console.warn(
@@ -2095,6 +2123,15 @@ async function openNativeFolderImport() {
   }
 
   try {
+    if (typeof folderImport.getPendingImport === "function") {
+      const pending = await folderImport.getPendingImport();
+      if (pending?.importId) {
+        console.warn("A folder import result is still pending.");
+        showOverlay(t("overlay.fileSelectFailed"));
+        return;
+      }
+    }
+
     showOverlay(t("overlay.selectFolder"));
     const result = await folderImport.pickAudioFolder({});
     const files = Array.isArray(result?.files) ? result.files : [];
@@ -2119,38 +2156,18 @@ async function openNativeFolderImport() {
 
     showOverlay(t("overlay.importingFiles", { count: files.length }));
 
-    for (const f of files) {
-      const name = typeof f?.name === "string" ? f.name : "";
-      const path = typeof f?.path === "string" ? f.path : "";
-      if (!name || !path) continue;
-      const isVideo = !!f?.isVideo;
-      state.playlist.push({
-        name,
-        url: undefined, // URLは再生時に生成
-        source: "local",
-        isVideo,
-        localRef: `app:${path}`,
-        size: f?.size || 0,
-        addedOrder: state.addedOrderCounter++,
-      });
-      // 保存設定がONの場合のみライブラリに登録
-      if (state.settings.storeLocalFiles) {
-        upsertLibraryEntry({
-          ref: `app:${path}`,
-          type: "app",
-          name,
-          sizeBytes: f?.size || 0,
-          isVideo,
-        });
-      }
-    }
+    addImportedFolderFiles(files);
 
     renderPlaylist();
     if (state.currentIndex === -1) {
       const firstAddedIndex = Math.max(0, state.playlist.length - files.length);
       playTrack(firstAddedIndex);
     }
-    saveSettingsToStorage();
+    if (!saveSettingsToStorage()) {
+      showOverlay(t("overlay.fileSelectFailed"));
+      return;
+    }
+    await folderImport.acknowledgePendingImport({ importId: result.importId });
     setTimeout(
       () => showOverlay(t("overlay.filesAdded", { count: files.length })),
       500,
@@ -2167,6 +2184,55 @@ async function openNativeFolderImport() {
     );
     await openNativeFilePicker();
   }
+}
+
+function addImportedFolderFiles(files) {
+  for (const f of files) {
+    const name = typeof f?.name === "string" ? f.name : "";
+    const path = typeof f?.path === "string" ? f.path : "";
+    if (!name || !path) continue;
+    const localRef = `app:${path}`;
+    if (state.playlist.some((track) => track?.localRef === localRef)) continue;
+    const isVideo = !!f?.isVideo;
+    state.playlist.push({
+      name,
+      url: undefined,
+      source: "local",
+      isVideo,
+      localRef,
+      size: f?.size || 0,
+      addedOrder: state.addedOrderCounter++,
+    });
+    if (state.settings.storeLocalFiles) {
+      upsertLibraryEntry({
+        ref: localRef,
+        type: "app",
+        name,
+        sizeBytes: f?.size || 0,
+        isVideo,
+      });
+    }
+  }
+}
+
+/**
+ * Restores a folder import persisted by the native plugin after recreation.
+ */
+async function restorePendingFolderImport() {
+  const folderImport = getRegisteredNativePlugin("LocalFolderImport");
+  if (!folderImport || typeof folderImport.getPendingImport !== "function")
+    return;
+  const result = await folderImport.getPendingImport();
+  const files = Array.isArray(result?.files) ? result.files : [];
+  if (files.length === 0 || !result?.importId) return;
+
+  addImportedFolderFiles(files);
+  renderPlaylist();
+  if (!saveSettingsToStorage()) {
+    throw new Error("Failed to persist restored folder import");
+  }
+  await folderImport.acknowledgePendingImport({ importId: result.importId });
+  renderStorageList();
 }
 
 // ============== PLAYLIST PERSISTENCE (LocalStorage + IndexedDB) ==============
@@ -2286,7 +2352,7 @@ async function deleteAllLocalTrackStorage(tracks) {
 
   if (appPaths.length > 0 && isNativeCapacitor()) {
     try {
-      const folderImport = window.Capacitor?.Plugins?.LocalFolderImport;
+      const folderImport = getRegisteredNativePlugin("LocalFolderImport");
       if (
         folderImport &&
         typeof folderImport.deleteImportedFiles === "function"
@@ -3034,6 +3100,9 @@ function closeSettings() {
   const persistentControls = document.getElementById("persistentControls");
   if (persistentControls) persistentControls.style.display = "";
 }
+/**
+ * Persists settings and closes the settings dialog only after success.
+ */
 function saveSettings() {
   const langSelect = document.getElementById("langSelect");
   if (langSelect) {
@@ -3044,9 +3113,13 @@ function saveSettings() {
 
   updateLanguageUI(); // 保存時にも確実に反映
   loadDeveloperMessage();
-  saveSettingsToStorage();
+  if (!saveSettingsToStorage()) {
+    showOverlay(t("overlay.fileSelectFailed"));
+    return false;
+  }
   closeSettings();
   showOverlay(t("overlay.settingsSaved"));
+  return true;
 }
 
 function switchTab(tabId) {
@@ -3440,12 +3513,14 @@ async function enumerateMicDevices() {
   try {
     const devices = await navigator.mediaDevices.enumerateDevices();
     const mics = devices.filter((d) => d.kind === "audioinput");
-    els.micDeviceSelect.innerHTML = mics
-      .map(
-        (m) =>
-          `<option value="${m.deviceId}">${m.label || "マイク " + m.deviceId.slice(0, 5)}</option>`,
-      )
-      .join("");
+    const fragment = document.createDocumentFragment();
+    mics.forEach((m) => {
+      const option = document.createElement("option");
+      option.value = m.deviceId;
+      option.textContent = m.label || `マイク ${m.deviceId.slice(0, 5)}`;
+      fragment.appendChild(option);
+    });
+    els.micDeviceSelect.replaceChildren(fragment);
   } catch (e) {
     console.warn("Device enumeration failed", e);
   }
@@ -3880,36 +3955,72 @@ function renderPlaylist() {
     .filter((track) => track.name.toLowerCase().includes(query));
 
   if (state.playlist.length === 0) {
-    els.playlistItems.innerHTML = `<div class="playlist-empty">${t("playlist.empty")}</div>`;
+    const empty = document.createElement("div");
+    empty.className = "playlist-empty";
+    empty.textContent = t("playlist.empty");
+    els.playlistItems.replaceChildren(empty);
     return;
   }
 
   if (filtered.length === 0) {
-    els.playlistItems.innerHTML = `<div class="playlist-empty">${t("playlist.notFound")}</div>`;
+    const empty = document.createElement("div");
+    empty.className = "playlist-empty";
+    empty.textContent = t("playlist.notFound");
+    els.playlistItems.replaceChildren(empty);
     return;
   }
 
-  els.playlistItems.innerHTML = filtered
-    .map(
-      (track) => `
-        <div class="playlist-item ${track.originalIndex === state.currentIndex ? "active" : ""}" data-index="${track.originalIndex}" draggable="true">
-            <div class="drag-handle" title="ドラッグして移動">☰</div>
-            <div class="track-info">
-                <span class="name">${track.originalIndex + 1}. ${track.name}</span>
-            </div>
-            <div class="item-actions">
-                <button class="move-btn up" data-index="${track.originalIndex}" title="上に移動">▲</button>
-                <button class="move-btn down" data-index="${track.originalIndex}" title="下に移動">▼</button>
-                <button class="remove-btn" data-index="${track.originalIndex}" title="削除">✖</button>
-            </div>
-        </div>
-    `,
-    )
-    .join("");
+  const fragment = document.createDocumentFragment();
+  filtered.forEach((track) => {
+    const item = document.createElement("div");
+    item.className = `playlist-item${track.originalIndex === state.currentIndex ? " active" : ""}`;
+    item.dataset.index = String(track.originalIndex);
+    item.draggable = true;
+
+    const dragHandle = document.createElement("div");
+    dragHandle.className = "drag-handle";
+    dragHandle.title = "ドラッグして移動";
+    dragHandle.textContent = "☰";
+
+    const trackInfo = document.createElement("div");
+    trackInfo.className = "track-info";
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = `${track.originalIndex + 1}. ${track.name}`;
+    trackInfo.appendChild(name);
+
+    const actions = document.createElement("div");
+    actions.className = "item-actions";
+    for (const [className, title, text] of [
+      ["move-btn up", "上に移動", "▲"],
+      ["move-btn down", "下に移動", "▼"],
+      ["remove-btn", "削除", "✖"],
+    ]) {
+      const button = document.createElement("button");
+      button.className = className;
+      button.dataset.index = String(track.originalIndex);
+      button.title = title;
+      button.textContent = text;
+      actions.appendChild(button);
+    }
+
+    item.append(dragHandle, trackInfo, actions);
+    fragment.appendChild(item);
+  });
+  els.playlistItems.replaceChildren(fragment);
 
   // ドラッグ&ドロップ処理
   setupPlaylistDragDrop();
   updatePlaylistCount();
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function removeTracksByLocalRefs(refs) {
@@ -3957,7 +4068,7 @@ async function deleteLibraryEntry(ref) {
     if (ref.startsWith("idb:")) {
       await idbDeleteLocalFile(ref.slice("idb:".length));
     } else if (ref.startsWith("app:") && isNativeCapacitor()) {
-      const folderImport = window.Capacitor?.Plugins?.LocalFolderImport;
+      const folderImport = getRegisteredNativePlugin("LocalFolderImport");
       if (
         folderImport &&
         typeof folderImport.deleteImportedFiles === "function"
@@ -3975,15 +4086,21 @@ async function deleteLibraryEntry(ref) {
 }
 
 async function deleteAllLibraryEntries() {
-  const refs = Object.keys(library);
-  if (refs.length === 0) {
+  if (Object.keys(library).length === 0) {
     showOverlay(t("overlay.deleteNone"));
     return;
   }
   const ok = confirm(t("confirm.deleteStoredFiles"));
   if (!ok) return;
-  for (const ref of refs) {
-    await deleteLibraryEntry(ref);
+  isClearingLibrary = true;
+  try {
+    await folderImportQueue;
+    const refs = Object.keys(library);
+    for (const ref of refs) {
+      await deleteLibraryEntry(ref);
+    }
+  } finally {
+    isClearingLibrary = false;
   }
   showOverlay(t("overlay.allDeleted"));
   renderStorageList();
@@ -3993,39 +4110,61 @@ function renderStorageList() {
   if (!els.storageList) return;
   const refs = Object.keys(library);
   if (refs.length === 0) {
-    els.storageList.innerHTML = `<div class="hint">${t("storage.empty")}</div>`;
+    const empty = document.createElement("div");
+    empty.className = "hint";
+    empty.textContent = t("storage.empty");
+    els.storageList.replaceChildren(empty);
     if (els.storageSummary) els.storageSummary.textContent = "";
     return;
   }
-  const rows = refs
-    .map((ref) => {
-      const item = library[ref] || {};
-      const size = item.sizeBytes ? formatBytes(item.sizeBytes) : "不明";
-      const typeLabel = item.type === "app" ? "端末" : "内部";
-      return `
-            <div class="storage-item" data-ref="${ref}" style="padding: 6px 8px; gap: 8px;">
-                <div class="storage-meta" style="flex: 1; min-width: 0;">
-                    <strong style="display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.85rem;">${item.name || ref}</strong>
-                    <span class="hint" style="font-size: 0.7rem;">${typeLabel} | ${size}</span>
-                </div>
-                <button class="icon-btn danger" data-delete="${ref}" style="width: 32px; height: 32px; font-size: 0.9rem; flex-shrink: 0;">🗑️</button>
-            </div>`;
-    })
-    .join("");
-  els.storageList.innerHTML = rows;
-  els.storageList.querySelectorAll("button[data-delete]").forEach((btn) => {
-    btn.onclick = () => deleteLibraryEntry(btn.dataset.delete);
+  const fragment = document.createDocumentFragment();
+  refs.forEach((ref) => {
+    const item = library[ref] || {};
+    const size = item.sizeBytes ? formatBytes(item.sizeBytes) : "不明";
+    const typeLabel = item.type === "app" ? "端末" : "内部";
+    const row = document.createElement("div");
+    row.className = "storage-item";
+    row.dataset.ref = ref;
+    row.style.cssText = "padding: 6px 8px; gap: 8px;";
+
+    const meta = document.createElement("div");
+    meta.className = "storage-meta";
+    meta.style.cssText = "flex: 1; min-width: 0;";
+    const name = document.createElement("strong");
+    name.textContent = item.name || ref;
+    name.style.cssText =
+      "display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.85rem;";
+    const details = document.createElement("span");
+    details.className = "hint";
+    details.textContent = `${typeLabel} | ${size}`;
+    details.style.fontSize = "0.7rem";
+    meta.append(name, details);
+
+    const button = document.createElement("button");
+    button.className = "icon-btn danger";
+    button.dataset.delete = ref;
+    button.textContent = "🗑️";
+    button.style.cssText =
+      "width: 32px; height: 32px; font-size: 0.9rem; flex-shrink: 0;";
+    button.onclick = () => deleteLibraryEntry(ref);
+    row.append(meta, button);
+    fragment.appendChild(row);
   });
+  els.storageList.replaceChildren(fragment);
   if (els.storageSummary) {
     const totalBytes = refs.reduce(
       (s, r) => s + (library[r]?.sizeBytes || 0),
       0,
     );
-    els.storageSummary.innerHTML = `
-            <div style="display: flex; justify-content: space-between; font-weight: 600; margin-top: 8px; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 8px; font-size: 0.85rem;">
-                <span>計 ${refs.length} 件</span>
-                <span>合計: ${totalBytes ? formatBytes(totalBytes) : "0B"}</span>
-            </div>`;
+    const summary = document.createElement("div");
+    summary.style.cssText =
+      "display: flex; justify-content: space-between; font-weight: 600; margin-top: 8px; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 8px; font-size: 0.85rem;";
+    const count = document.createElement("span");
+    count.textContent = `計 ${refs.length} 件`;
+    const total = document.createElement("span");
+    total.textContent = `合計: ${totalBytes ? formatBytes(totalBytes) : "0B"}`;
+    summary.append(count, total);
+    els.storageSummary.replaceChildren(summary);
   }
 }
 
@@ -4325,7 +4464,7 @@ async function removeFromPlaylist(index) {
       isNativeCapacitor()
     ) {
       try {
-        const folderImport = window.Capacitor?.Plugins?.LocalFolderImport;
+        const folderImport = getRegisteredNativePlugin("LocalFolderImport");
         if (
           folderImport &&
           typeof folderImport.deleteImportedFiles === "function"

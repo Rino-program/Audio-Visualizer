@@ -17,14 +17,17 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
-@CapacitorPlugin(name = "LocalFolderImport")
+@CapacitorPlugin(name = "LocalFolderImport", requestCodes = { 9101 })
 public class LocalFolderImportPlugin extends Plugin {
     private static final Set<String> ALLOWED_EXT = new HashSet<>(Arrays.asList(
             "mp3", "wav", "m4a", "aac", "mp4", "webm", "mkv", "mov", "ogg", "flac", "opus"
@@ -37,7 +40,9 @@ public class LocalFolderImportPlugin extends Plugin {
     private static final int DEFAULT_MAX_FILES = 2000;
 
     private static final int REQUEST_CODE_PICK_DIRECTORY = 9101;
+    private static final String PENDING_IMPORT_FILE = "pending-folder-import.json";
     private PluginCall pendingPickCall;
+    private final ExecutorService importExecutor = Executors.newSingleThreadExecutor();
 
     @PluginMethod
     public void pickAudioFolder(PluginCall call) {
@@ -88,6 +93,17 @@ public class LocalFolderImportPlugin extends Plugin {
             // ignore
         }
 
+        final int selectedMaxFiles = maxFiles;
+        importExecutor.execute(() -> importTree(call, treeUri, selectedMaxFiles));
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        importExecutor.shutdownNow();
+        super.handleOnDestroy();
+    }
+
+    private void importTree(PluginCall call, Uri treeUri, int maxFiles) {
         JSArray out = new JSArray();
         int scanned = 0;
 
@@ -190,7 +206,83 @@ public class LocalFolderImportPlugin extends Plugin {
         JSObject ret = new JSObject();
         ret.put("files", out);
         ret.put("scanned", scanned);
+        ret.put("importId", UUID.randomUUID().toString());
+        if (!savePendingImport(ret)) {
+            deleteImportedResultFiles(out);
+            call.reject("Failed to save folder import result");
+            return;
+        }
         call.resolve(ret);
+    }
+
+    private void deleteImportedResultFiles(JSArray files) {
+        File importDir = new File(getContext().getFilesDir(), "imported");
+        try {
+            String base = importDir.getCanonicalPath();
+            for (int i = 0; i < files.length(); i++) {
+                try {
+                    String path = files.getJSONObject(i).getString("path");
+                    if (path == null) continue;
+                    File file = new File(path);
+                    String canonical = file.getCanonicalPath();
+                    if (canonical.startsWith(base + File.separator)) {
+                        file.delete();
+                    }
+                } catch (Exception ignored) {
+                    // Ignore cleanup failures and preserve the original rejection.
+                }
+            }
+        } catch (Exception ignored) {
+            // Ignore cleanup failures and preserve the original rejection.
+        }
+    }
+
+    /**
+     * Returns an import result left pending by a previous Activity instance.
+     */
+    @PluginMethod
+    public void getPendingImport(PluginCall call) {
+        File pending = new File(getContext().getFilesDir(), PENDING_IMPORT_FILE);
+        if (!pending.isFile()) {
+            call.resolve(new JSObject());
+            return;
+        }
+        try {
+            byte[] data = java.nio.file.Files.readAllBytes(pending.toPath());
+            call.resolve(new JSObject(new String(data, StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            call.reject("Failed to read pending folder import", e);
+        }
+    }
+
+    /**
+     * Removes the pending import after the JavaScript side has persisted it.
+     */
+    @PluginMethod
+    public void acknowledgePendingImport(PluginCall call) {
+        File pending = new File(getContext().getFilesDir(), PENDING_IMPORT_FILE);
+        if (pending.exists() && !pending.delete()) {
+            call.reject("Failed to remove pending folder import");
+            return;
+        }
+        call.resolve();
+    }
+
+    private boolean savePendingImport(JSObject result) {
+        File pending = new File(getContext().getFilesDir(), PENDING_IMPORT_FILE);
+        File temporary = new File(pending.getPath() + ".tmp");
+        try (FileOutputStream out = new FileOutputStream(temporary)) {
+            out.write(result.toString().getBytes(StandardCharsets.UTF_8));
+            out.flush();
+            if (!temporary.renameTo(pending)) {
+                temporary.delete();
+                return false;
+            }
+            return true;
+        } catch (Exception e) {
+            temporary.delete();
+            return false;
+        }
     }
 
     @PluginMethod
@@ -226,7 +318,7 @@ public class LocalFolderImportPlugin extends Plugin {
             try {
                 File f = new File(p);
                 String canon = f.getCanonicalPath();
-                if (!canon.startsWith(base)) continue;
+                if (!canon.equals(base) && !canon.startsWith(base + File.separator)) continue;
                 if (f.exists() && f.isFile() && f.delete()) deleted++;
             } catch (Exception ignored) {
                 // ignore

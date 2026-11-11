@@ -1,0 +1,8 @@
+Main updates in v1.1.3:
+
+- Updated to Capacitor 8.5.3 and Android SDK 36
+- Improved folder-import stability and recovery
+- Improved DOM safety and persistence error handling
+- Clarified build and signing instructions
+
+Full changelog: https://github.com/Rino-program/Audio-Visualizer/blob/main/changelog_MD/en-US/16.txt

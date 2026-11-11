@@ -1,13 +1,15 @@
 {
   "name": "audio-visualizer-android",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "description": "Audio Visualizer - Android APK版",
   "main": "index.js",
   "scripts": {
     "dev": "npx cap open android",
     "sync": "npx cap sync",
     "build": "npx cap sync && cd android && gradlew.bat assembleDebug",
-    "build-release": "npx cap sync && cd android && gradlew.bat assembleRelease"
+    "build:unix": "npx cap sync && cd android && ./gradlew assembleDebug",
+    "build-release": "npx cap sync && cd android && gradlew.bat assembleRelease",
+    "build-release:unix": "npx cap sync && cd android && ./gradlew assembleRelease"
   },
   "keywords": [
     "audio",
@@ -18,11 +20,14 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@capacitor/cli": "^8.4.1"
+    "@capacitor/cli": "8.5.3"
   },
   "dependencies": {
-    "@capacitor/core": "^6.1.0",
-    "@capacitor/android": "^6.2.2",
-    "@capawesome/capacitor-file-picker": "^6.0.1"
+    "@capacitor/android": "8.5.3",
+    "@capacitor/core": "8.5.3",
+    "@capawesome/capacitor-file-picker": "^8.1.1"
+  },
+  "overrides": {
+    "xcode": "4.0.0"
   }
 }

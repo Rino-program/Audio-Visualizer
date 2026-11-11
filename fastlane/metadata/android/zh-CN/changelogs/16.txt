@@ -1,0 +1,8 @@
+v1.1.3 主要更新：
+
+- 更新至 Capacitor 8.5.3 和 Android SDK 36
+- 改进文件夹导入的稳定性和恢复能力
+- 改进 DOM 安全性和保存失败处理
+- 完善构建与签名说明
+
+完整更新日志：https://github.com/Rino-program/Audio-Visualizer/blob/main/changelog_MD/zh-CN/16.txt

@@ -12,9 +12,9 @@ import androidx.core.view.WindowInsetsControllerCompat;
 public class MainActivity extends BridgeActivity {
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
+		registerPlugin(LocalFolderImportPlugin.class);
 		super.onCreate(savedInstanceState);
 		applyImmersiveFullscreen();
-		registerPlugin(LocalFolderImportPlugin.class);
 		
 		// WebView設定: バックグラウンド音声再生を有効化
 		WebView webView = getBridge().getWebView();
