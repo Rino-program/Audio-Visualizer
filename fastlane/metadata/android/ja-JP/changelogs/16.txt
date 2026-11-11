@@ -1,0 +1,8 @@
+v1.1.3の主な更新:
+
+- Capacitor 8.5.3、Android SDK 36へ更新
+- フォルダー取り込みの安定性・復元性を改善
+- DOM生成の安全性と保存失敗時の処理を改善
+- ビルド手順と署名設定を整理
+
+変更点の全文: https://github.com/Rino-program/Audio-Visualizer/blob/main/changelog_MD/ja-JP/16.txt

@@ -1,0 +1,39 @@
+# v1.1.3 Changelog
+
+## Android and Capacitor platform
+
+- Updated Capacitor CLI, Core, and Android to 8.5.3.
+- Updated the Android minimum SDK to 24 and the compile and target SDKs to 36.
+- Updated AndroidX Activity, Core, Fragment, WebKit, and related dependencies for Capacitor 8.
+- Configured Android builds to use Java 21.
+- Documented Node.js 22 or later and JDK 21 as required build environments.
+- Set the Gradle wrapper executable bit in Git.
+- Updated npm dependencies and resolved the reported `npm audit` vulnerabilities.
+
+## File importing
+
+- Moved Android folder imports to a dedicated background executor.
+- Prevented large folder imports from occupying the shared task queue for an extended time.
+- Persisted pending import results so they can be restored after Activity recreation or destruction.
+- Acknowledge native import results only after the playlist has been persisted, preserving file references when saving fails.
+- Prevented a new import from overwriting an existing pending result.
+- Delete only files created by the current import when pending-result persistence fails.
+- Kept imported-file deletion inside the app's import directory.
+- Prevented races between multiple imports and delete-all operations.
+
+## Security and stability
+
+- Secured DOM generation for playlist, storage, and microphone-device lists.
+- Prevented user-controlled file names and paths from being interpreted as HTML.
+- Detect settings and playlist persistence failures and keep the settings dialog open while reporting the error.
+- Continue application initialization when pending-import restoration fails.
+- Use Capacitor 8 `registerPlugin` to access native plugins.
+- Registered the Activity result code for the folder-picker plugin.
+
+## CI and documentation
+
+- Reduced unnecessary GitHub Actions permissions.
+- Pinned the PR Agent Action to a commit SHA.
+- Documented Android build commands, signing configuration, and unsigned APK behavior.
+- Added a `keystore.properties` example and documented the base directory for `storeFile`.
+- Clarified Android debug and release APK build procedures.

@@ -1,0 +1,39 @@
+# v1.1.3 更新日志
+
+## Android 与 Capacitor 平台
+
+- 将 Capacitor CLI、Core 和 Android 更新至 8.5.3。
+- 将 Android 最低 SDK 更新为 24，并将 compile SDK 和 target SDK 更新为 36。
+- 根据 Capacitor 8 更新 AndroidX Activity、Core、Fragment、WebKit 及相关依赖。
+- 配置 Android 构建使用 Java 21。
+- 明确要求使用 Node.js 22 或更高版本以及 JDK 21 作为构建环境。
+- 在 Git 中设置 Gradle wrapper 的可执行权限。
+- 更新 npm 依赖并修复 `npm audit` 报告的漏洞。
+
+## 文件导入
+
+- 使用专用后台执行器处理 Android 文件夹导入。
+- 避免大型文件夹导入长时间占用共享任务队列。
+- 持久化未完成配送的导入结果，以便在 Activity 重建或销毁后恢复。
+- 仅在播放列表成功持久化后确认原生导入结果，保存失败时保留文件引用。
+- 防止新的导入覆盖已有的待处理结果。
+- 待处理结果保存失败时，只删除本次导入创建的文件。
+- 将已导入文件的删除限制在应用的导入目录内。
+- 防止多个导入操作与全部删除操作之间发生竞态。
+
+## 安全性与稳定性
+
+- 加固播放列表、存储列表和麦克风设备列表的 DOM 生成。
+- 防止用户控制的文件名和路径被当作 HTML 解析。
+- 检测设置和播放列表保存失败，并在报告错误时保持设置界面打开。
+- 待处理导入恢复失败时仍继续完成应用初始化。
+- 使用 Capacitor 8 的 `registerPlugin` 获取原生插件。
+- 为文件夹选择插件注册 Activity 结果代码。
+
+## CI 与文档
+
+- 减少 GitHub Actions 不必要的权限。
+- 将 PR Agent Action 固定到指定提交 SHA。
+- 补充 Android 构建命令、签名配置和未签名 APK 的说明。
+- 添加 `keystore.properties` 示例，并说明 `storeFile` 的基准目录。
+- 明确 Android debug 和 release APK 的构建步骤。
