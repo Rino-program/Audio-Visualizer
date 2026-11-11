@@ -2188,7 +2188,8 @@ function addImportedFolderFiles(files) {
 
 async function restorePendingFolderImport() {
   const folderImport = getRegisteredNativePlugin("LocalFolderImport");
-  if (!folderImport || typeof folderImport.getPendingImport !== "function") return;
+  if (!folderImport || typeof folderImport.getPendingImport !== "function")
+    return;
   const result = await folderImport.getPendingImport();
   const files = Array.isArray(result?.files) ? result.files : [];
   if (files.length === 0 || !result?.importId) return;
