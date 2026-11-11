@@ -1856,34 +1856,34 @@ function saveSettingsToStorage() {
     // プレイリスト情報（ローカルは参照キー(localRef)を保存、URLなし）
     const playlistData = state.playlist
       .map((track) => {
-      // storeLocalFilesがOFFの場合：
-      // - uri:形式は一時的な権限なので保存しない（再起動後アクセス不可）
-      // - app:形式（コピー済み）とpath:形式（永続パス）のみ保存可能
-      if (track.source === "local" && !state.settings.storeLocalFiles) {
-        // app:とpath:以外は保存しない
-        if (
-          !track.localRef?.startsWith("app:") &&
-          !track.localRef?.startsWith("path:")
-        ) {
-          return null;
+        // storeLocalFilesがOFFの場合：
+        // - uri:形式は一時的な権限なので保存しない（再起動後アクセス不可）
+        // - app:形式（コピー済み）とpath:形式（永続パス）のみ保存可能
+        if (track.source === "local" && !state.settings.storeLocalFiles) {
+          // app:とpath:以外は保存しない
+          if (
+            !track.localRef?.startsWith("app:") &&
+            !track.localRef?.startsWith("path:")
+          ) {
+            return null;
+          }
         }
-      }
-      // storeLocalFilesがONの場合：idb:形式以外は保存しない（uri:は永続権限がない）
-      if (track.source === "local" && state.settings.storeLocalFiles) {
-        if (
-          !track.localRef?.startsWith("idb:") &&
-          !track.localRef?.startsWith("app:") &&
-          !track.localRef?.startsWith("path:")
-        ) {
-          return null;
+        // storeLocalFilesがONの場合：idb:形式以外は保存しない（uri:は永続権限がない）
+        if (track.source === "local" && state.settings.storeLocalFiles) {
+          if (
+            !track.localRef?.startsWith("idb:") &&
+            !track.localRef?.startsWith("app:") &&
+            !track.localRef?.startsWith("path:")
+          ) {
+            return null;
+          }
         }
-      }
-      return {
-        name: track.name,
-        source: track.source,
-        isVideo: track.isVideo,
-        localRef: track.localRef || null,
-      };
+        return {
+          name: track.name,
+          source: track.source,
+          isVideo: track.isVideo,
+          localRef: track.localRef || null,
+        };
       })
       .filter(Boolean);
     localStorage.setItem(
@@ -1891,7 +1891,10 @@ function saveSettingsToStorage() {
       JSON.stringify(playlistData),
     );
     // 後方互換
-    localStorage.setItem("audioVisualizerPlaylist", JSON.stringify(playlistData));
+    localStorage.setItem(
+      "audioVisualizerPlaylist",
+      JSON.stringify(playlistData),
+    );
     return true;
   } catch (error) {
     console.error("Playlist settings save failed:", error);
