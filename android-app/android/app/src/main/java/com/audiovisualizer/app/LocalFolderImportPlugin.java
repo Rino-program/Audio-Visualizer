@@ -208,12 +208,38 @@ public class LocalFolderImportPlugin extends Plugin {
         ret.put("scanned", scanned);
         ret.put("importId", UUID.randomUUID().toString());
         if (!savePendingImport(ret)) {
+            deleteImportedResultFiles(out);
             call.reject("Failed to save folder import result");
             return;
         }
         call.resolve(ret);
     }
 
+    private void deleteImportedResultFiles(JSArray files) {
+        File importDir = new File(getContext().getFilesDir(), "imported");
+        try {
+            String base = importDir.getCanonicalPath();
+            for (int i = 0; i < files.length(); i++) {
+                try {
+                    String path = files.getJSONObject(i).getString("path");
+                    if (path == null) continue;
+                    File file = new File(path);
+                    String canonical = file.getCanonicalPath();
+                    if (canonical.startsWith(base + File.separator)) {
+                        file.delete();
+                    }
+                } catch (Exception ignored) {
+                    // Ignore cleanup failures and preserve the original rejection.
+                }
+            }
+        } catch (Exception ignored) {
+            // Ignore cleanup failures and preserve the original rejection.
+        }
+    }
+
+    /**
+     * Returns an import result left pending by a previous Activity instance.
+     */
     @PluginMethod
     public void getPendingImport(PluginCall call) {
         File pending = new File(getContext().getFilesDir(), PENDING_IMPORT_FILE);
@@ -229,6 +255,9 @@ public class LocalFolderImportPlugin extends Plugin {
         }
     }
 
+    /**
+     * Removes the pending import after the JavaScript side has persisted it.
+     */
     @PluginMethod
     public void acknowledgePendingImport(PluginCall call) {
         File pending = new File(getContext().getFilesDir(), PENDING_IMPORT_FILE);

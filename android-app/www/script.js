@@ -861,7 +861,12 @@ async function init() {
   loadDeveloperMessage();
   library = loadLibraryFromStorage();
   await loadPlaylistFromStorage();
-  await restorePendingFolderImport();
+  try {
+    await restorePendingFolderImport();
+  } catch (error) {
+    console.error("Pending folder import restore failed:", error);
+    showOverlay(t("overlay.fileSelectFailed"));
+  }
   rebuildLibraryFromPlaylist();
   renderStorageList();
 
@@ -1841,15 +1846,16 @@ function loadSettings() {
 }
 
 function saveSettingsToStorage() {
-  if (state.settings.persistSettings) {
-    localStorage.setItem(
-      "audioVisualizerSettingsV7",
-      JSON.stringify(state.settings),
-    );
-  }
-  // プレイリスト情報（ローカルは参照キー(localRef)を保存、URLなし）
-  const playlistData = state.playlist
-    .map((track) => {
+  try {
+    if (state.settings.persistSettings) {
+      localStorage.setItem(
+        "audioVisualizerSettingsV7",
+        JSON.stringify(state.settings),
+      );
+    }
+    // プレイリスト情報（ローカルは参照キー(localRef)を保存、URLなし）
+    const playlistData = state.playlist
+      .map((track) => {
       // storeLocalFilesがOFFの場合：
       // - uri:形式は一時的な権限なので保存しない（再起動後アクセス不可）
       // - app:形式（コピー済み）とpath:形式（永続パス）のみ保存可能
@@ -1878,14 +1884,19 @@ function saveSettingsToStorage() {
         isVideo: track.isVideo,
         localRef: track.localRef || null,
       };
-    })
-    .filter(Boolean);
-  localStorage.setItem(
-    "audioVisualizerPlaylistV7",
-    JSON.stringify(playlistData),
-  );
-  // 後方互換
-  localStorage.setItem("audioVisualizerPlaylist", JSON.stringify(playlistData));
+      })
+      .filter(Boolean);
+    localStorage.setItem(
+      "audioVisualizerPlaylistV7",
+      JSON.stringify(playlistData),
+    );
+    // 後方互換
+    localStorage.setItem("audioVisualizerPlaylist", JSON.stringify(playlistData));
+    return true;
+  } catch (error) {
+    console.error("Playlist settings save failed:", error);
+    return false;
+  }
 }
 
 function loadLibraryFromStorage() {
@@ -2131,14 +2142,17 @@ async function performNativeFolderImport() {
     showOverlay(t("overlay.importingFiles", { count: files.length }));
 
     addImportedFolderFiles(files);
-    await folderImport.acknowledgePendingImport({ importId: result.importId });
 
     renderPlaylist();
     if (state.currentIndex === -1) {
       const firstAddedIndex = Math.max(0, state.playlist.length - files.length);
       playTrack(firstAddedIndex);
     }
-    saveSettingsToStorage();
+    if (!saveSettingsToStorage()) {
+      showOverlay(t("overlay.fileSelectFailed"));
+      return;
+    }
+    await folderImport.acknowledgePendingImport({ importId: result.importId });
     setTimeout(
       () => showOverlay(t("overlay.filesAdded", { count: files.length })),
       500,
@@ -2195,9 +2209,11 @@ async function restorePendingFolderImport() {
   if (files.length === 0 || !result?.importId) return;
 
   addImportedFolderFiles(files);
-  await folderImport.acknowledgePendingImport({ importId: result.importId });
   renderPlaylist();
-  saveSettingsToStorage();
+  if (!saveSettingsToStorage()) {
+    throw new Error("Failed to persist restored folder import");
+  }
+  await folderImport.acknowledgePendingImport({ importId: result.importId });
   renderStorageList();
 }
 
