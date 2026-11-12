@@ -10,12 +10,12 @@ Pro code and does not replace these third-party licenses.
 
 ## Runtime JavaScript components
 
-| Component | Version | License | Copyright / attribution |
-| --- | --- | --- | --- |
-| `@capacitor/android` | 8.5.3 | MIT | Drifty Co. |
-| `@capacitor/core` | 8.5.3 | MIT | Drifty Co. |
-| `@capawesome/capacitor-file-picker` | 8.1.1 | MIT | Robin Genz |
-| `tslib` | 2.8.1 | 0BSD | Microsoft Corporation |
+| Component                           | Version | License | Copyright / attribution |
+| ----------------------------------- | ------- | ------- | ----------------------- |
+| `@capacitor/android`                | 8.5.3   | MIT     | Drifty Co.              |
+| `@capacitor/core`                   | 8.5.3   | MIT     | Drifty Co.              |
+| `@capawesome/capacitor-file-picker` | 8.1.1   | MIT     | Robin Genz              |
+| `tslib`                             | 2.8.1   | 0BSD    | Microsoft Corporation   |
 
 `@capacitor/cli` and its dependencies are development-only dependencies and
 are not included in the Android runtime APK.
@@ -41,10 +41,10 @@ corresponding upstream artifact when its distribution supplies one.
 
 ## Fonts
 
-| Font | Version from embedded metadata | License | Copyright / attribution |
-| --- | --- | --- | --- |
-| Inter Variable | 4.001; git-66647c0bb | SIL Open Font License 1.1 | Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter) |
-| Roboto Mono Variable | 3.001 | SIL Open Font License 1.1 | Copyright 2015 The Roboto Mono Project Authors (https://github.com/googlefonts/robotomono) |
+| Font                 | Version from embedded metadata | License                   | Copyright / attribution                                                                    |
+| -------------------- | ------------------------------ | ------------------------- | ------------------------------------------------------------------------------------------ |
+| Inter Variable       | 4.001; git-66647c0bb           | SIL Open Font License 1.1 | Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter)                   |
+| Roboto Mono Variable | 3.001                          | SIL Open Font License 1.1 | Copyright 2015 The Roboto Mono Project Authors (https://github.com/googlefonts/robotomono) |
 
 The font files were inspected directly. No modification was made to either
 font. Reserved Font Names are not specified in the copied upstream license

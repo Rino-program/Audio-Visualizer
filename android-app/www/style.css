@@ -230,7 +230,9 @@ body.drag-over::after {
   border: 1px solid var(--glass-border);
   background: rgba(0, 0, 0, 0.25);
   color: var(--text-muted);
-  font: 0.7rem/1.35 "Roboto Mono", monospace;
+  font:
+    0.7rem/1.35 "Roboto Mono",
+    monospace;
   white-space: pre-wrap;
   user-select: text;
 }
