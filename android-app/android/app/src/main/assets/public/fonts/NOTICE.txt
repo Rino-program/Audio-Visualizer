@@ -1,0 +1,9 @@
+Bundled fonts:
+- Inter-Variable.ttf
+  Copyright 2020 The Inter Project Authors
+- RobotoMono-Variable.ttf
+  Copyright 2015 The Roboto Mono Project Authors
+
+Source: Google Fonts
+License: SIL Open Font License 1.1
+Full license texts: OFL-Inter.txt and OFL-RobotoMono.txt

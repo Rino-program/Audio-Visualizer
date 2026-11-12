@@ -52,7 +52,7 @@ FONTS
 ======
 
 Inter Variable
-Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter)
+Copyright 2020 The Inter Project Authors (https://github.com/rsms/inter)
 Embedded font metadata version: 4.001;git-66647c0bb
 License: SIL Open Font License, Version 1.1
 
@@ -71,6 +71,16 @@ audio-visualizer-icon-btn240.png were generated from SVG artwork requested
 from GitHub Copilot, according to the developer. No external source or
 third-party copyright holder was identified. GitHub Copilot is not asserted
 as a copyright holder.
+
+
+APACHE CORDOVA NOTICE
+=====================
+
+Apache Cordova
+Copyright 2015-2020 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
 
 
 MIT LICENSE - DRIFTY CO.
