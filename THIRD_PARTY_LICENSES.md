@@ -1,6 +1,6 @@
 # Third-party licenses
 
-This file lists third-party components included in Audio Visualizer Pro v1.1.3.
+This file lists third-party components included in Audio Visualizer.
 The complete license texts are distributed with the Android web assets at
 [`android-app/www/licenses/THIRD_PARTY_LICENSES.txt`](android-app/www/licenses/THIRD_PARTY_LICENSES.txt)
 and are shown in the app's Developer tab.

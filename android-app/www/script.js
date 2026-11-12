@@ -1,5 +1,5 @@
 /**
- * Audio Visualizer Pro V7
+ * Audio Visualizer JS
  * - Removed YouTube
  * - Improved Input Source Switching (File / Mic)
  * - Microphone Device Selection
