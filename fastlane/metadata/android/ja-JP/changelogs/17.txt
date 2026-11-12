@@ -1,0 +1,8 @@
+v1.1.3の主な更新:
+
+- 第三者ライセンス情報を整理し、アプリ内で確認できるように改善
+- Android Gradle依存関係にLicenseeによるライセンス検査を追加
+- npm本番依存関係のライセンスレポートを追加
+- ライセンス検査コマンドと文書をREADMEに追加
+
+変更点の全文: https://github.com/Rino-program/Audio-Visualizer/blob/main/changelog_MD/ja-JP/17.md

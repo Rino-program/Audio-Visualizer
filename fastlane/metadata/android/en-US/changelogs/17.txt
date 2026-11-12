@@ -1,0 +1,8 @@
+Main updates in v1.1.3:
+
+- Organized third-party license information and made it available in the app
+- Added Licensee validation for Android Gradle dependencies
+- Added license reporting for production npm dependencies
+- Added license check commands and documentation to the README
+
+Full changelog: https://github.com/Rino-program/Audio-Visualizer/blob/main/changelog_MD/en-US/17.md

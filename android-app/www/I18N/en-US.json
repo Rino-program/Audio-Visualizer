@@ -209,5 +209,8 @@
   "label.glowToggle": "Enable Glow",
   "version.code": "Version Code",
   "overlay.fullscreenFailed": "Failed to enter fullscreen",
-  "label.showFullscreenBtn": "Show Fullscreen Button"
+  "label.showFullscreenBtn": "Show Fullscreen Button",
+  "licenses.title": "Open source licenses",
+  "licenses.description": "License information for third-party components included in this app.",
+  "licenses.loadFailed": "Failed to load third-party license information."
 }

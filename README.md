@@ -1,7 +1,7 @@
 # Audio Visualizer
 
 Android 向けのローカル再生オーディオビジュアライザーです。F-Droid 配布を前提に、外部サービスに依存しない構成へ整理しています。
-※このREADMEはv1.0.7時点での事が書いてあります。
+対応バージョン: v1.1.3（バージョンコード 16）
 
 ## 特徴
 
@@ -22,7 +22,7 @@ Android 向けのローカル再生オーディオビジュアライザーです
 
 必要な環境:
 
-- Node.js 22 以上（Capacitor CLI 8.5.1）
+- Node.js 22 以上（Capacitor CLI 8.5.3）
 - JDK 21（Androidビルド）
 
 ```bash
@@ -30,6 +30,27 @@ cd android-app
 npm ci
 npx cap sync
 ```
+
+### 第三者ライセンスの継続確認
+
+依存関係にライセンス情報がないものや、Android 側で許可していないライセンスが
+追加されていないかを確認するには、`android-app` で次を実行します。
+
+```bash
+npm run licenses:check
+```
+
+`licenses:npm` は本番依存（`dependencies`）とその推移依存のライセンス一覧を表示し、
+`licenses:npm:json` は機械処理用の JSON を表示します。
+`licenses:android` は Android の release 依存関係を Licensee で検証し、
+`android-app/android/app/build/reports/licensee/androidRelease/` にレポートを生成します。
+許可リストにないライセンス、または判定できないライセンスがある場合は、
+Android 側の検証が失敗します。
+
+自動レポートは確認の起点であり、最終的な利用者向け表示は
+[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) と
+[android-app/www/licenses/THIRD_PARTY_LICENSES.txt](android-app/www/licenses/THIRD_PARTY_LICENSES.txt)
+を人手で確認・更新してください。
 
 ## ビルド
 
@@ -70,6 +91,19 @@ macOS / Linux では `./gradlew assembleDebug` を使います。
 ## ライセンスとお願いについて
 
 本アプリはMITライセンスのもとで公開されているオープンソースソフトウェアです。どなたでも自由に利用、改変、再配布していただけます。
+
+アプリ本体のライセンスは [LICENSE](LICENSE) を参照してください。
+APKにもアプリ本体のMITライセンスを
+[android-app/www/licenses/LICENSE.txt](android-app/www/licenses/LICENSE.txt)
+として同梱しています。
+アプリに含まれる Capacitor、Capawesome File Picker、AndroidX、Cordova、
+Kotlin、フォントなどの第三者コンポーネントについては、
+[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) を参照してください。
+Android アプリ内の「開発者より」タブにも、同じライセンス本文を表示します。
+
+アプリのアイコン、スプラッシュ画像、ランチャー画像などは、開発者が
+GitHub Copilot に SVG として生成を依頼した artwork から作成したものです。
+確認できた範囲では外部素材の出所や特定第三者の著作権者はありません。
 
 ## 製作者からのお願い（任意）
 

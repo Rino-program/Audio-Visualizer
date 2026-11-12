@@ -1,0 +1,8 @@
+v1.1.3 主要更新：
+
+- 整理第三方许可证信息，并支持在应用内查看
+- 为 Android Gradle 依赖添加 Licensee 许可证检查
+- 添加生产环境 npm 依赖的许可证报告
+- 在 README 中添加许可证检查命令和相关文档
+
+完整更新日志：https://github.com/Rino-program/Audio-Visualizer/blob/main/changelog_MD/zh-CN/17.md

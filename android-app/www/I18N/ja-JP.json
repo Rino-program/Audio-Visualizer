@@ -222,5 +222,8 @@
   "label.glowToggle": "Glow（発光）を有効",
   "version.code": "バージョンコード",
   "overlay.fullscreenFailed": "全画面に失敗しました",
-  "label.showFullscreenBtn": "全画面ボタンを表示"
+  "label.showFullscreenBtn": "全画面ボタンを表示",
+  "licenses.title": "オープンソースライセンス",
+  "licenses.description": "このアプリに含まれる第三者コンポーネントのライセンス情報です。",
+  "licenses.loadFailed": "第三者ライセンス情報の読み込みに失敗しました。"
 }

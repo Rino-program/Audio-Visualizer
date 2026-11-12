@@ -3139,6 +3139,8 @@ function switchTab(tabId) {
     enumerateMicDevices();
   } else if (tabId === "storage") {
     renderStorageList();
+  } else if (tabId === "developer") {
+    loadOpenSourceLicenses();
   }
 }
 
@@ -3168,6 +3170,39 @@ async function loadDeveloperMessage() {
     if (contentEl) {
       contentEl.textContent = t("devMessage.loadFailed");
     }
+  }
+}
+
+let openSourceLicensesLoaded = false;
+
+async function loadOpenSourceLicenses() {
+  if (openSourceLicensesLoaded) return;
+
+  const contentEl = document.getElementById("openSourceLicenseContent");
+  if (!contentEl) return;
+
+  try {
+    const licensePaths = [
+      "./licenses/LICENSE.txt",
+      "./licenses/THIRD_PARTY_LICENSES.txt",
+    ];
+    const responses = await Promise.all(
+      licensePaths.map(async (path) => {
+        const response = await fetch(path);
+        if (!response.ok) {
+          throw new Error(`Failed to load license document: ${path}`);
+        }
+        return response.text();
+      }),
+    );
+
+    contentEl.textContent = responses.join(
+      "\n\n========================================\n\n",
+    );
+    openSourceLicensesLoaded = true;
+  } catch (error) {
+    console.error("Failed to load third-party licenses:", error);
+    contentEl.textContent = t("licenses.loadFailed");
   }
 }
 

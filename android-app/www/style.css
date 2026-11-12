@@ -208,6 +208,33 @@ body.drag-over::after {
   pointer-events: none;
 }
 
+.open-source-licenses {
+  margin: 14px 10px 0;
+  color: var(--text-muted);
+}
+
+.open-source-licenses summary {
+  color: var(--text-main);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.open-source-licenses p {
+  font-size: 0.8rem;
+}
+
+.open-source-licenses pre {
+  max-height: 45vh;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid var(--glass-border);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text-muted);
+  font: 0.7rem/1.35 "Roboto Mono", monospace;
+  white-space: pre-wrap;
+  user-select: text;
+}
+
 .video-controls {
   position: absolute;
   top: 0;

@@ -9,7 +9,13 @@
     "build": "npx cap sync && cd android && gradlew.bat assembleDebug",
     "build:unix": "npx cap sync && cd android && ./gradlew assembleDebug",
     "build-release": "npx cap sync && cd android && gradlew.bat assembleRelease",
-    "build-release:unix": "npx cap sync && cd android && ./gradlew assembleRelease"
+    "build-release:unix": "npx cap sync && cd android && ./gradlew assembleRelease",
+    "licenses:npm": "license-report-recursive --recurse --only=prod --output=table",
+    "licenses:npm:json": "license-report-recursive --recurse --only=prod --output=json",
+    "licenses:android": "cd android && gradlew.bat :app:licenseeAndroidRelease",
+    "licenses:android:unix": "cd android && ./gradlew :app:licenseeAndroidRelease",
+    "licenses:check": "npm run licenses:npm && npm run licenses:android",
+    "licenses:check:unix": "npm run licenses:npm && npm run licenses:android:unix"
   },
   "keywords": [
     "audio",
@@ -20,7 +26,8 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@capacitor/cli": "8.5.3"
+    "@capacitor/cli": "8.5.3",
+    "license-report-recursive": "^6.8.6"
   },
   "dependencies": {
     "@capacitor/android": "8.5.3",

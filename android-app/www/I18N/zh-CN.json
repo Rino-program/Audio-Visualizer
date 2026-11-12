@@ -209,5 +209,8 @@
   "label.glowToggle": "启用发光 (Glow)",
   "version.code": "版本代码",
   "overlay.fullscreenFailed": "进入全屏失败",
-  "label.showFullscreenBtn": "显示全屏按钮"
+  "label.showFullscreenBtn": "显示全屏按钮",
+  "licenses.title": "开源许可证",
+  "licenses.description": "本应用中包含的第三方组件的许可证信息。",
+  "licenses.loadFailed": "第三方许可证信息加载失败。"
 }
