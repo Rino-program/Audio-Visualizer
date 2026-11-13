@@ -12,10 +12,10 @@
 
 The following versions of this project are currently supported with security updates.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 1.1.x   | :white_check_mark: |
-| 1.0.x   | :x:                |
+| Version  | Supported          |
+| -------- | ------------------ |
+| >= 1.1.4 | :white_check_mark: |
+| < 1.1.4  | :x:                |
 
 ### Reporting a Vulnerability
 
@@ -39,8 +39,8 @@ We will acknowledge your report as soon as possible and work on a fix. Thank you
 
 | バージョン | サポート状況       |
 | ---------- | ------------------ |
-| 1.1.x      | :white_check_mark: |
-| 1.0.x      | :x:                |
+| >= 1.1.4   | :white_check_mark: |
+| < 1.1.4    | :x:                |
 
 ### 脆弱性の報告方法
 
@@ -62,10 +62,10 @@ We will acknowledge your report as soon as possible and work on a fix. Thank you
 
 当前为以下版本提供安全更新。建议更新到最新版本。
 
-| 版本    | 支持状态           |
-| ------- | ------------------ |
-| 1.1.x   | :white_check_mark: |
-| 1.0.x   | :x:                |
+| 版本     | 支持状态           |
+| -------- | ------------------ |
+| >= 1.1.4 | :white_check_mark: |
+| < 1.1.4  | :x:                |
 
 ### 报告安全漏洞
 
@@ -87,10 +87,10 @@ We will acknowledge your report as soon as possible and work on a fix. Thank you
 
 현재 다음 버전에 대해 보안 업데이트를 제공하고 있습니다. 최신 버전으로의 업데이트를 권장합니다.
 
-| 버전    | 지원 상태          |
-| ------- | ------------------ |
-| 1.1.x   | :white_check_mark: |
-| 1.0.x   | :x:                |
+| 버전     | 지원 상태          |
+| -------- | ------------------ |
+| >= 1.1.4 | :white_check_mark: |
+| < 1.1.4  | :x:                |
 
 ### 취약점 보고 방법
 
