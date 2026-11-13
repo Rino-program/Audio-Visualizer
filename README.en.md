@@ -1,6 +1,6 @@
 # Audio Visualizer
 
-[日本語](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md)
+[日本語](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [한국어](README.ko-KR.md)
 
 An audio visualizer for local media playback on Android. Tailored for F-Droid distribution with no external service dependencies.
 Supported version: v1.1.4 (version code 17)

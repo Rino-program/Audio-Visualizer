@@ -154,6 +154,7 @@
   "overlay.languageChangedJa": "语言已切换为日语",
   "overlay.languageChangedEn": "语言已切换为英语",
   "overlay.languageChangedZh": "语言已切换为中文",
+  "overlay.languageChangedKo": "语言已切换为韩语",
   "confirm.resetAll": "要重置所有设置吗？",
   "confirm.clearPlaylist": "要清空播放列表吗？",
   "status.idle": "🎵 空闲中...",

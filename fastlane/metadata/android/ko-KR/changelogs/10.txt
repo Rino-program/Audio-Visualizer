@@ -1,0 +1,18 @@
+v1.0.10의 업데이트 내용은 다음과 같습니다.
+
+- 백그라운드 재생 수정
+    WebView, MediaSession, 알림 동기화를 개선하여 앱이 백그라운드로 전환되어도 재생이 지속되도록 수정했습니다.
+- 화면 회전 레이아웃 수정
+    가로/세로 전환 시 UI 및 Canvas 좌표를 재계산하여 좌측 쏠림이나 렌더링 위치 어긋남이 발생하지 않도록 수정했습니다.
+- Canvas 크기 어긋남 수정
+    작업 관리자 전환 시 Canvas 크기가 크게 어긋나던 오류를 수정했습니다.
+    3초마다 Canvas 크기를 재계산하도록 변경하여 화면 회전 시에도 올바른 크기로 렌더링되도록 강화했습니다.
+- 버전 표시 추가
+    설정 화면에 앱 버전을 표시하도록 변경했습니다.
+- Android 14 백그라운드 재생 중단 문제 수정(위의 백그라운드 재생 수정 강화 대응)
+    MediaPlaybackService 개선:
+    - AndroidManifest.xml에 `foregroundServiceType="mediaPlayback"` 추가(Android 14 필수)
+    - startForeground() 호출을 헬퍼 함수로 확실히 처리하고 중복 제거
+    - onDestroy()에서 stopForeground()를 명시적으로 호출하도록 변경
+    - 알림 채널 생성 및 PendingIntent 처리를 안정화
+    이를 통해 앱이 백그라운드나 화면 꺼짐 상태에서도 재생을 지속할 수 있게 되었습니다.

@@ -154,6 +154,7 @@
   "overlay.languageChangedJa": "Language changed to Japanese",
   "overlay.languageChangedEn": "Language changed to English",
   "overlay.languageChangedZh": "Language changed to Chinese",
+  "overlay.languageChangedKo": "Language changed to Korean",
   "confirm.resetAll": "Reset all settings?",
   "confirm.clearPlaylist": "Clear the playlist?",
   "status.idle": "🎵 Idle...",

@@ -167,6 +167,7 @@
   "overlay.languageChangedJa": "言語を日本語に変更しました",
   "overlay.languageChangedEn": "言語を英語に変更しました",
   "overlay.languageChangedZh": "言語を中国語に変更しました",
+  "overlay.languageChangedKo": "言語を韓国語に変更しました",
   "confirm.resetAll": "すべての設定を初期化しますか？",
   "confirm.clearPlaylist": "プレイリストを空にしますか？",
   "status.idle": "🎵 待機中...",

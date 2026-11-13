@@ -111,7 +111,7 @@ const state = {
 // 多言語対応 (i18n) 完全版翻訳辞書データ
 // ==========================================================================
 // 1. 読み込みたい言語（ファイル名）のリストを定義
-const languages = ["ja-JP", "en-US", "zh-CN"];
+const languages = ["ja-JP", "en-US", "zh-CN", "ko-KR"];
 
 let currentLang;
 
@@ -140,14 +140,17 @@ async function initI18n() {
     if (savedLang === "ja") savedLang = "ja-JP";
     if (savedLang === "en") savedLang = "en-US";
     if (savedLang === "zh") savedLang = "zh-CN";
+    if (savedLang === "ko") savedLang = "ko-KR";
 
     currentLang =
       savedLang ||
-      (navigator.language.startsWith("zh-CN")
+      (navigator.language.startsWith("zh")
         ? "zh-CN"
-        : navigator.language.startsWith("en-US")
+        : navigator.language.startsWith("en")
           ? "en-US"
-          : "ja-JP");
+          : navigator.language.startsWith("ko")
+            ? "ko-KR"
+            : "ja-JP");
     localStorage.setItem("app_lang", currentLang);
 
     // すべてのファイルの読み込み完了を待つ
@@ -158,11 +161,13 @@ async function initI18n() {
 
     currentLang =
       localStorage.getItem("app_lang") ||
-      (navigator.language.startsWith("zh-CN")
+      (navigator.language.startsWith("zh")
         ? "zh-CN"
-        : navigator.language.startsWith("en-US")
+        : navigator.language.startsWith("en")
           ? "en-US"
-          : "ja-JP");
+          : navigator.language.startsWith("ko")
+            ? "ko-KR"
+            : "ja-JP");
 
     console.log("すべての翻訳ファイルを読み込みました:", window.I18N);
 
@@ -182,11 +187,13 @@ function startApplication() {
 
   currentLang =
     localStorage.getItem("app_lang") ||
-    (navigator.language.startsWith("zh-CN")
+    (navigator.language.startsWith("zh")
       ? "zh-CN"
-      : navigator.language.startsWith("en-US")
+      : navigator.language.startsWith("en")
         ? "en-US"
-        : "ja-JP");
+        : navigator.language.startsWith("ko")
+          ? "ko-KR"
+          : "ja-JP");
 
   // ==================== スマホ初期化・隙間対策 ====================
   // 起動直後Canvasサイズを強制修正
@@ -1050,10 +1057,12 @@ async function init() {
       // メッセージ（存在しないキーを安全に扱う）
       showOverlay(
         currentLang === "ja-JP"
-          ? t("overlay.languageChangedja-JP")
+          ? (t("overlay.languageChangedJa") !== "overlay.languageChangedJa" ? t("overlay.languageChangedJa") : "言語を日本語に変更しました")
           : currentLang === "en-US"
-            ? t("overlay.languageChangeden-US")
-            : t("overlay.languageChangedzh-CN"),
+            ? (t("overlay.languageChangedEn") !== "overlay.languageChangedEn" ? t("overlay.languageChangedEn") : "Language changed to English")
+            : currentLang === "zh-CN"
+              ? (t("overlay.languageChangedZh") !== "overlay.languageChangedZh" ? t("overlay.languageChangedZh") : "语言已切换为中文")
+              : (t("overlay.languageChangedKo") !== "overlay.languageChangedKo" ? t("overlay.languageChangedKo") : "언어를 한국어로 변경했습니다"),
       );
     });
   }

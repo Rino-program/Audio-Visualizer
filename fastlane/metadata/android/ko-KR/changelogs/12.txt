@@ -1,0 +1,7 @@
+v1.0.12(12)의 업데이트 내용은 다음과 같습니다:
+
+- 동영상과 오디오 간 싱크 정확도를 높였습니다.
+
+- 번역 데이터를 android-app/www/script.js 내부에서 android-app/www/I18N/{lang}.json 파일로 분리했습니다.
+
+- DEVELOPER_MESSAGE_{lang}.md 위치를 android-app/www에서 android-app/www/DevMessages로 이동했습니다.
