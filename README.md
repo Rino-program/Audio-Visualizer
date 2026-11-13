@@ -1,5 +1,7 @@
 # Audio Visualizer
 
+[日本語](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md)
+
 Android 向けのローカル再生オーディオビジュアライザーです。F-Droid 配布を前提に、外部サービスに依存しない構成へ整理しています。
 対応バージョン: v1.1.4（バージョンコード 17）
 

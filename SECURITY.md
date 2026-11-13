@@ -1,6 +1,6 @@
 # Security Policy
 
-[English](#english) | [日本語](#日本語)
+[English](#english) | [日本語](#日本語) | [简体中文](#简体中文)
 
 ---
 
@@ -51,3 +51,28 @@ We will acknowledge your report as soon as possible and work on a fix. Thank you
 3. 詳細をご報告ください。
 
 報告を確認次第、速やかに修正対応を行います。プロジェクトの安全な運用のためにご協力をお願いいたします。
+
+---
+
+<a name="简体中文"></a>
+
+## 简体中文
+
+### 支持的版本
+
+当前为以下版本提供安全更新。建议更新到最新版本。
+
+| 版本    | 支持状态           |
+| ------- | ------------------ |
+| 1.1.x   | :white_check_mark: |
+| 1.0.x   | :x:                |
+
+### 报告安全漏洞
+
+如果您在此项目中发现安全漏洞，请**不要**创建公开的 Issue 或 Pull Request。请使用 GitHub 的**私密漏洞报告（Private vulnerability reporting）**功能：
+
+1. 导航至此仓库的 **“Security and quality”** 部分。
+2. 点击 **“Report a vulnerability”**。
+3. 安全地提交您的报告。
+
+我们会在确认报告后尽快进行修复。感谢您为保障本项目安全做出的贡献！
