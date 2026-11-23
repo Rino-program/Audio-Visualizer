@@ -16,8 +16,7 @@ Binaries:
 Builds:
   - versionName: 1.1.5
     versionCode: 18
-    # TODO: v1.1.5 のリリースコミットに更新する
-    commit: ac24e59223c8ce1ffe703d93f377b5bb8c129de3
+    commit: dd7f8fdb7f927194da645382cc78be3e2e151b68
     subdir: android-app/android/app
     sudo:
       - echo "deb https://deb.debian.org/debian forky main" > /etc/apt/sources.list.d/forky.list
