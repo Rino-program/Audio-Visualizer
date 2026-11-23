@@ -1,0 +1,8 @@
+Main updates in v1.1.5:
+
+- Removed the misleading GPU/CPU rendering mode and show the actual backend (Canvas2D)
+- Added Korean (ko-KR) support
+- Added multilingual README and SECURITY documents
+- Old rendering mode settings are removed automatically
+
+Full changelog: https://github.com/Rino-program/Audio-Visualizer/blob/main/changelog_MD/en-US/18.md

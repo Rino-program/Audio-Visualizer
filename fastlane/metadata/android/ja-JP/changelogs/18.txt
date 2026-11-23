@@ -1,0 +1,8 @@
+v1.1.5の主な更新:
+
+- 描画モードの「GPU優先 / CPU」表示を削除し、実際の描画バックエンド（Canvas2D）を表示
+- 韓国語（ko-KR）対応
+- README / SECURITY の多言語化
+- 旧バージョンの描画モード設定を自動削除
+
+変更点の全文: https://github.com/Rino-program/Audio-Visualizer/blob/main/changelog_MD/ja-JP/18.md

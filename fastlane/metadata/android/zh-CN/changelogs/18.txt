@@ -1,0 +1,8 @@
+v1.1.5 主要更新：
+
+- 删除误导性的 GPU/CPU 渲染模式，显示实际渲染后端（Canvas2D）
+- 新增韩语（ko-KR）支持
+- README 和 SECURITY 支持多语言
+- 自动删除旧版本的渲染模式设置
+
+完整更新日志：https://github.com/Rino-program/Audio-Visualizer/blob/main/changelog_MD/zh-CN/18.md

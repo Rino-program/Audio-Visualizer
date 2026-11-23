@@ -52,10 +52,6 @@ const state = {
   prevLevels: null,
   sandHeights: null,
 
-  // GPU rendering
-  gpuRenderer: null,
-  gpuAvailable: false,
-
   // Settings
   settings: {
     smoothing: 0.7,
@@ -92,8 +88,6 @@ const state = {
     sandMode: false,
     sandFallRate: 0.6, // per second
     circleAngleOffset: 0,
-    // GPU rendering settings
-    renderMode: "auto", // 'auto', 'gpu', 'cpu'
     // UI auto-hide settings
     autoHideUI: true,
     // fullscreen button visibility
@@ -551,6 +545,7 @@ let library = {};
 // ============== DOM ELEMENTS ==============
 const $ = (id) => document.getElementById(id);
 const cv = $("cv");
+// 描画バックエンドはCanvas2D固定（GPU/CPUの切り替えは提供しない）
 const ctx = cv.getContext("2d");
 const audio = new Audio();
 const bgVideo = $("bgVideo");
@@ -1209,12 +1204,6 @@ async function init() {
     btn.onclick = () => switchTab(btn.dataset.tab);
   });
 
-  // GPU サポートチェックと初期化
-  checkGPUSupport();
-  if (state.gpuAvailable && state.settings.renderMode !== "cpu") {
-    initGPURenderer();
-  }
-
   setupSettingsInputs();
   initDraggableVideo();
   // プレイリストパネルはAndroid版では固定位置（ドラッグ無効）
@@ -1848,6 +1837,8 @@ function loadSettings() {
     try {
       const parsed = JSON.parse(saved);
       Object.assign(state.settings, parsed);
+      // 旧バージョンの描画モード設定を削除
+      delete state.settings.renderMode;
     } catch (e) {
       console.warn("Settings load failed");
     }
@@ -2842,18 +2833,6 @@ function setupSettingsInputs() {
     state.settings.stopOnVideoEnd = e.target.checked;
   };
 
-  // Render mode settings
-  const renderModeSelect = $("renderModeSelect");
-  if (renderModeSelect) {
-    renderModeSelect.onchange = (e) => {
-      state.settings.renderMode = e.target.value;
-      updateRenderModeStatus();
-      if (state.settings.renderMode !== "cpu" && state.gpuAvailable) {
-        initGPURenderer();
-      }
-    };
-  }
-
   // Auto-hide UI settings
   const autoHideUICheckbox = $("autoHideUICheckbox");
   if (autoHideUICheckbox) {
@@ -2970,6 +2949,7 @@ function loadPreset(slot) {
     try {
       const parsed = JSON.parse(saved);
       Object.assign(state.settings, parsed);
+      delete state.settings.renderMode;
       applySettingsToUI();
       updateVideoVisibility();
       applyCanvasResolution();
@@ -3055,11 +3035,6 @@ function applySettingsToUI() {
   $("autoPlayNextCheckbox").checked = state.settings.autoPlayNext;
   $("stopOnVideoEndCheckbox").checked = state.settings.stopOnVideoEnd;
 
-  // Render mode settings
-  const renderModeSelect = $("renderModeSelect");
-  if (renderModeSelect)
-    renderModeSelect.value = state.settings.renderMode || "auto";
-  updateRenderModeStatus();
   applyBalanceToPan();
 
   // Volume restore
@@ -4391,95 +4366,6 @@ function scrollToCurrentPlaylistItem() {
   }
 }
 
-// GPU サポート確認
-function checkGPUSupport() {
-  try {
-    const testCanvas = document.createElement("canvas");
-    const gl =
-      testCanvas.getContext("webgl2") || testCanvas.getContext("webgl");
-    if (gl) {
-      const debugInfo = gl.getExtension("WEBGL_debug_renderer_info");
-      if (debugInfo) {
-        const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
-        console.log("GPU Renderer:", renderer);
-        state.gpuAvailable = true;
-        return true;
-      }
-      state.gpuAvailable = true;
-      return true;
-    }
-  } catch (e) {
-    console.warn("GPU check failed:", e);
-  }
-  state.gpuAvailable = false;
-  return false;
-}
-
-// GPU レンダラー初期化（将来的な拡張用）
-function initGPURenderer() {
-  // renderModeに応じてレンダリング方法を設定
-  const mode = state.settings.renderMode;
-
-  if (mode === "cpu") {
-    // CPUモード: GPU機能を無効化
-    state.gpuRenderer = { enabled: false };
-    console.log("Rendering mode: CPU (forced)");
-  } else if (state.gpuAvailable) {
-    // GPUが利用可能な場合
-    try {
-      if (typeof OffscreenCanvas !== "undefined") {
-        state.gpuRenderer = {
-          enabled: true,
-          type: "offscreen",
-        };
-        console.log("Rendering mode: GPU (OffscreenCanvas)");
-      } else {
-        // OffscreenCanvasがない場合でもCanvas2Dは通常GPU加速される
-        state.gpuRenderer = {
-          enabled: true,
-          type: "canvas2d",
-        };
-        console.log("Rendering mode: GPU (Canvas2D hardware accelerated)");
-      }
-    } catch (e) {
-      console.warn("GPU renderer init failed:", e);
-      state.gpuRenderer = { enabled: false };
-    }
-  } else {
-    // GPUが利用不可
-    state.gpuRenderer = { enabled: false };
-    console.log("Rendering mode: CPU (GPU not available)");
-  }
-
-  updateRenderModeStatus();
-}
-
-function updateRenderModeStatus() {
-  const statusEl = $("renderModeStatus");
-  if (!statusEl) return;
-
-  const mode = state.settings.renderMode;
-  let status = "";
-
-  if (mode === "auto") {
-    if (state.gpuRenderer && state.gpuRenderer.enabled) {
-      status = "✓ GPU使用中";
-    } else {
-      status = "⚠ CPUフォールバック";
-    }
-  } else if (mode === "gpu") {
-    if (state.gpuRenderer && state.gpuRenderer.enabled) {
-      status = "✓ GPU強制";
-    } else {
-      status = "⚠ GPU非対応";
-    }
-  } else {
-    status = "✓ CPU使用中";
-  }
-
-  statusEl.textContent = status;
-}
-
 async function removeFromPlaylist(index) {
   if (index < 0 || index >= state.playlist.length) return;
   const track = state.playlist[index];
@@ -4852,17 +4738,11 @@ function updateResourceMonitor() {
     }
   }
 
-  // GPU状態
-  const gpuEl = $("gpuValue");
-  if (gpuEl) {
-    const gpuEnabled = state.gpuRenderer && state.gpuRenderer.enabled;
-    if (gpuEnabled) {
-      gpuEl.textContent = "GPU";
-      gpuEl.style.color = "#4f4";
-    } else {
-      gpuEl.textContent = "CPU";
-      gpuEl.style.color = "#ff4";
-    }
+  // 描画バックエンド
+  const renderEl = $("renderValue");
+  if (renderEl) {
+    renderEl.textContent = "Canvas2D";
+    renderEl.style.color = "#4fc3f7";
   }
 }
 
@@ -5491,8 +5371,6 @@ function drawMonitor(fd, maxH, drawH, drawStartY) {
   for (let i = 0; i < fd.length; i++) {
     if (fd[i] > maxDisp) maxDisp = fd[i];
   }
-
-  const renderLabel = state.gpuRenderer?.enabled ? "GPU" : "CPU";
 
   const bands = compact
     ? [

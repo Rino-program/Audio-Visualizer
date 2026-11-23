@@ -3,7 +3,7 @@
 [日本語](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [한국어](README.ko-KR.md)
 
 专为 Android 本地媒体播放设计的音频可视化器。针对 F-Droid 分发优化，不依赖任何外部服务。
-支持版本: v1.1.4（版本代码 17）
+支持版本: v1.1.5（版本代码 18）
 
 ## 特性
 

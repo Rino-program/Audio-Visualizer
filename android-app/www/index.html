@@ -327,8 +327,8 @@
 
         <div class="tab-content active" id="tab-display">
           <p style="font-size: 0.6rem; color: var(--text-muted); margin: 0">
-            <span data-i18n="version.prefix">バージョン</span>: v1.1.4
-            <span data-i18n="version.code">バージョンコード</span>: 17
+            <span data-i18n="version.prefix">バージョン</span>: v1.1.5
+            <span data-i18n="version.code">バージョンコード</span>: 18
           </p>
           <div class="settings-section-title" data-i18n="section.system">
             システム / System
@@ -429,17 +429,8 @@
             </select>
           </div>
           <div class="setting-item">
-            <label data-i18n="label.renderMode">レンダリングモード</label>
-            <select id="renderModeSelect">
-              <option value="auto" data-i18n="opt.renderAuto">
-                自動 (Auto)
-              </option>
-              <option value="gpu" data-i18n="opt.renderGpu">GPU優先</option>
-              <option value="cpu" data-i18n="opt.renderCpu">
-                CPU (互換性重視)
-              </option>
-            </select>
-            <span id="gpuStatusHint" class="hint"></span>
+            <label data-i18n="label.renderBackend">描画バックエンド</label>
+            <span class="hint">Canvas2D</span>
           </div>
           <div class="settings-section-title" data-i18n="section.quickSettings">
             クイック設定
@@ -1077,7 +1068,7 @@
               </div>
               <div style="display: flex; justify-content: space-between">
                 <span data-i18n="res.rendering">レンダリング:</span>
-                <span id="gpuValue">--</span>
+                <span id="renderValue">Canvas2D</span>
               </div>
             </div>
           </div>

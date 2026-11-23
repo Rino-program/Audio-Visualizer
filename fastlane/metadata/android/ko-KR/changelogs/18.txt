@@ -1,0 +1,8 @@
+v1.1.5의 주요 업데이트:
+
+- 오해를 부르던 GPU/CPU 렌더링 모드를 삭제하고 실제 백엔드(Canvas2D) 표시
+- 한국어(ko-KR) 지원 추가
+- README 및 SECURITY 다국어 지원
+- 이전 버전의 렌더링 모드 설정 자동 삭제
+
+변경 사항 전문: https://github.com/Rino-program/Audio-Visualizer/blob/main/changelog_MD/ko-KR/18.md
