@@ -1,0 +1,9 @@
+v1.1.6 主要更新：
+
+- 新增内部渲染分辨率（省电至原生）
+- 暂停或进入后台时停止渲染，并根据负载自动调整分辨率
+- 将发光改为轻量泛光合成
+- 设置更改仅在“保存并关闭”后应用
+- 修复无限制 FPS 被显示为 60 的问题
+
+完整更新日志：https://github.com/Rino-program/Audio-Visualizer/blob/main/changelog_MD/zh-CN/19.md

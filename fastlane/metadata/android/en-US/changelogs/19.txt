@@ -1,0 +1,9 @@
+Main updates in v1.1.6:
+
+- Added Internal Resolution (Power Saving to Native)
+- Rendering stops while paused or in the background, with automatic resolution adjustment under load
+- Replaced glow with a lightweight bloom pass
+- Settings changes now apply only after "Save & Close"
+- Fixed Unlimited FPS being shown as 60
+
+Full changelog: https://github.com/Rino-program/Audio-Visualizer/blob/main/changelog_MD/en-US/19.md

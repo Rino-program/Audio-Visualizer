@@ -72,6 +72,8 @@ const state = {
     persistSettings: true,
     lowPowerMode: false,
     targetFps: 60,
+    // 内部描画解像度（0 = ネイティブ）。見た目のサイズ感は変えずに負荷だけ調整する。
+    renderDpr: 1.5,
     showVideo: true,
     videoMode: "window", // 'window' or 'background'
     videoFitMode: "cover", // 'cover', 'contain', 'fill'
@@ -943,6 +945,9 @@ async function init() {
     state.isPlaying = true;
     updatePlayBtn();
     updateMediaSessionPlaybackState();
+    renderEmaInterval = 0;
+    renderSlowStreak = 0;
+    invalidateRender(3);
     if (bgVideo.src && state.settings.showVideo) {
       bgVideo.play().catch(() => {});
     }
@@ -973,6 +978,8 @@ async function init() {
     updatePlayBtn();
     bgVideo.pause();
     updateMediaSessionPlaybackState();
+    // 停止状態を1〜2フレーム描いてから描画ループを止める
+    invalidateRender(2);
   });
   audio.addEventListener("ended", () => {
     if (state.isExporting) {
@@ -1031,6 +1038,7 @@ async function init() {
   els.volSlider.oninput = updateVolume;
   els.modeSelect.onchange = (e) => {
     state.mode = +e.target.value;
+    invalidateRender(2);
     const modeName = e.target.options[e.target.selectedIndex].text;
     showOverlay(t("overlay.mode", { mode: modeName }));
   };
@@ -1039,26 +1047,9 @@ async function init() {
   if (langSelect) {
     langSelect.value = currentLang;
 
-    // 変更イベント
+    // 変更イベント（「保存して閉じる」まで反映しない）
     langSelect.addEventListener("change", (e) => {
-      currentLang = e.target.value;
-      localStorage.setItem("app_lang", currentLang);
-      state.settings.language = currentLang;
-
-      updateLanguageUI(); // 即時反映
-      loadDeveloperMessage();
-      saveSettingsToStorage();
-
-      // メッセージ（存在しないキーを安全に扱う）
-      showOverlay(
-        currentLang === "ja-JP"
-          ? (t("overlay.languageChangedJa") !== "overlay.languageChangedJa" ? t("overlay.languageChangedJa") : "言語を日本語に変更しました")
-          : currentLang === "en-US"
-            ? (t("overlay.languageChangedEn") !== "overlay.languageChangedEn" ? t("overlay.languageChangedEn") : "Language changed to English")
-            : currentLang === "zh-CN"
-              ? (t("overlay.languageChangedZh") !== "overlay.languageChangedZh" ? t("overlay.languageChangedZh") : "语言已切换为中文")
-              : (t("overlay.languageChangedKo") !== "overlay.languageChangedKo" ? t("overlay.languageChangedKo") : "언어를 한국어로 변경했습니다"),
-      );
+      setSetting("language", e.target.value);
     });
   }
   // UI表示ボタン：タッチ環境で click/touchstart が二重に走りやすいので
@@ -1282,6 +1273,8 @@ async function init() {
 
   document.addEventListener("keydown", (e) => {
     resetUITimeout();
+    // 設定モーダルを開いている間はショートカットで設定を変更しない
+    if (state.settingsOpen) return;
     const tag = e.target.tagName;
     if (
       tag === "INPUT" ||
@@ -1381,6 +1374,7 @@ async function init() {
       case "KeyM":
         state.mode = (state.mode + 1) % 9;
         els.modeSelect.value = state.mode;
+        invalidateRender(2);
         const modeName =
           els.modeSelect.options[els.modeSelect.selectedIndex].text;
         showOverlay(t("overlay.mode", { mode: modeName }));
@@ -1389,7 +1383,8 @@ async function init() {
   });
   resetUITimeout();
 
-  requestAnimationFrame(draw);
+  // 再生中・マイク入力中のみ描画ループを回す（停止中は描かない）
+  invalidateRender(3);
 }
 
 function resetUITimeout(e) {
@@ -1718,16 +1713,43 @@ function updateVideoVisibility() {
   }
 }
 
+// ============== Render quality / scheduler state ==============
+// 内部描画解像度の上限。バーや波形にネイティブ解像度は不要なため、
+// DPR 2.5 の端末では内部バッファが約1/3になり、消費電力を大きく削減できる。
+const MAX_RENDER_DPR = 2.5;
+// 内部解像度に応じた固定ピクセル値の補正係数（2.5を従来の基準とする）。
+// これにより解像度を下げてもバーの太さ・砂粒の大きさなどは見た目が変わらない。
+let renderPixelScale = 1;
+// 自動品質調整のスケール（0.6〜1.0）。重い端末では自動で解像度を落とす。
+let renderQualityScale = 1;
+// 明示的な再描画要求（設定変更・シークなど）の残りフレーム数
+let renderPendingFrames = 0;
+let renderRafId = null;
+let renderLastQualityCheck = 0;
+let renderEmaInterval = 0;
+let renderSlowStreak = 0;
+let renderLastSlowAt = 0;
+// 実際に観測できた最短フレーム間隔（ディスプレイのリフレッシュ周期の推定値）
+let renderMinInterval = 0;
+let renderAdaptTargetFps = -1;
+
 function applyCanvasResolution(force = false) {
   if (!cv) return;
 
-  const dpr = Math.min(2.5, window.devicePixelRatio || 1);
+  const deviceDpr = window.devicePixelRatio || 1;
+  const requested = +state.settings.renderDpr;
+  // 0（または未設定）はネイティブ解像度
+  const cap = requested > 0 ? Math.min(requested, MAX_RENDER_DPR) : deviceDpr;
+  const dpr = Math.max(0.5, Math.min(cap, deviceDpr) * renderQualityScale);
+  // 旧実装（min(2.5, devicePixelRatio)）と同じ見た目になるよう補正する
+  const referenceDpr = Math.min(MAX_RENDER_DPR, deviceDpr);
+  renderPixelScale = Math.max(0.2, dpr / referenceDpr);
 
   let viewW = Math.floor(window.visualViewport?.width || window.innerWidth);
   let viewH = Math.floor(window.visualViewport?.height || window.innerHeight);
 
-  const targetW = Math.floor(viewW * dpr);
-  const targetH = Math.floor(viewH * dpr);
+  const targetW = Math.max(1, Math.floor(viewW * dpr));
+  const targetH = Math.max(1, Math.floor(viewH * dpr));
 
   cv.width = targetW;
   cv.height = targetH;
@@ -1757,6 +1779,7 @@ function resize() {
   // 初期化時・リサイズ時に複数回実行
   applyCanvasResolution();
   setTimeout(() => applyCanvasResolution(true), 150);
+  invalidateRender(3);
 
   recenterFloatingUiAfterResize();
 
@@ -2525,67 +2548,70 @@ async function purgeIdbLocalTracksFromPlaylist() {
   saveSettingsToStorage();
 }
 
+// ============== Settings draft ==============
+// 設定モーダル内の変更は下書きに保持し、「保存して閉じる」まで適用しない。
+// モーダルが閉じているときは従来どおり state.settings を直接変更する。
+let settingsDraft = null;
+
+function editableSettings() {
+  return settingsDraft || state.settings;
+}
+
+function setSetting(key, value) {
+  editableSettings()[key] = value;
+}
+
 function setupSettingsInputs() {
   const smoothingSlider = $("smoothingSlider");
   if (smoothingSlider) {
     smoothingSlider.oninput = (e) => {
-      state.settings.smoothing = +e.target.value;
-      $("smoothingValue").textContent = state.settings.smoothing.toFixed(2);
-      if (state.analyser)
-        state.analyser.smoothingTimeConstant = state.settings.smoothing;
+      setSetting("smoothing", +e.target.value);
+      $("smoothingValue").textContent = editableSettings().smoothing.toFixed(2);
     };
   }
   const sensitivitySlider = $("sensitivitySlider");
   if (sensitivitySlider) {
     sensitivitySlider.oninput = (e) => {
-      state.settings.sensitivity = +e.target.value;
-      $("sensitivityValue").textContent = state.settings.sensitivity.toFixed(1);
-      applySensitivityToAnalyser();
+      setSetting("sensitivity", +e.target.value);
+      $("sensitivityValue").textContent =
+        editableSettings().sensitivity.toFixed(1);
     };
   }
   const fftSizeSelect = $("fftSizeSelect");
   if (fftSizeSelect) {
     fftSizeSelect.onchange = (e) => {
-      state.settings.fftSize = +e.target.value;
-      if (state.analyser) state.analyser.fftSize = state.settings.fftSize;
+      setSetting("fftSize", +e.target.value);
     };
   }
   const qualitySelect = $("qualitySelect");
   if (qualitySelect) {
     qualitySelect.onchange = (e) => {
-      state.settings.quality = e.target.value;
+      setSetting("quality", e.target.value);
     };
   }
   const barCountSelect = $("barCountSelect");
   if (barCountSelect) {
     barCountSelect.onchange = (e) => {
-      state.settings.barCount = +e.target.value;
-      updateNumBars();
+      setSetting("barCount", +e.target.value);
     };
   }
   const audioSourceSelect = $("audioSourceSelect");
   if (audioSourceSelect) {
-    audioSourceSelect.onchange = async (e) => {
-      state.settings.audioSource = e.target.value;
-      await updateAudioSource();
-      saveSettingsToStorage();
+    audioSourceSelect.onchange = (e) => {
+      setSetting("audioSource", e.target.value);
     };
   }
   const micDeviceSelect = $("micDeviceSelect");
   if (micDeviceSelect) {
-    micDeviceSelect.onchange = async (e) => {
-      state.settings.micDeviceId = e.target.value;
-      await updateMicrophoneInput();
-      saveSettingsToStorage();
+    micDeviceSelect.onchange = (e) => {
+      setSetting("micDeviceId", e.target.value);
     };
   }
   const inputGainSlider = $("inputGainSlider");
   if (inputGainSlider) {
     inputGainSlider.oninput = (e) => {
-      state.settings.inputGain = +e.target.value;
-      $("inputGainValue").textContent = state.settings.inputGain.toFixed(1);
-      if (state.microphoneGain)
-        state.microphoneGain.gain.value = state.settings.inputGain;
+      setSetting("inputGain", +e.target.value);
+      $("inputGainValue").textContent = editableSettings().inputGain.toFixed(1);
     };
   }
   const freqRangeSelect = $("freqRangeSelect");
@@ -2595,8 +2621,9 @@ function setupSettingsInputs() {
       if (presetKey === "custom") return;
       const preset = FREQ_RANGE_PRESETS[presetKey];
       if (!preset) return;
-      state.settings.lowFreq = preset.low;
-      state.settings.highFreq = preset.high;
+      const s = editableSettings();
+      s.lowFreq = preset.low;
+      s.highFreq = preset.high;
       $("lowFreqSlider").value = preset.low;
       $("lowFreqValue").textContent = preset.low + "Hz";
       $("highFreqSlider").value = preset.high;
@@ -2607,19 +2634,18 @@ function setupSettingsInputs() {
   const lowFreqSlider = $("lowFreqSlider");
   if (lowFreqSlider) {
     lowFreqSlider.oninput = (e) => {
-      state.settings.lowFreq = +e.target.value;
-      $("lowFreqValue").textContent = state.settings.lowFreq + "Hz";
+      setSetting("lowFreq", +e.target.value);
+      $("lowFreqValue").textContent = editableSettings().lowFreq + "Hz";
       if (freqRangeSelect) freqRangeSelect.value = "custom";
     };
   }
   const highFreqSlider = $("highFreqSlider");
   if (highFreqSlider) {
     highFreqSlider.oninput = (e) => {
-      state.settings.highFreq = +e.target.value;
+      setSetting("highFreq", +e.target.value);
+      const high = editableSettings().highFreq;
       $("highFreqValue").textContent =
-        state.settings.highFreq >= 1000
-          ? state.settings.highFreq / 1000 + "kHz"
-          : state.settings.highFreq + "Hz";
+        high >= 1000 ? high / 1000 + "kHz" : high + "Hz";
       if (freqRangeSelect) freqRangeSelect.value = "custom";
     };
   }
@@ -2628,8 +2654,7 @@ function setupSettingsInputs() {
     const el = $(id);
     if (el)
       el.oninput = (e) => {
-        state.settings.eq[i] = +e.target.value;
-        updateEQ(i, +e.target.value);
+        editableSettings().eq[i] = +e.target.value;
       };
   });
   const resetEqBtn = $("resetEqBtn");
@@ -2653,13 +2678,13 @@ function setupSettingsInputs() {
       const preset = btn.dataset.preset;
       const values = EQ_PRESETS[preset];
       if (!values) return;
-      state.settings.eq = [...values];
-      state.eqFilters.forEach((f, i) => {
-        f.gain.value = values[i];
+      editableSettings().eq = [...values];
+      // スライダー表示のみ更新（音声への適用は保存時）
+      values.forEach((value, i) => {
         const freq = EQ_FREQS[i];
         const id = freq >= 1000 ? `eq${freq / 1000}k` : `eq${freq}`;
         const el = $(id);
-        if (el) el.value = values[i];
+        if (el) el.value = value;
       });
       showOverlay(t("overlay.eq", { name: btn.textContent }));
     });
@@ -2670,19 +2695,18 @@ function setupSettingsInputs() {
   if (fpsSelect) {
     fpsSelect.onchange = (e) => {
       const fps = +e.target.value;
-      state.settings.targetFps = fps;
-      state.settings.lowPowerMode = fps <= 30;
-      showOverlay(t("overlay.fps", { fps: fps === 0 ? "∞" : fps }));
+      setSetting("targetFps", fps);
+      setSetting("lowPowerMode", fps <= 30);
     };
   }
   const glowSlider = $("glowSlider");
   if (glowSlider) {
     glowSlider.oninput = (e) => {
-      state.settings.glowStrength = +e.target.value;
+      setSetting("glowStrength", +e.target.value);
       $("glowValue").textContent =
-        state.settings.glowStrength > 30
+        editableSettings().glowStrength > 30
           ? "strong"
-          : state.settings.glowStrength > 10
+          : editableSettings().glowStrength > 10
             ? "Medium"
             : "weak";
     };
@@ -2690,101 +2714,98 @@ function setupSettingsInputs() {
   const glowEnabledCheckbox = $("glowEnabledCheckbox");
   if (glowEnabledCheckbox) {
     glowEnabledCheckbox.onchange = (e) => {
-      state.settings.glowEnabled = e.target.checked;
+      setSetting("glowEnabled", e.target.checked);
     };
   }
   const rainbowCheckbox = $("rainbowCheckbox");
   if (rainbowCheckbox) {
     rainbowCheckbox.onchange = (e) => {
-      state.settings.rainbow = e.target.checked;
+      setSetting("rainbow", e.target.checked);
     };
   }
   const mirrorCheckbox = $("mirrorCheckbox");
   if (mirrorCheckbox) {
     mirrorCheckbox.onchange = (e) => {
-      state.settings.mirror = e.target.checked;
+      setSetting("mirror", e.target.checked);
     };
   }
   const bgBlurSlider = $("bgBlurSlider");
   if (bgBlurSlider) {
     bgBlurSlider.oninput = (e) => {
-      state.settings.bgBlur = +e.target.value;
-      $("bgBlurValue").textContent = state.settings.bgBlur + "px";
-      updateVideoVisibility();
+      setSetting("bgBlur", +e.target.value);
+      $("bgBlurValue").textContent = editableSettings().bgBlur + "px";
     };
   }
   const blurEnabledCheckbox = $("blurEnabledCheckbox");
   if (blurEnabledCheckbox) {
     blurEnabledCheckbox.onchange = (e) => {
-      state.settings.blurEnabled = e.target.checked;
-      updateVideoVisibility();
+      setSetting("blurEnabled", e.target.checked);
     };
   }
   const opacitySlider = $("opacitySlider");
   if (opacitySlider) {
     opacitySlider.oninput = (e) => {
-      state.settings.opacity = +e.target.value;
-      $("opacityValue").textContent = state.settings.opacity.toFixed(1);
+      setSetting("opacity", +e.target.value);
+      $("opacityValue").textContent = editableSettings().opacity.toFixed(1);
     };
   }
   const balanceSlider = $("balanceSlider");
   if (balanceSlider) {
     balanceSlider.oninput = (e) => {
-      state.settings.balance = +e.target.value;
+      setSetting("balance", +e.target.value);
       const label = $("balanceValue");
-      if (label) label.textContent = formatBalanceValue(state.settings.balance);
-      applyBalanceToPan();
+      if (label)
+        label.textContent = formatBalanceValue(editableSettings().balance);
     };
   }
   const resetBalanceBtn = $("resetBalanceBtn");
   if (resetBalanceBtn) {
     resetBalanceBtn.onclick = () => {
-      state.settings.balance = 0;
+      setSetting("balance", 0);
       if (balanceSlider) balanceSlider.value = 0;
       const label = $("balanceValue");
       if (label) label.textContent = "C";
-      applyBalanceToPan();
       showOverlay(t("overlay.centerReset"));
     };
   }
   const fixedColorPicker = $("fixedColorPicker");
   if (fixedColorPicker) {
     fixedColorPicker.oninput = (e) => {
-      state.settings.fixedColor = e.target.value;
+      setSetting("fixedColor", e.target.value);
     };
   }
   const changeModeSelect = $("changeModeSelect");
   if (changeModeSelect) {
     changeModeSelect.onchange = (e) => {
-      state.settings.changeMode = e.target.value;
+      setSetting("changeMode", e.target.value);
     };
   }
   const sandModeCheckbox = $("sandModeCheckbox");
   if (sandModeCheckbox) {
     sandModeCheckbox.onchange = (e) => {
-      state.settings.sandMode = e.target.checked;
+      setSetting("sandMode", e.target.checked);
     };
   }
   const sandFallRateSlider = $("sandFallRateSlider");
   if (sandFallRateSlider) {
     sandFallRateSlider.oninput = (e) => {
-      state.settings.sandFallRate = +e.target.value;
+      setSetting("sandFallRate", +e.target.value);
       $("sandFallRateValue").textContent =
-        state.settings.sandFallRate.toFixed(1);
+        editableSettings().sandFallRate.toFixed(1);
     };
   }
   const circleAngleOffsetSlider = $("circleAngleOffsetSlider");
   if (circleAngleOffsetSlider) {
     circleAngleOffsetSlider.oninput = (e) => {
-      state.settings.circleAngleOffset = +e.target.value;
+      setSetting("circleAngleOffset", +e.target.value);
       $("circleAngleOffsetValue").textContent =
-        `${state.settings.circleAngleOffset}°`;
+        `${editableSettings().circleAngleOffset}°`;
     };
   }
   const resetCircleAngleBtn = $("resetCircleAngleBtn");
   if (resetCircleAngleBtn) {
     resetCircleAngleBtn.onclick = () => {
-      state.settings.circleAngleOffset = 0;
+      setSetting("circleAngleOffset", 0);
       const slider = $("circleAngleOffsetSlider");
       const valEl = $("circleAngleOffsetValue");
       if (slider) slider.value = 0;
@@ -2794,7 +2815,7 @@ function setupSettingsInputs() {
   const persistSettingsCheckbox = $("persistSettingsCheckbox");
   if (persistSettingsCheckbox) {
     persistSettingsCheckbox.onchange = (e) => {
-      state.settings.persistSettings = e.target.checked;
+      setSetting("persistSettings", e.target.checked);
     };
   }
   const storeLocalFilesCheckbox = $("storeLocalFilesCheckbox");
@@ -2822,49 +2843,52 @@ function setupSettingsInputs() {
           ? t("overlay.localSaveOn")
           : t("overlay.localSaveOff"),
       );
+      // 保存ポリシーの変更はデータ操作を伴うため即時反映し、下書きにも同期する
+      if (settingsDraft)
+        settingsDraft.storeLocalFiles = state.settings.storeLocalFiles;
       renderStorageList();
     };
   }
 
   $("autoPlayNextCheckbox").onchange = (e) => {
-    state.settings.autoPlayNext = e.target.checked;
+    setSetting("autoPlayNext", e.target.checked);
   };
   $("stopOnVideoEndCheckbox").onchange = (e) => {
-    state.settings.stopOnVideoEnd = e.target.checked;
+    setSetting("stopOnVideoEnd", e.target.checked);
   };
 
   // Auto-hide UI settings
   const autoHideUICheckbox = $("autoHideUICheckbox");
   if (autoHideUICheckbox) {
-    autoHideUICheckbox.checked = state.settings.autoHideUI !== false;
     autoHideUICheckbox.onchange = (e) => {
-      state.settings.autoHideUI = e.target.checked;
-      if (!state.settings.autoHideUI && state.uiTimeout) {
-        clearTimeout(state.uiTimeout);
-        state.uiTimeout = null;
-      }
+      setSetting("autoHideUI", e.target.checked);
     };
   }
 
   const showVideoCheckbox = $("showVideoCheckbox");
   if (showVideoCheckbox) {
     showVideoCheckbox.onchange = (e) => {
-      state.settings.showVideo = e.target.checked;
-      updateVideoVisibility();
+      setSetting("showVideo", e.target.checked);
     };
   }
   const videoModeSelect = $("videoModeSelect");
   if (videoModeSelect) {
     videoModeSelect.onchange = (e) => {
-      state.settings.videoMode = e.target.value;
-      updateVideoVisibility();
+      setSetting("videoMode", e.target.value);
     };
   }
   const videoFitModeSelect = $("videoFitModeSelect");
   if (videoFitModeSelect) {
     videoFitModeSelect.onchange = (e) => {
-      state.settings.videoFitMode = e.target.value;
-      updateVideoVisibility();
+      setSetting("videoFitMode", e.target.value);
+    };
+  }
+
+  // 内部解像度（描画負荷）
+  const renderScaleSelect = $("renderScaleSelect");
+  if (renderScaleSelect) {
+    renderScaleSelect.onchange = (e) => {
+      setSetting("renderDpr", +e.target.value);
     };
   }
 
@@ -2874,12 +2898,7 @@ function setupSettingsInputs() {
   const speedSelect = $("speedSelect");
   if (speedSelect) {
     speedSelect.onchange = (e) => {
-      const rate = +e.target.value;
-      audio.playbackRate = rate;
-      state.settings.playbackRate = rate;
-      if (bgVideo.src) bgVideo.playbackRate = rate;
-      syncVideoRateAfterChange();
-      showOverlay(`⏩ 再生速度: ${rate}x`);
+      setSetting("playbackRate", +e.target.value);
     };
   }
 
@@ -2904,9 +2923,14 @@ function setupSettingsInputs() {
   const showFullscreenCheckbox = $("showFullscreenBtnCheckbox");
   if (showFullscreenCheckbox) {
     showFullscreenCheckbox.onchange = (e) => {
-      state.settings.showFullscreenButton = e.target.checked;
-      applySettingsToUI();
-      saveSettingsToStorage();
+      setSetting("showFullscreenButton", e.target.checked);
+    };
+  }
+
+  const showLabelsCheckbox = $("showLabelsCheckbox");
+  if (showLabelsCheckbox) {
+    showLabelsCheckbox.onchange = (e) => {
+      setSetting("showLabels", e.target.checked);
     };
   }
 
@@ -2923,9 +2947,10 @@ function setupPresets() {
     btn.style.backgroundColor = p.color;
     btn.textContent = p.name;
     btn.onclick = () => {
-      state.settings.fixedColor = p.color;
-      state.settings.rainbow = false;
-      applySettingsToUI();
+      const s = editableSettings();
+      s.fixedColor = p.color;
+      s.rainbow = false;
+      applySettingsToUI(s);
       showOverlay(t("overlay.colorApplied", { name: p.name }));
     };
     list.appendChild(btn);
@@ -2938,7 +2963,8 @@ function setupPresets() {
 }
 
 function savePreset(slot) {
-  const presetData = JSON.stringify(state.settings);
+  // 編集中なら下書きの内容を保存する
+  const presetData = JSON.stringify(editableSettings());
   localStorage.setItem(`visualizerPreset_${slot}`, presetData);
   showOverlay(t("overlay.presetSaved", { slot }));
 }
@@ -2948,15 +2974,12 @@ function loadPreset(slot) {
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
-      Object.assign(state.settings, parsed);
-      delete state.settings.renderMode;
-      applySettingsToUI();
-      updateVideoVisibility();
-      applyCanvasResolution();
-      if (state.analyser) {
-        state.analyser.smoothingTimeConstant = state.settings.smoothing;
-        state.analyser.fftSize = state.settings.fftSize;
-        applySensitivityToAnalyser();
+      const target = editableSettings();
+      Object.assign(target, parsed);
+      delete target.renderMode;
+      applySettingsToUI(target);
+      if (!settingsDraft) {
+        applyRuntimeSettings();
       }
       showOverlay(t("overlay.presetLoaded", { slot }));
     } catch (e) {
@@ -2967,107 +2990,158 @@ function loadPreset(slot) {
   }
 }
 
-function applySettingsToUI() {
-  $("smoothingSlider").value = state.settings.smoothing;
-  $("smoothingValue").textContent = state.settings.smoothing.toFixed(2);
-  $("sensitivitySlider").value = state.settings.sensitivity;
-  $("sensitivityValue").textContent = state.settings.sensitivity.toFixed(1);
-  if (!QUALITY_PRESETS[state.settings.fftSize]) state.settings.fftSize = 8192; // デフォルトに戻す
-  applyQualityPreset(state.settings.fftSize);
-  $("qualitySelect").value = state.settings.fftSize;
-  $("barCountSelect").value = state.settings.barCount;
-  $("showLabelsCheckbox").checked = state.settings.showLabels;
+function applySettingsToUI(source) {
+  const s = source || state.settings;
+  const isLive = !source || source === state.settings;
+
+  if (!QUALITY_PRESETS[s.fftSize]) s.fftSize = 8192; // デフォルトに戻す
+  s.barCount = Math.max(16, Math.min(1024, s.barCount || 64));
+
+  $("smoothingSlider").value = s.smoothing;
+  $("smoothingValue").textContent = s.smoothing.toFixed(2);
+  $("sensitivitySlider").value = s.sensitivity;
+  $("sensitivityValue").textContent = s.sensitivity.toFixed(1);
+  $("qualitySelect").value = s.fftSize;
+  $("barCountSelect").value = s.barCount;
+  $("showLabelsCheckbox").checked = s.showLabels;
   const fpsSelectUI = $("fpsSelect");
-  if (fpsSelectUI) fpsSelectUI.value = state.settings.targetFps || 60;
-  $("showVideoCheckbox").checked = state.settings.showVideo;
-  $("videoModeSelect").value = state.settings.videoMode;
-  $("videoFitModeSelect").value = state.settings.videoFitMode || "cover";
-  $("lowFreqSlider").value = state.settings.lowFreq;
-  $("lowFreqValue").textContent = state.settings.lowFreq + "Hz";
-  $("highFreqSlider").value = state.settings.highFreq;
+  if (fpsSelectUI) {
+    // 0（無制限）を 60 に丸めない
+    fpsSelectUI.value = String(s.targetFps === 0 ? 0 : s.targetFps || 60);
+  }
+  const renderScaleSelect = $("renderScaleSelect");
+  if (renderScaleSelect) renderScaleSelect.value = String(s.renderDpr ?? 1.5);
+  $("showVideoCheckbox").checked = s.showVideo;
+  $("videoModeSelect").value = s.videoMode;
+  $("videoFitModeSelect").value = s.videoFitMode || "cover";
+  $("lowFreqSlider").value = s.lowFreq;
+  $("lowFreqValue").textContent = s.lowFreq + "Hz";
+  $("highFreqSlider").value = s.highFreq;
   $("highFreqValue").textContent =
-    state.settings.highFreq >= 1000
-      ? state.settings.highFreq / 1000 + "kHz"
-      : state.settings.highFreq + "Hz";
+    s.highFreq >= 1000 ? s.highFreq / 1000 + "kHz" : s.highFreq + "Hz";
   const freqRangeSelectUI = $("freqRangeSelect");
   if (freqRangeSelectUI) {
     let matched = "custom";
     Object.keys(FREQ_RANGE_PRESETS).forEach((key) => {
       const preset = FREQ_RANGE_PRESETS[key];
-      if (
-        preset.low === state.settings.lowFreq &&
-        preset.high === state.settings.highFreq
-      ) {
+      if (preset.low === s.lowFreq && preset.high === s.highFreq) {
         matched = key;
       }
     });
     freqRangeSelectUI.value = matched;
   }
-  $("glowSlider").value = state.settings.glowStrength;
-  $("glowEnabledCheckbox").checked = !!state.settings.glowEnabled;
-  $("rainbowCheckbox").checked = state.settings.rainbow;
-  $("mirrorCheckbox").checked = state.settings.mirror;
-  $("bgBlurSlider").value = state.settings.bgBlur;
-  $("blurEnabledCheckbox").checked = !!state.settings.blurEnabled;
-  $("bgBlurValue").textContent = state.settings.bgBlur + "px";
-  $("opacitySlider").value = state.settings.opacity;
-  $("opacityValue").textContent = state.settings.opacity.toFixed(1);
+  $("glowSlider").value = s.glowStrength;
+  $("glowEnabledCheckbox").checked = !!s.glowEnabled;
+  $("rainbowCheckbox").checked = s.rainbow;
+  $("mirrorCheckbox").checked = s.mirror;
+  $("bgBlurSlider").value = s.bgBlur;
+  $("blurEnabledCheckbox").checked = !!s.blurEnabled;
+  $("bgBlurValue").textContent = s.bgBlur + "px";
+  $("opacitySlider").value = s.opacity;
+  $("opacityValue").textContent = s.opacity.toFixed(1);
   const balanceSlider = $("balanceSlider");
-  if (balanceSlider) balanceSlider.value = state.settings.balance || 0;
+  if (balanceSlider) balanceSlider.value = s.balance || 0;
   const balanceValue = $("balanceValue");
   if (balanceValue)
-    balanceValue.textContent = formatBalanceValue(state.settings.balance || 0);
-  $("fixedColorPicker").value = state.settings.fixedColor;
-  $("changeModeSelect").value = state.settings.changeMode || "off";
-  $("sandModeCheckbox").checked = !!state.settings.sandMode;
-  $("sandFallRateSlider").value = state.settings.sandFallRate;
-  $("sandFallRateValue").textContent = (
-    state.settings.sandFallRate || 0.6
-  ).toFixed(1);
-  $("circleAngleOffsetSlider").value = state.settings.circleAngleOffset || 0;
-  $("circleAngleOffsetValue").textContent =
-    `${state.settings.circleAngleOffset || 0}°`;
-  $("persistSettingsCheckbox").checked = state.settings.persistSettings;
+    balanceValue.textContent = formatBalanceValue(s.balance || 0);
+  $("fixedColorPicker").value = s.fixedColor;
+  $("changeModeSelect").value = s.changeMode || "off";
+  $("sandModeCheckbox").checked = !!s.sandMode;
+  $("sandFallRateSlider").value = s.sandFallRate;
+  $("sandFallRateValue").textContent = (s.sandFallRate || 0.6).toFixed(1);
+  $("circleAngleOffsetSlider").value = s.circleAngleOffset || 0;
+  $("circleAngleOffsetValue").textContent = `${s.circleAngleOffset || 0}°`;
+  $("persistSettingsCheckbox").checked = s.persistSettings;
   const storeLocalFilesCheckbox = $("storeLocalFilesCheckbox");
   if (storeLocalFilesCheckbox)
-    storeLocalFilesCheckbox.checked = !!state.settings.storeLocalFiles;
+    storeLocalFilesCheckbox.checked = !!s.storeLocalFiles;
 
-  $("autoPlayNextCheckbox").checked = state.settings.autoPlayNext;
-  $("stopOnVideoEndCheckbox").checked = state.settings.stopOnVideoEnd;
+  $("autoPlayNextCheckbox").checked = s.autoPlayNext;
+  $("stopOnVideoEndCheckbox").checked = s.stopOnVideoEnd;
+  $("autoHideUICheckbox").checked = s.autoHideUI !== false;
+  $("showFullscreenBtnCheckbox").checked = !!s.showFullscreenButton;
 
-  applyBalanceToPan();
-
-  // Volume restore
-  if (state.settings.volume !== undefined) {
-    els.volSlider.value = state.settings.volume;
-    updateVolume();
-  }
-  // Speed restore
-  if (state.settings.playbackRate) {
-    audio.playbackRate = state.settings.playbackRate;
-    const speedSel = $("speedSelect");
-    if (speedSel) speedSel.value = state.settings.playbackRate;
+  const inputGainSlider = $("inputGainSlider");
+  if (inputGainSlider) {
+    inputGainSlider.value = s.inputGain;
+    $("inputGainValue").textContent = (+s.inputGain).toFixed(1);
   }
 
-  state.settings.eq.forEach((val, i) => {
+  (s.eq || []).forEach((val, i) => {
     const freq = EQ_FREQS[i];
     const id = freq >= 1000 ? `eq${freq / 1000}k` : `eq${freq}`;
     const el = $(id);
     if (el) el.value = val;
   });
 
-  // 新規追加: 全画面ボタンの表示制御
+  const speedSel = $("speedSelect");
+  if (speedSel) speedSel.value = s.playbackRate || 1;
+
+  if (!isLive) return;
+
+  applyBalanceToPan();
+
+  // Volume restore
+  if (s.volume !== undefined) {
+    els.volSlider.value = s.volume;
+    updateVolume();
+  }
+  // Speed restore
+  if (s.playbackRate) {
+    audio.playbackRate = s.playbackRate;
+  }
+
+  // 全画面ボタンの表示制御
   if (els.fullscreenBtn) {
-    els.fullscreenBtn.style.display = state.settings.showFullscreenButton
-      ? "flex"
-      : "none";
+    els.fullscreenBtn.style.display = s.showFullscreenButton ? "flex" : "none";
   }
 }
 
+// 下書きを state.settings に反映したあと、音声・動画・描画へ一括適用する
+function applyRuntimeSettings() {
+  if (state.analyser) {
+    state.analyser.smoothingTimeConstant = state.settings.smoothing;
+    if (state.analyser.fftSize !== state.settings.fftSize) {
+      state.analyser.fftSize = state.settings.fftSize;
+      state.bufLen = state.analyser.frequencyBinCount;
+      state.freqData = new Uint8Array(state.bufLen);
+      state.timeData = new Uint8Array(state.bufLen);
+    }
+    applySensitivityToAnalyser();
+  }
+
+  (state.settings.eq || []).forEach((val, i) => {
+    if (state.eqFilters[i]) state.eqFilters[i].gain.value = val;
+  });
+
+  applyBalanceToPan();
+
+  if (state.settings.playbackRate) {
+    audio.playbackRate = state.settings.playbackRate;
+    if (bgVideo.src) bgVideo.playbackRate = state.settings.playbackRate;
+    syncVideoRateAfterChange();
+  }
+
+  updateVideoVisibility();
+
+  if (state.settings.autoHideUI === false && state.uiTimeout) {
+    clearTimeout(state.uiTimeout);
+    state.uiTimeout = null;
+  }
+
+  updateNumBars();
+  applyCanvasResolution();
+  invalidateRender(3);
+}
+
 function openSettings() {
+  // 変更は下書きに保持し、「保存して閉じる」まで適用しない
+  settingsDraft = JSON.parse(JSON.stringify(state.settings));
+  applySettingsToUI(settingsDraft);
+
   const langSelect = document.getElementById("langSelect");
   if (langSelect) {
-    langSelect.value = currentLang; // 確実に現在の言語を表示
+    langSelect.value = settingsDraft.language || currentLang;
   }
 
   els.settingsModal.classList.add("open");
@@ -3078,6 +3152,11 @@ function openSettings() {
   if (persistentControls) persistentControls.style.display = "none";
 }
 function closeSettings() {
+  if (settingsDraft) {
+    // 保存せずに閉じた場合は下書きを破棄して表示を元に戻す
+    settingsDraft = null;
+    applySettingsToUI();
+  }
   els.settingsModal.classList.remove("open");
   state.settingsOpen = false;
   // 設定タブを閉じたらUI非表示ボタンを復元
@@ -3088,16 +3167,29 @@ function closeSettings() {
  * Persists settings and closes the settings dialog only after success.
  */
 function saveSettings() {
+  const draft = settingsDraft || JSON.parse(JSON.stringify(state.settings));
   const langSelect = document.getElementById("langSelect");
-  if (langSelect) {
-    currentLang = langSelect.value;
-    localStorage.setItem("app_lang", currentLang);
-    state.settings.language = currentLang;
+  if (langSelect) draft.language = langSelect.value;
+
+  const prevMicDeviceId = state.settings.micDeviceId;
+  settingsDraft = null;
+  Object.assign(state.settings, draft);
+
+  currentLang = state.settings.language || currentLang;
+  localStorage.setItem("app_lang", currentLang);
+
+  applyRuntimeSettings();
+  applySettingsToUI();
+  if (state.settings.micDeviceId !== prevMicDeviceId) {
+    updateMicrophoneInput();
   }
 
   updateLanguageUI(); // 保存時にも確実に反映
   loadDeveloperMessage();
   if (!saveSettingsToStorage()) {
+    // 保存に失敗した場合は編集を続けられるよう下書きを復元する
+    settingsDraft = JSON.parse(JSON.stringify(state.settings));
+    applySettingsToUI(settingsDraft);
     showOverlay(t("overlay.fileSelectFailed"));
     return false;
   }
@@ -3481,6 +3573,8 @@ async function startMic() {
 
     console.log("[Mic] Success - Context state:", state.audioCtx.state);
     showOverlay(t("overlay.micStarted") || "マイク入力開始");
+    renderEmaInterval = 0;
+    invalidateRender(3);
   } catch (e) {
     console.error("[Mic] Failed:", e);
     let msg = "マイクアクセスに失敗しました";
@@ -3512,6 +3606,8 @@ function stopMic() {
     } catch (e) {}
     state.micSource = null;
   }
+  // マイク停止後は数フレーム描いて描画ループを止める
+  invalidateRender(2);
 }
 
 function connectFileSource() {
@@ -3559,10 +3655,14 @@ function updateEQ(index, gain) {
   if (state.eqFilters[index]) state.eqFilters[index].gain.value = gain;
 }
 function resetEQ() {
-  state.settings.eq = [0, 0, 0, 0, 0, 0, 0, 0];
-  state.eqFilters.forEach((f, i) => {
-    f.gain.value = 0;
-    const freq = EQ_FREQS[i];
+  editableSettings().eq = [0, 0, 0, 0, 0, 0, 0, 0];
+  // 保存前（下書き中）は音声へ適用せず、保存時にまとめて反映する
+  if (!settingsDraft) {
+    state.eqFilters.forEach((f) => {
+      f.gain.value = 0;
+    });
+  }
+  EQ_FREQS.forEach((freq, i) => {
     const id = freq >= 1000 ? `eq${freq / 1000}k` : `eq${freq}`;
     const el = $(id);
     if (el) el.value = 0;
@@ -4578,15 +4678,27 @@ function finishExport() {
 }
 
 // ============== VISUALIZATION ==============
+let filteredFreqBuffer = new Uint8Array(0);
 function getFilteredData() {
-  if (!state.analyser) return new Uint8Array(state.settings.barCount);
+  const barCount = state.settings.barCount;
+  if (!state.analyser) {
+    if (filteredFreqBuffer.length !== barCount)
+      filteredFreqBuffer = new Uint8Array(barCount);
+    return filteredFreqBuffer;
+  }
   state.analyser.getByteFrequencyData(state.freqData);
   state.analyser.getByteTimeDomainData(state.timeData);
   const loIdx = freqToIdx(state.settings.lowFreq);
   const hiIdx = Math.min(freqToIdx(state.settings.highFreq), state.bufLen);
-  const out = new Uint8Array(state.settings.barCount);
+  // 毎フレームの配列確保を避けるためバッファを再利用する
+  if (filteredFreqBuffer.length !== barCount)
+    filteredFreqBuffer = new Uint8Array(barCount);
+  const out = filteredFreqBuffer;
   const range = hiIdx - loIdx;
-  if (range <= 0) return out;
+  if (range <= 0) {
+    out.fill(0);
+    return out;
+  }
 
   // 対数スケーリングで人間の聴覚に合わせた周波数マッピング
   for (let i = 0; i < state.settings.barCount; i++) {
@@ -4624,28 +4736,68 @@ function freqToIdx(f) {
     ? Math.round((f * state.analyser.fftSize) / state.audioCtx.sampleRate)
     : 0;
 }
-function getColor(i, v = 1, total = state.settings.barCount) {
-  if (state.settings.rainbow) {
-    const baseHue = (i / total) * 360;
-    const timeHue =
-      state.mode === 1 || state.mode === 4 ? Date.now() * 0.05 : 0;
-    const hue = Math.floor((baseHue + timeHue) % 360);
-    const lightness = Math.max(0, Math.min(100, Math.round(50 + v * 20)));
-    return `hsl(${hue}, 80%, ${lightness}%)`;
+// HSL→HEX変換（起動時に一度だけ実行）
+function hslToHex(h, s, l) {
+  h = ((h % 360) + 360) % 360;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let r = 0,
+    g = 0,
+    b = 0;
+  if (h < 60) {
+    r = c;
+    g = x;
+  } else if (h < 120) {
+    r = x;
+    g = c;
+  } else if (h < 180) {
+    g = c;
+    b = x;
+  } else if (h < 240) {
+    g = x;
+    b = c;
+  } else if (h < 300) {
+    r = x;
+    b = c;
+  } else {
+    r = c;
+    b = x;
   }
-  return state.settings.fixedColor;
+  const toHex = (v) =>
+    Math.round((v + m) * 255)
+      .toString(16)
+      .padStart(2, "0");
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
-// ============== Display value computation (changeMode + sand) ==============
-function ensureFrameBuffers(n) {
-  if (!state.displayValues || state.displayValues.length !== n)
-    state.displayValues = new Float32Array(n);
-  if (!state.prevLevels || state.prevLevels.length !== n)
-    state.prevLevels = new Float32Array(n);
-  if (!state.sandHeights || state.sandHeights.length !== n)
-    state.sandHeights = new Float32Array(n);
-  if (!state.curLevels || state.curLevels.length !== n)
-    state.curLevels = new Float32Array(n);
+// レインボー色のLUT（360色相 × 明度8段階）。
+// 旧実装はバーごとに hsl() 文字列を生成して毎フレームCSS色パースしていた。
+const RAINBOW_LEVELS = 8;
+const RAINBOW_LUT = (() => {
+  const lut = new Array(360 * RAINBOW_LEVELS);
+  for (let h = 0; h < 360; h++) {
+    for (let i = 0; i < RAINBOW_LEVELS; i++) {
+      const lightness = (50 + (i / (RAINBOW_LEVELS - 1)) * 20) / 100;
+      lut[h * RAINBOW_LEVELS + i] = hslToHex(h, 0.8, lightness);
+    }
+  }
+  return lut;
+})();
+
+function getColor(i, v = 1, total = state.settings.barCount) {
+  if (state.settings.rainbow) {
+    const baseHue = (i / Math.max(1, total)) * 360;
+    const timeHue =
+      state.mode === 1 || state.mode === 4 ? Date.now() * 0.05 : 0;
+    const hue = Math.floor((((baseHue + timeHue) % 360) + 360) % 360);
+    const level = Math.round(
+      Math.max(0, Math.min(1, v)) * (RAINBOW_LEVELS - 1),
+    );
+    // 事前計算した色文字列を返す（毎フレームのHSL生成・パースを避ける）
+    return RAINBOW_LUT[hue * RAINBOW_LEVELS + level];
+  }
+  return state.settings.fixedColor;
 }
 
 // ============== Display value computation (changeMode + sand + 新decay) ==============
@@ -4701,7 +4853,6 @@ let lastVideoSyncCheckTs = 0;
 let videoSyncCooldown = 0; // 同期後のクールダウン時間
 let cachedReduceMotion = false; // matchMediaキャッシュ
 let colorsCache = []; // 色配列キャッシュ
-let animationFrameId = null; // rAF IDを保存して制御
 let appliedBlurPx = -1;
 let visualizerBaseAlpha = 1;
 
@@ -4709,6 +4860,123 @@ let visualizerBaseAlpha = 1;
 let fpsFrameCount = 0;
 let fpsLastTime = performance.now();
 let lastResourceUpdateTime = 0;
+
+// ============== Render scheduler ==============
+// 再生中・マイク入力中・明示的な再描画要求があるときだけ描画ループを回す。
+// 一時停止中に60fpsで描き続けるのが最大の無駄だったため、停止中はrAFを止める。
+function isRenderActive() {
+  if (state.isExporting) return true;
+  if (state.isPlaying) return true;
+  if (state.inputSource === "mic" && state.micStream) return true;
+  return renderPendingFrames > 0;
+}
+
+function invalidateRender(frames = 2) {
+  renderPendingFrames = Math.max(renderPendingFrames, frames);
+  scheduleRender();
+}
+
+function scheduleRender() {
+  if (document.hidden) return;
+  if (renderRafId !== null) return;
+  if (!isRenderActive()) return;
+  renderRafId = requestAnimationFrame(draw);
+}
+
+function stopRenderLoop() {
+  if (renderRafId !== null) {
+    cancelAnimationFrame(renderRafId);
+    renderRafId = null;
+  }
+  renderPendingFrames = 0;
+  renderEmaInterval = 0;
+  renderSlowStreak = 0;
+  lastDrawTs = 0;
+  fpsFrameCount = 0;
+  fpsLastTime = performance.now();
+  const fpsEl = $("fpsValue");
+  if (fpsEl) fpsEl.textContent = "0 fps";
+}
+
+// 実測フレーム間隔から描画解像度を自動調整する（ユーザー設定の最大FPSは変更しない）
+const QUALITY_RECOVER_MS = 30000;
+function updateAdaptiveQuality(frameIntervalMs) {
+  if (!(frameIntervalMs > 0) || frameIntervalMs > 500) return;
+
+  // 最短間隔を記録（リフレッシュ周期の推定）。目標FPSが120でも60Hz画面で
+  // 「常に遅い」と誤判定しないための基準になる。
+  if (!renderMinInterval || frameIntervalMs < renderMinInterval) {
+    renderMinInterval = Math.max(4, frameIntervalMs);
+  }
+
+  renderEmaInterval = renderEmaInterval
+    ? renderEmaInterval * 0.9 + frameIntervalMs * 0.1
+    : frameIntervalMs;
+
+  const now = performance.now();
+  if (now - renderLastQualityCheck < 2000) return;
+  renderLastQualityCheck = now;
+
+  const targetFps = state.settings.targetFps || 60;
+  if (targetFps !== renderAdaptTargetFps) {
+    renderAdaptTargetFps = targetFps;
+    renderMinInterval = 0;
+  }
+  // 120fps等の設定は「出れば嬉しい」扱い。60fpsを基準に品質を判断する。
+  const adaptTargetFps = Math.min(targetFps, 60);
+  const targetMs = 1000 / Math.max(1, adaptTargetFps);
+  // ディスプレイのリフレッシュ周期は30〜120Hzの範囲とみなす。
+  // 常時スローな端末でも「60ms周期の画面」と誤認して調整を諦めないようにする。
+  const refreshFloorMs = Math.min(
+    1000 / 30,
+    Math.max(1000 / 120, renderMinInterval || targetMs),
+  );
+  const effectiveTargetMs = Math.max(targetMs, refreshFloorMs);
+
+  // 実際に達成可能な間隔に対して明確に遅い場合だけ解像度を下げる
+  if (renderEmaInterval > effectiveTargetMs * 1.35) {
+    renderSlowStreak++;
+    renderLastSlowAt = now;
+  } else {
+    renderSlowStreak = 0;
+  }
+
+  if (renderSlowStreak >= 2 && renderQualityScale > 0.6) {
+    renderQualityScale = Math.max(0.6, renderQualityScale * 0.85);
+    renderSlowStreak = 0;
+    renderLastSlowAt = now;
+    applyCanvasResolution();
+    return;
+  }
+
+  // 30秒間遅いフレームが出なければ、余裕があるとみなして徐々に戻す
+  if (
+    renderQualityScale < 1 &&
+    renderLastSlowAt > 0 &&
+    now - renderLastSlowAt > QUALITY_RECOVER_MS
+  ) {
+    renderQualityScale = Math.min(1, renderQualityScale + 0.05);
+    renderLastSlowAt = now;
+    applyCanvasResolution();
+  }
+}
+
+function endFrame(ts) {
+  const prevTs = lastDrawTs;
+  lastDrawTs = ts;
+  if (
+    prevTs &&
+    (state.isPlaying || (state.inputSource === "mic" && state.micStream))
+  ) {
+    updateAdaptiveQuality(ts - prevTs);
+  }
+  if (renderPendingFrames > 0) renderPendingFrames--;
+  if (isRenderActive()) {
+    renderRafId = requestAnimationFrame(draw);
+  } else {
+    stopRenderLoop();
+  }
+}
 
 function updateResourceMonitor() {
   const now = performance.now();
@@ -4756,23 +5024,25 @@ if (window.matchMedia) {
 }
 
 function draw(ts = 0) {
-  try {
-    // バックグラウンド中は描画を行わない（復帰時に同期チェックで追従）
-    if (document.hidden) {
-      animationFrameId = requestAnimationFrame(draw);
-      return;
-    }
+  renderRafId = null;
 
-    // Android版も高FPS（設定に応じたフレームレート）
-    const targetFps = state.settings.targetFps || 60;
-    const minInterval = targetFps > 0 ? 1000 / targetFps : 0;
+  // バックグラウンド中は描画しない（復帰時に visibilitychange で再開）
+  if (document.hidden) {
+    renderPendingFrames = 0;
+    return;
+  }
+
+  // 設定された最大FPSを超えるフレームは描画せず次フレームへ
+  const targetFps = state.settings.targetFps || 0;
+  const minInterval = targetFps > 0 ? 1000 / targetFps : 0;
+  if (minInterval > 0 && lastDrawTs && ts - lastDrawTs < minInterval - 0.5) {
+    renderRafId = requestAnimationFrame(draw);
+    return;
+  }
+
+  try {
     const dtSecRaw = lastDrawTs ? (ts - lastDrawTs) / 1000 : 0;
-    if (minInterval > 0 && lastDrawTs && ts - lastDrawTs < minInterval) {
-      animationFrameId = requestAnimationFrame(draw);
-      return;
-    }
-    const dtSec = dtSecRaw || minInterval / 1000;
-    lastDrawTs = ts;
+    const dtSec = Math.min(0.1, dtSecRaw || minInterval / 1000 || 1 / 60);
 
     // 背景ぼかしは固定強度で維持
     if (
@@ -4894,13 +5164,11 @@ function draw(ts = 0) {
     }
 
     if (!state.analyser) {
-      animationFrameId = requestAnimationFrame(draw);
-      return;
+      return endFrame(ts);
     }
     const fd = getFilteredData();
     if (!fd || fd.length === 0) {
-      animationFrameId = requestAnimationFrame(draw);
-      return;
+      return endFrame(ts);
     }
     const display = computeDisplayValues(fd, dtSec);
     // Precompute colors for the frame - 配列再利用でメモリ確保を削減
@@ -4928,14 +5196,7 @@ function draw(ts = 0) {
           ? drawH * 0.8
           : drawH * 0.9;
 
-    // 低 FPSモード時はシャドウを無効化して軽量化
-    const originalGlow = state.settings.glowStrength;
-    if (
-      state.settings.lowPowerMode ||
-      (state.settings.targetFps > 0 && state.settings.targetFps <= 30)
-    )
-      state.settings.glowStrength = 0;
-
+    // 低 FPSモードでもグローは使えるようにする（ブルームは軽量なため）
     visualizerBaseAlpha = Math.max(0, Math.min(1, state.settings.opacity));
     ctx.globalAlpha = visualizerBaseAlpha;
 
@@ -4986,18 +5247,70 @@ function draw(ts = 0) {
       ctx.restore();
     }
 
-    ctx.globalAlpha = 1.0;
+    // グローはバー単位の shadowBlur ではなく、低解像度ブルームの合成で近似する。
+    // shadowBlur は1図形ごとにブラー処理が走るため、本数が多いと非常に重い。
+    if (state.settings.glowEnabled && state.settings.glowStrength > 0) {
+      applyBloom(state.settings.glowStrength);
+    }
 
-    if (
-      state.settings.lowPowerMode ||
-      (state.settings.targetFps > 0 && state.settings.targetFps <= 30)
-    )
-      state.settings.glowStrength = originalGlow;
+    ctx.globalAlpha = 1.0;
   } catch (err) {
     console.error("Draw error:", err);
   }
-  // 次のフレームを末尾でスケジュール（エラーが発生しても継続）
-  animationFrameId = requestAnimationFrame(draw);
+  // 後始末と次フレームのスケジュール
+  endFrame(ts);
+}
+// ============== Cheap bloom (glow) ==============
+// shadowBlur の代わりに、画面を1/4に縮小して低解像度側でぼかし、加算合成する。
+// ぼかしは小さいキャンバス上で行うため、バー単位の shadowBlur より大幅に軽い。
+let bloomCanvasA = null;
+let bloomCanvasB = null;
+let bloomCtxA = null;
+let bloomCtxB = null;
+
+function applyBloom(strength) {
+  if (!cv || W < 8 || H < 8) return;
+  const wA = Math.max(4, Math.floor(W / 4));
+  const hA = Math.max(4, Math.floor(H / 4));
+
+  if (!bloomCanvasA) {
+    bloomCanvasA = document.createElement("canvas");
+    bloomCanvasB = document.createElement("canvas");
+    bloomCtxA = bloomCanvasA.getContext("2d");
+    bloomCtxB = bloomCanvasB.getContext("2d");
+  }
+  if (bloomCanvasA.width !== wA || bloomCanvasA.height !== hA) {
+    bloomCanvasA.width = wA;
+    bloomCanvasA.height = hA;
+  }
+  if (bloomCanvasB.width !== wA || bloomCanvasB.height !== hA) {
+    bloomCanvasB.width = wA;
+    bloomCanvasB.height = hA;
+  }
+
+  // 1/4解像度に縮小
+  bloomCtxA.clearRect(0, 0, wA, hA);
+  bloomCtxA.imageSmoothingEnabled = true;
+  bloomCtxA.drawImage(cv, 0, 0, wA, hA);
+
+  // 低解像度のままぼかして、広い光のにじみを作る
+  bloomCtxB.clearRect(0, 0, wA, hA);
+  bloomCtxB.imageSmoothingEnabled = true;
+  bloomCtxB.filter = "blur(3px)";
+  bloomCtxB.drawImage(bloomCanvasA, 0, 0);
+  bloomCtxB.filter = "none";
+
+  const t = Math.max(0, Math.min(1, strength / 50));
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalCompositeOperation = "lighter";
+  ctx.imageSmoothingEnabled = true;
+  // 広いぼかし + 芯の光の2段階で合成する
+  ctx.globalAlpha = 0.45 + t * 0.45;
+  ctx.drawImage(bloomCanvasB, 0, 0, W, H);
+  ctx.globalAlpha = 0.25 + t * 0.35;
+  ctx.drawImage(bloomCanvasA, 0, 0, W, H);
+  ctx.restore();
 }
 // ============== Shake & Sparkles ==============
 function computeEnergy(display) {
@@ -5058,23 +5371,12 @@ function getVideoStartOffset() {
 // Modes (updated bars/circle to use display & sand)
 function drawBarsFromDisplay(display, colors, maxH, drawH, drawStartY) {
   const n = display.length;
+  const px = renderPixelScale;
   const bw = W / n;
   // バー本数が多い場合は空白を減らす（128本以上で調整開始）
+  // 内部解像度が変わっても見た目の太さが変わらないよう px で補正する
   const gap =
-    n >= 256 ? Math.max(0.5, 2 - (n - 256) / 256) : n >= 128 ? 1.5 : 2;
-  // global glow based on max level
-  let peak = 0;
-  for (let i = 0; i < n; i++) {
-    peak = Math.max(peak, Math.abs(display[i]));
-  }
-  if (state.settings.glowEnabled && state.settings.glowStrength > 0) {
-    ctx.shadowBlur = state.settings.glowStrength * Math.max(0.2, peak);
-    ctx.shadowColor = state.settings.rainbow
-      ? "#ffffff"
-      : state.settings.fixedColor;
-  } else {
-    ctx.shadowBlur = 0;
-  }
+    (n >= 256 ? Math.max(0.5, 2 - (n - 256) / 256) : n >= 128 ? 1.5 : 2) * px;
   for (let i = 0; i < n; i++) {
     let v = Math.max(0, display[i]);
     v = Math.pow(v, 1.15); // ★ 低レベル強調でピークが目立つように
@@ -5088,7 +5390,7 @@ function drawBarsFromDisplay(display, colors, maxH, drawH, drawStartY) {
     if (v > 0.7) {
       ctx.fillStyle = "#ffffff";
       ctx.globalAlpha = 0.4;
-      ctx.fillRect(i * bw + gap / 2, drawStartY + drawH - h, bw - gap, 4); // トップライン
+      ctx.fillRect(i * bw + gap / 2, drawStartY + drawH - h, bw - gap, 4 * px); // トップライン
       ctx.globalAlpha = visualizerBaseAlpha;
     }
     // sand marker: use same color as bar
@@ -5099,17 +5401,13 @@ function drawBarsFromDisplay(display, colors, maxH, drawH, drawStartY) {
         ctx.fillStyle = color;
         ctx.globalAlpha = 0.6;
         const y = drawStartY + drawH - sh;
-        ctx.fillRect(i * bw + gap / 2, y - 2, bw - gap, 4);
+        ctx.fillRect(i * bw + gap / 2, y - 2 * px, bw - gap, 4 * px);
         ctx.globalAlpha = visualizerBaseAlpha;
       }
     }
   }
-  ctx.shadowBlur = 0;
 }
 function drawWaveform(maxH, drawH, drawStartY) {
-  const glowEnabled =
-    state.settings.glowEnabled && state.settings.glowStrength >= 5; // ← 変更
-
   let startIdx = 0;
   for (let i = 0; i < state.bufLen - 1; i++) {
     if (state.timeData[i] < 128 && state.timeData[i + 1] >= 128) {
@@ -5118,63 +5416,76 @@ function drawWaveform(maxH, drawH, drawStartY) {
     }
   }
 
-  ctx.beginPath();
-  const slice = W / (state.bufLen - startIdx);
+  // 全サンプル（最大 fftSize/2 点）を結ぶとパス構築が重いので、
+  // 画面幅に対して十分な密度まで間引く（見た目はほぼ変わらない）
+  const total = state.bufLen - startIdx;
+  const step = Math.max(1, Math.ceil(total / Math.max(256, W / 2)));
+  const slice = W / total;
   const centerY = drawStartY + drawH / 2;
 
-  for (let i = startIdx; i < state.bufLen; i++) {
+  ctx.beginPath();
+  for (let i = startIdx; i < state.bufLen; i += step) {
     const v = state.timeData[i] / 128 - 1;
     const y = centerY + v * maxH * 0.5;
     i === startIdx ? ctx.moveTo(0, y) : ctx.lineTo((i - startIdx) * slice, y);
+  }
+  // 間引きで最後のサンプルが落ちた場合は右端まで線をつなぐ
+  const lastIdx = state.bufLen - 1;
+  if (lastIdx > startIdx && (lastIdx - startIdx) % step !== 0) {
+    const v = state.timeData[lastIdx] / 128 - 1;
+    ctx.lineTo(W, centerY + v * maxH * 0.5);
   }
 
   ctx.strokeStyle = state.settings.rainbow
     ? `hsl(${(Date.now() * 0.1) % 360}, 80%, 60%)`
     : state.settings.fixedColor;
-  ctx.lineWidth = 3;
-
-  if (glowEnabled) {
-    ctx.shadowBlur = state.settings.glowStrength * 0.7;
-    ctx.shadowColor = ctx.strokeStyle;
-  }
+  ctx.lineWidth = 3 * renderPixelScale;
 
   ctx.stroke();
-  ctx.shadowBlur = 0;
 }
 function drawDigitalBlocks(fd, maxH, drawH, drawStartY) {
   const cols = 32;
   const rows = 20;
+  const px = renderPixelScale;
   const cellW = W / cols;
   const cellH = drawH / rows;
+  const inset = 2 * px;
+  const innerW = Math.max(0.5, cellW - inset * 2);
+  const innerH = Math.max(0.5, cellH - inset * 2);
+
+  // 非アクティブなマス目は全部同じ色なので、1パスにまとめて塗る。
+  ctx.beginPath();
   for (let i = 0; i < cols; i++) {
     const idx = Math.floor((i / cols) * fd.length);
-    const v = fd[idx] / 255;
-    const activeRows = Math.floor(v * rows);
-    for (let j = 0; j < rows; j++) {
-      if (rows - j <= activeRows) {
-        ctx.fillStyle = getColor(i, (rows - j) / rows, cols);
-        ctx.fillRect(
-          i * cellW + 2,
-          drawStartY + j * cellH + 2,
-          cellW - 4,
-          cellH - 4,
-        );
-      } else {
-        ctx.fillStyle = "rgba(255,255,255,0.05)";
-        ctx.fillRect(
-          i * cellW + 2,
-          drawStartY + j * cellH + 2,
-          cellW - 4,
-          cellH - 4,
-        );
-      }
+    const activeRows = Math.floor((fd[idx] / 255) * rows);
+    for (let j = 0; j < rows - activeRows; j++) {
+      ctx.rect(
+        i * cellW + inset,
+        drawStartY + j * cellH + inset,
+        innerW,
+        innerH,
+      );
+    }
+  }
+  ctx.fillStyle = "rgba(255,255,255,0.05)";
+  ctx.fill();
+
+  // アクティブなマス目だけ個別に塗る（本数はデータ量に依存）
+  for (let i = 0; i < cols; i++) {
+    const idx = Math.floor((i / cols) * fd.length);
+    const activeRows = Math.floor((fd[idx] / 255) * rows);
+    for (let j = rows - activeRows; j < rows; j++) {
+      ctx.fillStyle = getColor(i, (rows - j) / rows, cols);
+      ctx.fillRect(
+        i * cellW + inset,
+        drawStartY + j * cellH + inset,
+        innerW,
+        innerH,
+      );
     }
   }
 }
 function drawCircleFromDisplay(display, colors, maxH, drawH, drawStartY) {
-  const glowEnabled =
-    state.settings.glowEnabled && state.settings.glowStrength >= 5; // ← 変更
-
   const cx = W / 2,
     cy = drawStartY + drawH / 2;
   const r = Math.min(W, drawH) * 0.25;
@@ -5184,43 +5495,63 @@ function drawCircleFromDisplay(display, colors, maxH, drawH, drawStartY) {
   const angleOffset =
     (((state.settings.circleAngleOffset || 0) % 360) * Math.PI) / 180;
 
+  // バーごとに save/translate/rotate/restore する代わりに、
+  // 現在の変換（ミラー等）に回転と平行移動を合成して setTransform で直接適用する
+  const base = ctx.getTransform();
+  const ba = base.a,
+    bb = base.b,
+    bc = base.c,
+    bd = base.d,
+    be = base.e,
+    bf = base.f;
+  // 平行移動 (cx, cy) は全バー共通なので事前に計算
+  const transE = ba * cx + bc * cy + be;
+  const transF = bb * cx + bd * cy + bf;
+
   for (let i = 0; i < n; i++) {
     const ang = (i / n) * Math.PI * 2 - Math.PI / 2 + angleOffset;
+    const cos = Math.cos(ang);
+    const sin = Math.sin(ang);
+
+    // base * rotate(ang) * translate(cx, cy)
+    ctx.setTransform(
+      ba * cos + bc * sin,
+      bb * cos + bd * sin,
+      -ba * sin + bc * cos,
+      -bb * sin + bd * cos,
+      transE,
+      transF,
+    );
+
     const v = Math.max(0, display[i]);
     const len = v * maxH * 0.6;
-
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(ang);
     const color = colors[i];
     ctx.fillStyle = color;
 
-    if (glowEnabled && v > 0.3) {
-      ctx.shadowBlur = state.settings.glowStrength * 0.7;
-      ctx.shadowColor = color;
-    }
-
     ctx.fillRect(r, -barW / 2, len, barW);
-    ctx.restore();
 
     if (state.settings.sandMode) {
       const sandV = state.sandHeights ? state.sandHeights[i] : 0;
       const sh = sandV * maxH * 0.6; // Circleのバー長さに合わせる
       if (sh > 0) {
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(ang);
+        // 直前のバーで設定した変換をそのまま利用する
         ctx.fillStyle = color;
         ctx.globalAlpha = 0.6;
         ctx.beginPath();
-        ctx.arc(r + sh, 0, Math.max(1.5, barW * 0.3), 0, Math.PI * 2);
+        ctx.arc(
+          r + sh,
+          0,
+          Math.max(1.5 * renderPixelScale, barW * 0.3),
+          0,
+          Math.PI * 2,
+        );
         ctx.fill();
         ctx.globalAlpha = visualizerBaseAlpha;
-        ctx.restore();
       }
     }
   }
-  ctx.shadowBlur = 0;
+
+  ctx.setTransform(ba, bb, bc, bd, be, bf);
 }
 function drawSpectrum(fd, maxH, drawH, drawStartY) {
   const n = fd.length;
@@ -5259,13 +5590,13 @@ function drawSpectrum(fd, maxH, drawH, drawStartY) {
   ctx.fill();
 
   ctx.strokeStyle = state.settings.rainbow ? `hsl(${hue}, 80%, 80%)` : "#fff";
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 2 * renderPixelScale;
   ctx.stroke();
 }
 function drawGalaxy(fd, drawH, drawStartY) {
-  const glowEnabled = state.settings.glowStrength >= 5;
   const cx = W / 2,
     cy = drawStartY + drawH / 2;
+  const px = renderPixelScale;
   const bass = fd[0] / 255;
   ctx.save();
   ctx.translate(cx, cy);
@@ -5278,19 +5609,14 @@ function drawGalaxy(fd, drawH, drawStartY) {
       const idx = Math.floor(progress * fd.length);
       const v = fd[idx] / 255;
       const angle = (i / arms) * Math.PI * 2 + progress * Math.PI * 2;
-      const r = progress * Math.min(W, drawH) * 0.4 + bass * 50;
+      const r = progress * Math.min(W, drawH) * 0.4 + bass * 50 * px;
       const x = Math.cos(angle) * r;
       const y = Math.sin(angle) * r;
-      const size = (v * 10 + 2) * (1 - progress * 0.5);
+      const size = (v * 10 + 2) * px * (1 - progress * 0.5);
       ctx.beginPath();
       ctx.arc(x, y, size, 0, Math.PI * 2);
       ctx.fillStyle = getColor(idx, v, fd.length);
-      if (state.settings.glowStrength >= 5) {
-        ctx.shadowBlur = size * 2 * 0.7;
-        ctx.shadowColor = ctx.fillStyle;
-      }
       ctx.fill();
-      ctx.shadowBlur = 0;
     }
   }
   ctx.restore();
@@ -5546,7 +5872,6 @@ function drawMonitor(fd, maxH, drawH, drawStartY) {
   }
 }
 function drawHexagon(fd, drawH, drawStartY) {
-  const glowEnabled = state.settings.glowStrength >= 5;
   const cx = W / 2,
     cy = drawStartY + drawH / 2;
   const maxR = Math.min(W, drawH) * 0.4;
@@ -5567,32 +5892,23 @@ function drawHexagon(fd, drawH, drawStartY) {
     }
     ctx.closePath();
     ctx.strokeStyle = getColor(idx, v, fd.length);
-    ctx.lineWidth = 2 + v * 5;
-    if (state.settings.glowStrength >= 5) {
-      ctx.shadowBlur = 10 * 0.7;
-      ctx.shadowColor = ctx.strokeStyle;
-    }
+    ctx.lineWidth = (2 + v * 5) * renderPixelScale;
     ctx.stroke();
-    ctx.shadowBlur = 0;
   }
 }
 function drawMirrorBars(fd, maxH, drawH, drawStartY) {
-  const glowEnabled = state.settings.glowStrength >= 5;
   const n = fd.length;
+  const px = renderPixelScale;
   const bw = W / n;
+  const inset = Math.max(0.5, px);
   const cy = drawStartY + drawH / 2;
   for (let i = 0; i < n; i++) {
     const v = fd[i] / 255;
     const h = v * maxH * 0.5;
     const color = getColor(i, v, n);
-    if (state.settings.glowEnabled && glowEnabled && v > 0.3) {
-      ctx.shadowBlur = state.settings.glowStrength * 0.7;
-      ctx.shadowColor = color;
-    }
     ctx.fillStyle = color;
-    ctx.fillRect(i * bw + 1, cy - h, bw - 2, h);
-    ctx.fillRect(i * bw + 1, cy, bw - 2, h);
-    ctx.shadowBlur = 0;
+    ctx.fillRect(i * bw + inset, cy - h, Math.max(0.5, bw - inset * 2), h);
+    ctx.fillRect(i * bw + inset, cy, Math.max(0.5, bw - inset * 2), h);
   }
 }
 
@@ -5610,20 +5926,39 @@ if (!window.__audioVisualizerBgGuardInstalled) {
   window.__audioVisualizerBgGuardInstalled = true;
 
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) {
-      if (
-        typeof syncNativeMediaNotification === "function" &&
-        typeof state !== "undefined" &&
-        state.isPlaying
-      ) {
-        syncNativeMediaNotification(false);
-      }
+    if (document.hidden) {
+      // 非表示中は描画ループを完全に止める
+      if (typeof stopRenderLoop === "function") stopRenderLoop();
+      return;
+    }
 
-      if (typeof updateMediaSessionMetadata === "function") {
-        updateMediaSessionMetadata();
-      }
+    // 復帰時は数フレーム描いて状態を同期する
+    if (typeof invalidateRender === "function") invalidateRender(3);
+
+    if (
+      typeof syncNativeMediaNotification === "function" &&
+      typeof state !== "undefined" &&
+      state.isPlaying
+    ) {
+      syncNativeMediaNotification(false);
+    }
+
+    if (typeof updateMediaSessionMetadata === "function") {
+      updateMediaSessionMetadata();
     }
   });
+}
+
+// 設定スライダー・セレクト・ボタン操作で停止中でも即座に描き直す。
+// （停止中はrAFを止めているため、明示的な再描画要求が必要）
+if (!window.__audioVisualizerRenderInvalidationInstalled) {
+  window.__audioVisualizerRenderInvalidationInstalled = true;
+  const invalidate = () => {
+    if (typeof invalidateRender === "function") invalidateRender(2);
+  };
+  document.addEventListener("input", invalidate, true);
+  document.addEventListener("change", invalidate, true);
+  document.addEventListener("click", invalidate, true);
 }
 
 (() => {
@@ -5656,11 +5991,16 @@ if (!window.__audioVisualizerBgGuardInstalled) {
 
     const cv = document.getElementById("cv");
     if (cv) {
-      const dpr = window.devicePixelRatio || 1;
-      cv.width = Math.round(width * dpr);
-      cv.height = Math.round(height * dpr);
-      cv.style.width = "100%";
-      cv.style.height = "100%";
+      // 解像度は applyCanvasResolution に一任する（DPR上限と自動品質調整を反映）
+      if (typeof applyCanvasResolution === "function") {
+        applyCanvasResolution();
+      } else {
+        const dpr = Math.min(1.5, window.devicePixelRatio || 1);
+        cv.width = Math.round(width * dpr);
+        cv.height = Math.round(height * dpr);
+        cv.style.width = "100%";
+        cv.style.height = "100%";
+      }
     }
 
     const video = document.getElementById("videoContainer");

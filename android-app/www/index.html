@@ -429,6 +429,29 @@
             </select>
           </div>
           <div class="setting-item">
+            <label data-i18n="label.renderScale">内部解像度</label>
+            <select id="renderScaleSelect">
+              <option value="1" data-i18n="opt.renderScaleLow">
+                省電力 (1.0x)
+              </option>
+              <option value="1.5" data-i18n="opt.renderScaleStandard" selected>
+                標準 (1.5x)
+              </option>
+              <option value="2" data-i18n="opt.renderScaleHigh">
+                高画質 (2.0x)
+              </option>
+              <option value="2.5" data-i18n="opt.renderScaleMax">
+                最高 (2.5x)
+              </option>
+              <option value="0" data-i18n="opt.renderScaleNative">
+                ネイティブ
+              </option>
+            </select>
+            <p class="hint" data-i18n="hint.renderScale">
+              ※ 低いほど省電力です。バーや波形の大きさは変わりません。
+            </p>
+          </div>
+          <div class="setting-item">
             <label data-i18n="label.renderBackend">描画バックエンド</label>
             <span class="hint">Canvas2D</span>
           </div>
