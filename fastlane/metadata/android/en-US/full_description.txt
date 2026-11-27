@@ -1,10 +1,20 @@
 Audio Visualizer is an Android app for playing local audio and video files while showing visual effects.
 
 Features:
- - Local playback of audio and video files
- - Visualizer display with basic media controls
- - Built for offline use without Google services
- - Focused on local media playback for F-Droid distribution
+ - Local audio and video playback
+ - Bulk import from the device music library (MediaStore)
+ - Title, artist, and album art display
+ - Background playback with notification, lock-screen, and headset controls
+ - Restore the last track and playback position
+ - Keep-screen-on option
+ - 9 visualizer modes
+ - Real-time microphone input visualization
+ - 8-band equalizer and playback settings persistence
+ - Video display options: audio only / window / background
+ - Adjustable text and UI size from 80% to 130%
+ - Offline design without Google services
+
+Note: Video export and recording are not supported yet.
 
 Source code:
 https://github.com/Rino-program/Audio-Visualizer
