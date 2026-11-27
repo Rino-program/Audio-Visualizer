@@ -1,0 +1,9 @@
+<resources>
+    <string name="notification_channel_name">재생</string>
+    <string name="notification_channel_description">재생 컨트롤</string>
+    <string name="notification_previous">이전</string>
+    <string name="notification_play">재생</string>
+    <string name="notification_pause">일시 정지</string>
+    <string name="notification_next">다음</string>
+    <string name="notification_stop">정지</string>
+</resources>

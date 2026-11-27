@@ -3,11 +3,18 @@
 [日本語](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [한국어](README.ko-KR.md)
 
 An audio visualizer for local media playback on Android. Tailored for F-Droid distribution with no external service dependencies.
-Supported version: v1.1.5 (version code 18)
+Supported version: v1.2.0 (version code 19)
 
 ## Features
 
 - Local audio and video file playback
+- Video display options (audio only / window / background)
+- Device music library (MediaStore) import
+- Metadata and album art display
+- Background playback with notification and lock-screen controls
+- Restore the last track and playback position
+- Keep-screen-on option
+- Adjustable UI text and size (80%–130%)
 - Real-time microphone input visualization
 - 9 visualizer modes
 - Equalizer and playback settings persistence

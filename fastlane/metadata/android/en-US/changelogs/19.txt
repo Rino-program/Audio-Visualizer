@@ -1,9 +1,11 @@
-Main updates in v1.1.6:
+v1.2.0 main updates:
 
-- Added Internal Resolution (Power Saving to Native)
-- Rendering stops while paused or in the background, with automatic resolution adjustment under load
-- Replaced glow with a lightweight bloom pass
-- Settings changes now apply only after "Save & Close"
-- Fixed Unlimited FPS being shown as 60
+- Background playback and notification/lock-screen controls
+- Device music library import, metadata and album art
+- Resume position and keep-screen-on
+- Video display: audio only / window / background
+- Text/UI size 80%–130%
+- Compact one-row bars on tablets/wide screens; auto-positioned playlist
+- Restored settings tabs, fixed translation and startup issues
 
 Full changelog: https://github.com/Rino-program/Audio-Visualizer/blob/main/changelog_MD/en-US/19.md

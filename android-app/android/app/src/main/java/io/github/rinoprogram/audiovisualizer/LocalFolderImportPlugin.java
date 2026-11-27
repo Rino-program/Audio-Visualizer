@@ -14,7 +14,9 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -77,9 +79,10 @@ public class LocalFolderImportPlugin extends Plugin {
 
         Uri treeUri = data.getData();
         try {
-            final int takeFlags = data.getFlags()
-                    & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-            getContext().getContentResolver().takePersistableUriPermission(treeUri, takeFlags);
+            getContext().getContentResolver().takePersistableUriPermission(
+                    treeUri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+            );
         } catch (Exception ignored) {
             // ignore
         }
@@ -248,10 +251,22 @@ public class LocalFolderImportPlugin extends Plugin {
             return;
         }
         try {
-            byte[] data = java.nio.file.Files.readAllBytes(pending.toPath());
+            byte[] data = readAllBytes(pending);
             call.resolve(new JSObject(new String(data, StandardCharsets.UTF_8)));
         } catch (Exception e) {
             call.reject("Failed to read pending folder import", e);
+        }
+    }
+
+    private static byte[] readAllBytes(File file) throws Exception {
+        try (InputStream in = new FileInputStream(file);
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = in.read(buffer)) != -1) {
+                out.write(buffer, 0, read);
+            }
+            return out.toByteArray();
         }
     }
 

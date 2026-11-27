@@ -1,0 +1,9 @@
+<resources>
+    <string name="notification_channel_name">再生</string>
+    <string name="notification_channel_description">再生コントロール</string>
+    <string name="notification_previous">前へ</string>
+    <string name="notification_play">再生</string>
+    <string name="notification_pause">一時停止</string>
+    <string name="notification_next">次へ</string>
+    <string name="notification_stop">停止</string>
+</resources>

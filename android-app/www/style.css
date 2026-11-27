@@ -50,6 +50,13 @@
   --sab: env(safe-area-inset-bottom);
   --sal: env(safe-area-inset-left);
   --sar: env(safe-area-inset-right);
+
+  /* General UI text scale (does not affect the visualizer canvas). */
+  --ui-scale: 1;
+}
+
+html {
+  font-size: calc(16px * var(--ui-scale, 1));
 }
 
 html,
@@ -82,7 +89,7 @@ body {
   height: 100dvh;
   height: var(--app-height, 100dvh);
   min-height: var(--app-height, 100dvh);
-  font-size: 14px;
+  font-size: calc(14px * var(--ui-scale, 1));
   line-height: 1.5;
 }
 
@@ -259,7 +266,7 @@ body.drag-over::after {
 .video-handle {
   cursor: move;
   color: #fff;
-  font-size: 18px;
+  font-size: 1.125rem;
 }
 
 .mini-btn {
@@ -267,7 +274,7 @@ body.drag-over::after {
   border: none;
   color: #fff;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 0.875rem;
   padding: 4px;
 }
 
@@ -385,7 +392,7 @@ body.drag-over::after {
   position: fixed;
   top: calc(20px + var(--safe-top));
   right: calc(20px + var(--safe-right));
-  display: flex;
+  display: none;
   gap: 12px;
   z-index: 1001;
   transition: var(--transition);
@@ -393,6 +400,7 @@ body.drag-over::after {
 }
 
 #uiLayer.hidden ~ #persistentControls {
+  display: flex;
   opacity: 0.5;
 }
 
@@ -417,6 +425,19 @@ body.drag-over::after {
     var(--glass-highlight),
     transparent
   );
+}
+
+/* 再生中は毎フレームの背景ブラーを止めて合成負荷を下げる（見た目は不透明寄りに） */
+body.playing .glass {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background-color: rgba(15, 23, 42, 0.88);
+}
+body.playing .playlist-header,
+body.playing .playlist-search {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background-color: rgba(15, 23, 42, 0.92);
 }
 .hint {
   color: var(--text-muted);
@@ -499,6 +520,10 @@ body.drag-over::after {
     rgba(255, 255, 255, 0.35),
     rgba(79, 172, 254, 0.25)
   );
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -543,6 +568,14 @@ body.drag-over::after {
   display: flex;
   gap: 12px;
   align-items: center;
+  flex-shrink: 0;
+}
+
+/* UI表示切替・全画面（UI表示中はトップバー内に置く） */
+.top-utility {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex-shrink: 0;
 }
 
@@ -893,12 +926,13 @@ select option {
 
 /* Playlist Panel */
 .playlist-panel {
-  position: absolute;
-  top: 80px;
-  left: 20px;
+  position: fixed;
+  top: var(--playlist-top, 80px);
+  bottom: auto;
+  left: calc(20px + var(--safe-left));
   width: 400px;
-  max-width: calc(100vw - 40px);
-  max-height: calc(var(--app-height, 100vh) - 240px);
+  max-width: calc(100vw - 40px - var(--safe-left) - var(--safe-right));
+  max-height: var(--playlist-max-height, calc(var(--app-height, 100vh) - 240px));
   border-radius: var(--radius-lg);
   display: flex;
   flex-direction: column;
@@ -909,9 +943,6 @@ select option {
 }
 
 @media (max-width: 900px) and (orientation: portrait) {
-  .playlist-panel {
-    max-height: calc(var(--app-height, 100vh) - 300px);
-  }
   .controls-bar {
     padding: 16px;
     gap: 12px;
@@ -1293,12 +1324,15 @@ select option {
 
 .tabs {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   padding: 6px 8px 4px 8px;
   border-bottom: 1px solid var(--glass-border);
   background: transparent;
-  gap: 6px 8px;
-  overflow-x: visible;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
   scrollbar-width: none;
   width: 100%;
   flex-shrink: 0; /* Prevent squashing */
@@ -1313,11 +1347,12 @@ select option {
 .tab-btn {
   display: inline-flex;
   align-items: center;
-  padding: 6px 10px;
+  padding: 6px 8px;
   background: transparent;
   gap: 8px 6px;
   font-weight: 600;
-  font-size: 0.88rem;
+  font-size: 0.85rem;
+  border: none;
   border-bottom: 2px solid transparent;
   transition: var(--transition);
   white-space: nowrap;
@@ -1495,17 +1530,22 @@ select option {
   }
 
   .top-bar {
+    position: relative;
     flex-direction: column;
     justify-content: flex-start;
     align-items: stretch;
-    padding: calc(12px + var(--safe-top)) 12px 8px;
-    gap: 8px;
+    padding: calc(8px + var(--safe-top)) 12px 6px;
+    gap: 6px;
   }
   .status-display {
     text-align: center;
     width: 100%;
     min-width: 0;
     order: 1;
+  }
+  /* 右上の固定ボタン領域と重ならないよう、曲名側だけ右を空ける */
+  .now-playing-badge {
+    padding-right: 92px;
   }
   .top-controls {
     width: 100%;
@@ -1514,12 +1554,18 @@ select option {
     align-items: center;
     flex-shrink: 0;
     order: 2;
+    gap: 8px;
+  }
+  .top-utility {
+    position: absolute;
+    top: calc(12px + var(--safe-top));
+    right: 12px;
   }
 
   .controls-bar {
     /* Make padding symmetric so horizontal space matches both edges */
-    padding: 12px;
-    gap: 10px;
+    padding: 10px;
+    gap: 8px;
   }
 
   /* Stack controls vertically to avoid squashing and let each row breathe */
@@ -1527,7 +1573,7 @@ select option {
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    gap: 10px;
+    gap: 8px;
   }
 
   .control-group {
@@ -1537,16 +1583,13 @@ select option {
   }
 
   .control-group.left {
-    order: 1;
-    display: flex;
-    gap: 8px;
-    justify-content: flex-start;
+    display: none; /* Volume is hidden on mobile, so drop the empty row. */
   }
   .control-group.center {
     order: 2;
     display: flex;
     flex-wrap: nowrap;
-    gap: 10px;
+    gap: 8px;
     justify-content: center;
     align-items: center;
     overflow-x: auto;
@@ -1616,34 +1659,95 @@ select option {
     padding: 6px 10px;
   }
 
-  /* Playlist becomes a bottom sheet on mobile */
+  /* Playlist: full-width panel below the top bar on phones/tablets */
   .playlist-panel {
-    position: fixed;
-    left: 12px;
-    right: 12px;
-    top: auto;
-    bottom: calc(150px + var(--safe-bottom));
+    left: calc(12px + var(--safe-left));
+    right: calc(12px + var(--safe-right));
     width: auto;
-    max-height: min(70vh, calc(100vh - 200px));
+    max-width: none;
     border-radius: var(--radius-lg);
     z-index: 1005;
   }
 }
 
-/* Portrait mode: move playlist to top (below UI) to avoid overlapping controls */
-@media (max-width: 768px) and (orientation: portrait) {
-  .playlist-panel {
-    position: fixed;
-    left: 12px;
-    right: 12px;
-    top: var(--playlist-top, calc(100px + var(--safe-top)));
-    bottom: auto;
-    width: auto;
-    max-height: min(60vh, calc(100vh - 360px));
-    border-radius: var(--radius-lg);
-    z-index: 1005;
+/* Large phones / small tablets: use compact one-row bars instead of stacking. */
+@media (min-width: 600px) and (max-width: 768px) {
+  .top-bar {
+    flex-direction: row;
+    align-items: center;
+    padding: calc(8px + var(--safe-top)) 12px 8px;
+    gap: 10px;
+    padding-right: 12px;
   }
 
+  .status-display {
+    flex: 1;
+    width: auto;
+    text-align: left;
+    order: 0;
+  }
+
+  .now-playing-badge {
+    padding-right: 0;
+  }
+
+  .top-controls {
+    width: auto;
+    flex: 0 0 auto;
+    justify-content: flex-end;
+    order: 0;
+    gap: 8px;
+  }
+
+  .top-utility {
+    position: static;
+  }
+
+  .controls-bar {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .main-controls {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .control-group {
+    width: auto;
+    min-width: 0;
+  }
+
+  .control-group.left {
+    display: none;
+  }
+
+  .control-group.center {
+    width: auto;
+    margin: 0;
+    gap: 8px;
+    justify-self: center;
+    overflow: visible;
+    grid-column: 2;
+  }
+
+  .control-group.right {
+    width: auto;
+    justify-self: end;
+    grid-column: 3;
+  }
+
+  .mode-select {
+    min-width: 110px;
+    font-size: 0.8rem;
+    padding: 5px 10px;
+  }
+}
+
+/* Portrait mode: playlist keeps the shared top-anchored layout */
+@media (max-width: 768px) and (orientation: portrait) {
   .playlist-items {
     padding: 4px;
   }
@@ -1709,7 +1813,7 @@ select option {
   }
 
   .control-group.center {
-    gap: 14px;
+    gap: 10px;
   }
 
   .control-group.right {
@@ -1739,42 +1843,64 @@ select option {
 /* Phone landscape: keep controls reachable and playlist unobtrusive */
 @media (max-width: 768px) and (orientation: landscape) and (max-height: 520px) {
   .top-bar {
-    padding: calc(44px + var(--safe-top)) 12px 10px;
+    flex-direction: row;
+    align-items: center;
+    padding: calc(10px + var(--safe-top)) 12px 10px;
+    gap: 12px;
+  }
+
+  .status-display {
+    flex: 1;
+    width: auto;
+    text-align: left;
+    order: 0;
+  }
+
+  .now-playing-badge {
+    padding-right: 0;
+  }
+
+  .top-controls {
+    width: auto;
+    flex: 0 0 auto;
+    justify-content: flex-end;
+    order: 0;
     gap: 8px;
   }
 
+  .top-utility {
+    position: static;
+  }
+
   .controls-bar {
-    padding: 12px;
-    gap: 10px;
+    padding: 10px 12px;
+    gap: 8px;
   }
 
   .main-controls {
-    display: flex;
-    flex-wrap: nowrap;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
     gap: 10px;
+  }
+
+  .control-group {
+    width: auto;
+    min-width: 0;
   }
 
   .control-group.center {
     width: auto;
     margin-bottom: 0;
-    gap: 16px;
-    order: 2;
+    gap: 12px;
+    justify-self: center;
+    grid-column: 2;
   }
 
-  .control-group.left {
-    order: 1;
-  }
   .control-group.right {
-    order: 3;
-  }
-
-  .playlist-panel {
-    left: auto;
-    right: 12px;
-    top: calc(12px + var(--safe-top));
-    bottom: calc(120px + var(--safe-bottom));
-    width: min(420px, 46vw);
-    max-height: none;
+    width: auto;
+    justify-self: end;
+    grid-column: 3;
   }
 }
 /* Sort Dropdown */
@@ -1829,4 +1955,24 @@ select option {
 /* __videoContainerCenterFix */
 .video-container {
   transform: translateX(-50%) translateZ(0);
+}
+
+/* Landscape phones: use the full screen so the settings content stays usable */
+@media (max-height: 520px) and (orientation: landscape) and (max-width: 1024px) {
+  .modal-content {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
+  }
+
+  .modal-header,
+  .modal-footer {
+    padding: 10px 16px;
+  }
+
+  .tab-content {
+    padding: 12px 16px;
+  }
 }

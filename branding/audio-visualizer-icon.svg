@@ -1,0 +1,182 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2048" height="2048" viewBox="0 0 2048 2048">
+  <defs>
+    <clipPath id="appShape">
+      <rect x="128" y="128" width="1792" height="1792" rx="400"/>
+    </clipPath>
+
+    <!-- Background: teal (top-left) to indigo (bottom-right) -->
+    <linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="128" y1="128" x2="1919" y2="1919">
+      <stop offset="0" stop-color="#2a7490"/>
+      <stop offset=".15" stop-color="#2a7490"/>
+      <stop offset=".21" stop-color="#286b8b"/>
+      <stop offset=".26" stop-color="#285b83"/>
+      <stop offset=".32" stop-color="#26507c"/>
+      <stop offset=".375" stop-color="#254675"/>
+      <stop offset=".43" stop-color="#243c6f"/>
+      <stop offset=".49" stop-color="#26366b"/>
+      <stop offset=".54" stop-color="#273265"/>
+      <stop offset=".60" stop-color="#2e3162"/>
+      <stop offset=".65" stop-color="#342f5f"/>
+      <stop offset=".71" stop-color="#37305e"/>
+      <stop offset=".77" stop-color="#3b2f5d"/>
+      <stop offset=".82" stop-color="#3d2f5c"/>
+      <stop offset=".88" stop-color="#42305f"/>
+      <stop offset="1" stop-color="#44305f"/>
+    </linearGradient>
+
+    <radialGradient id="centerShade" gradientUnits="userSpaceOnUse" cx="990" cy="1010" r="650">
+      <stop offset="0" stop-color="#050a1e" stop-opacity=".18"/>
+      <stop offset=".65" stop-color="#050a1e" stop-opacity=".12"/>
+      <stop offset="1" stop-color="#050a1e" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Bar fills: light cap, body, darker foot -->
+    <linearGradient id="bar1" gradientUnits="userSpaceOnUse" x1="0" y1="893" x2="0" y2="1319">
+      <stop offset="0" stop-color="#a1e3ff"/>
+      <stop offset=".16" stop-color="#9ce1ff"/>
+      <stop offset=".24" stop-color="#74cfff"/>
+      <stop offset="1" stop-color="#5fb4ff"/>
+    </linearGradient>
+    <linearGradient id="bar2" gradientUnits="userSpaceOnUse" x1="0" y1="760" x2="0" y2="1319">
+      <stop offset="0" stop-color="#9ee1ff"/>
+      <stop offset=".08" stop-color="#76d1ff"/>
+      <stop offset="1" stop-color="#57a7ff"/>
+    </linearGradient>
+    <linearGradient id="bar3" gradientUnits="userSpaceOnUse" x1="0" y1="456" x2="0" y2="1319">
+      <stop offset="0" stop-color="#a8ebff"/>
+      <stop offset=".17" stop-color="#9de0ff"/>
+      <stop offset=".25" stop-color="#75cfff"/>
+      <stop offset=".75" stop-color="#57aaff"/>
+      <stop offset="1" stop-color="#559eff"/>
+    </linearGradient>
+    <linearGradient id="bar4" gradientUnits="userSpaceOnUse" x1="0" y1="640" x2="0" y2="1319">
+      <stop offset="0" stop-color="#8cd1ff"/>
+      <stop offset=".17" stop-color="#64baff"/>
+      <stop offset="1" stop-color="#538cff"/>
+    </linearGradient>
+    <linearGradient id="bar5" gradientUnits="userSpaceOnUse" x1="0" y1="770" x2="0" y2="1319">
+      <stop offset="0" stop-color="#72b8ff"/>
+      <stop offset=".25" stop-color="#56a0ff"/>
+      <stop offset="1" stop-color="#517fff"/>
+    </linearGradient>
+
+    <!-- Wave: cyan -> blue-violet -> magenta -->
+    <linearGradient id="wave" gradientUnits="userSpaceOnUse" x1="560" y1="1000" x2="1540" y2="960">
+      <stop offset="0" stop-color="#7ed2ff"/>
+      <stop offset=".08" stop-color="#7ed2ff"/>
+      <stop offset=".30" stop-color="#7bc0ff"/>
+      <stop offset=".68" stop-color="#7a92ff"/>
+      <stop offset=".72" stop-color="#7a8bff"/>
+      <stop offset=".90" stop-color="#a277e2"/>
+      <stop offset="1" stop-color="#d05fc0"/>
+    </linearGradient>
+
+    <radialGradient id="capGlow">
+      <stop offset="0" stop-color="#eaffff" stop-opacity=".40"/>
+      <stop offset=".58" stop-color="#a9e2ff" stop-opacity=".20"/>
+      <stop offset="1" stop-color="#a9e2ff" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="dotGlow">
+      <stop offset="0" stop-color="#d6eeff" stop-opacity=".30"/>
+      <stop offset=".55" stop-color="#d6eeff" stop-opacity=".16"/>
+      <stop offset="1" stop-color="#d6eeff" stop-opacity="0"/>
+    </radialGradient>
+
+    <filter id="blur30" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="30"/></filter>
+    <filter id="blur14" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="14"/></filter>
+    <filter id="blur6" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="6"/></filter>
+
+    <g id="barShapes">
+      <rect x="494" y="893" width="115" height="426" rx="57.5"/>
+      <rect x="692" y="760" width="115" height="559" rx="57.5"/>
+      <rect x="888" y="456" width="115" height="863" rx="57.5"/>
+      <rect x="1084" y="640" width="115" height="679" rx="57.5"/>
+      <rect x="1280" y="770" width="115" height="549" rx="57.5"/>
+    </g>
+  </defs>
+
+  <!-- Background -->
+  <rect x="128" y="128" width="1792" height="1792" rx="400" fill="url(#bg)"/>
+
+  <!-- Decorative ripples and streaks -->
+  <g clip-path="url(#appShape)">
+    <g fill="none" stroke="#d6ebff" stroke-opacity=".04" stroke-width="3">
+      <circle cx="985" cy="985" r="300"/>
+      <circle cx="985" cy="985" r="360"/>
+      <circle cx="985" cy="985" r="420"/>
+      <circle cx="985" cy="985" r="480"/>
+      <circle cx="985" cy="985" r="540"/>
+    </g>
+    <circle cx="985" cy="985" r="600" fill="none" stroke="#d6ebff" stroke-opacity=".07" stroke-width="4"/>
+    <circle cx="985" cy="985" r="596" fill="none" stroke="#0a1430" stroke-opacity=".06" stroke-width="10"/>
+
+    <g stroke="#ffffff" stroke-opacity=".175" stroke-width="14" stroke-linecap="round">
+      <line x1="303" y1="431" x2="645" y2="146"/>
+      <line x1="231" y1="823" x2="693" y2="353"/>
+      <line x1="590" y1="638" x2="1033" y2="193"/>
+      <line x1="1207" y1="586" x2="1391" y2="391"/>
+      <line x1="1497" y1="903" x2="1737" y2="657"/>
+      <line x1="1128" y1="1755" x2="1742" y2="1103"/>
+    </g>
+
+    <rect x="128" y="128" width="1792" height="1792" rx="400" fill="url(#centerShade)"/>
+  </g>
+
+  <g clip-path="url(#appShape)">
+    <!-- Shadow and light around the bars -->
+    <use href="#barShapes" transform="translate(0 25)" fill="#04102a" opacity=".22" filter="url(#blur30)"/>
+    <use href="#barShapes" fill="#4fd8ff" opacity=".45" filter="url(#blur6)"/>
+    <use href="#barShapes" fill="#4fd8ff" opacity=".42" filter="url(#blur14)"/>
+    <use href="#barShapes" fill="#8fe0ff" opacity=".14" filter="url(#blur30)"/>
+
+    <!-- Waveform -->
+    <path d="M 555 1075
+             C 585 1035 620 985 660 935
+             C 692 895 725 858 762 835
+             C 786 820 796 812 808 812
+             C 840 812 862 830 884 858
+             C 930 915 980 975 1025 1005
+             C 1042 1017 1052 1028 1062 1024
+             C 1112 1000 1160 895 1200 835
+             C 1235 777 1265 758 1300 758
+             C 1340 758 1380 790 1420 826
+             C 1450 855 1490 920 1530 950"
+          fill="none" stroke="#9fe6ff" stroke-width="76" stroke-opacity=".10"
+          stroke-linecap="round" filter="url(#blur14)"/>
+    <path d="M 555 1075
+             C 585 1035 620 985 660 935
+             C 692 895 725 858 762 835
+             C 786 820 796 812 808 812
+             C 840 812 862 830 884 858
+             C 930 915 980 975 1025 1005
+             C 1042 1017 1052 1028 1062 1024
+             C 1112 1000 1160 895 1200 835
+             C 1235 777 1265 758 1300 758
+             C 1340 758 1380 790 1420 826
+             C 1450 855 1490 920 1530 950"
+          fill="none" stroke="url(#wave)" stroke-width="55" stroke-linecap="round"/>
+
+    <!-- Light around the bar caps -->
+    <g fill="url(#capGlow)">
+      <circle cx="551.5" cy="950.5" r="95"/>
+      <circle cx="749.5" cy="817.5" r="95"/>
+      <circle cx="945.5" cy="513.5" r="100"/>
+      <circle cx="1141.5" cy="697.5" r="95"/>
+      <circle cx="1337.5" cy="827.5" r="95"/>
+    </g>
+
+    <!-- Bars -->
+    <g>
+      <rect x="494" y="893" width="115" height="426" rx="57.5" fill="url(#bar1)"/>
+      <rect x="692" y="760" width="115" height="559" rx="57.5" fill="url(#bar2)"/>
+      <rect x="888" y="456" width="115" height="863" rx="57.5" fill="url(#bar3)"/>
+      <rect x="1084" y="640" width="115" height="679" rx="57.5" fill="url(#bar4)"/>
+      <rect x="1280" y="770" width="115" height="549" rx="57.5" fill="url(#bar5)"/>
+    </g>
+
+    <!-- Cursor dot -->
+    <circle cx="1023" cy="1023" r="86" fill="url(#dotGlow)"/>
+    <circle cx="1023" cy="1023" r="36" fill="#d6eeff"/>
+  </g>
+</svg>

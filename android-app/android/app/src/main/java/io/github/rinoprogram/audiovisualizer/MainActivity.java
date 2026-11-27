@@ -5,15 +5,39 @@ import android.webkit.WebView;
 
 import com.getcapacitor.BridgeActivity;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
 public class MainActivity extends BridgeActivity {
+	private final OnBackPressedCallback backPressedCallback = new OnBackPressedCallback(true) {
+		@Override
+		public void handleOnBackPressed() {
+			WebView webView = getBridge() != null ? getBridge().getWebView() : null;
+			if (webView == null) {
+				fallbackToSystemBack();
+				return;
+			}
+			webView.evaluateJavascript(
+				"(function(){try{return !!(window.handleAndroidBack && window.handleAndroidBack());}catch(e){return false;}})()",
+				value -> {
+					if (!"true".equals(value)) {
+						runOnUiThread(MainActivity.this::fallbackToSystemBack);
+					}
+				}
+			);
+		}
+	};
+
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		registerPlugin(LocalFolderImportPlugin.class);
+		registerPlugin(MediaNotificationPlugin.class);
+		registerPlugin(MediaLibraryPlugin.class);
+		registerPlugin(MediaMetadataPlugin.class);
 		super.onCreate(savedInstanceState);
+		getOnBackPressedDispatcher().addCallback(this, backPressedCallback);
 		applyImmersiveFullscreen();
 		
 		// WebView設定: バックグラウンド音声再生を有効化
@@ -52,6 +76,12 @@ public class MainActivity extends BridgeActivity {
 			}
 		} catch (Exception ignored) {}
 		super.onPause();
+	}
+
+	private void fallbackToSystemBack() {
+		// このコールバックを無効化して、通常の戻る動作（アプリ終了/バックグラウンド）へ委ねる
+		backPressedCallback.setEnabled(false);
+		getOnBackPressedDispatcher().onBackPressed();
 	}
 
 	private void applyImmersiveFullscreen() {

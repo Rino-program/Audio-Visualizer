@@ -47,6 +47,13 @@
       <div class="top-bar glass">
         <div class="status-display">
           <div class="now-playing-badge">
+            <div
+              id="nowPlayingArtSm"
+              class="now-playing-art-sm"
+              aria-hidden="true"
+            >
+              🎵
+            </div>
             <div class="now-playing-meta">
               <span id="statusText" data-i18n="status.waiting"
                 >🎵 待機中...</span
@@ -106,6 +113,32 @@
           >
             ⚙️
           </button>
+          <div class="top-utility">
+            <button
+              id="toggleUIBtnTop"
+              class="icon-btn"
+              data-i18n-title="btn.toggleUI"
+              data-i18n-aria="aria.toggleUI"
+              title="UI表示切替 (H)"
+              aria-label="UI表示を切り替える"
+            >
+              <img
+                src="./img/audio-visualizer-icon-btn240.png"
+                alt=""
+                class="btn-icon"
+              />
+            </button>
+            <button
+              id="fullscreenBtn"
+              class="icon-btn"
+              data-i18n-title="btn.fullscreen"
+              data-i18n-aria="aria.fullscreen"
+              title="全画面 (F)"
+              aria-label="全画面表示"
+            >
+              ⛶
+            </button>
+          </div>
         </div>
       </div>
 
@@ -225,6 +258,16 @@
               🗑️
             </button>
             <button
+              id="deviceMusicBtn"
+              class="icon-btn sm file-btn"
+              data-i18n-title="btn.deviceMusic"
+              data-i18n-aria="aria.deviceMusic"
+              title="端末の音楽を追加"
+              aria-label="端末の音楽を追加"
+            >
+              🎵
+            </button>
+            <button
               id="nativeFileBtn"
               class="icon-btn sm file-btn"
               data-i18n-title="btn.addFile"
@@ -268,25 +311,16 @@
       <button
         id="toggleUIBtn"
         class="icon-btn"
-        data-i18n-title="btn.toggleUI"
-        data-i18n-aria="aria.toggleUI"
-        title="UI表示切替 (H)"
-        aria-label="UI表示を切り替える"
+        data-i18n-title="btn.showUI"
+        data-i18n-aria="aria.showUI"
+        title="UIを表示 (H)"
+        aria-label="UIを表示する"
       >
         <img
           src="./img/audio-visualizer-icon-btn240.png"
-          alt="UI切替"
+          alt=""
           class="btn-icon"
         />
-      </button>
-      <!-- 新規追加: 全画面ボタン -->
-      <button
-        id="fullscreenBtn"
-        class="icon-btn"
-        title="全画面 (F)"
-        aria-label="全画面表示"
-      >
-        ⛶
       </button>
     </div>
 
@@ -294,7 +328,12 @@
       <div class="modal-content glass">
         <div class="modal-header">
           <h2 data-i18n="settings.title">設定</h2>
-          <button id="closeSettingsBtn" class="close-btn" aria-label="閉じる">
+          <button
+            id="closeSettingsBtn"
+            class="close-btn"
+            data-i18n-aria="btn.close"
+            aria-label="閉じる"
+          >
             ✖
           </button>
         </div>
@@ -313,6 +352,12 @@
           <button class="tab-btn" data-tab="player" data-i18n="tab.player">
             プレーヤー
           </button>
+          <button class="tab-btn" data-tab="presets" data-i18n="tab.presets">
+            プリセット
+          </button>
+          <button class="tab-btn" data-tab="storage" data-i18n="tab.storage">
+            ストレージ
+          </button>
           <button class="tab-btn" data-tab="help" data-i18n="tab.help">
             ヘルプ
           </button>
@@ -327,8 +372,8 @@
 
         <div class="tab-content active" id="tab-display">
           <p style="font-size: 0.6rem; color: var(--text-muted); margin: 0">
-            <span data-i18n="version.prefix">バージョン</span>: v1.1.5
-            <span data-i18n="version.code">バージョンコード</span>: 18
+            <span data-i18n="version.prefix">バージョン</span>: v1.2.0
+            <span data-i18n="version.code">バージョンコード</span>: 19
           </p>
           <div class="settings-section-title" data-i18n="section.system">
             システム / System
@@ -355,6 +400,36 @@
               <option value="zh-CN">中文 (简体)</option>
               <option value="ko-KR">한국어</option>
             </select>
+          </div>
+
+          <div class="setting-item">
+            <label for="uiScaleSlider" data-i18n="label.uiScale"
+              >文字とUIの大きさ</label
+            >
+            <div class="range-wrapper">
+              <input
+                type="range"
+                id="uiScaleSlider"
+                min="80"
+                max="130"
+                step="5"
+                value="100"
+                data-i18n-aria="aria.uiScale"
+                aria-label="文字とUIの大きさ"
+              />
+              <span id="uiScaleValue">100%</span>
+            </div>
+            <p class="hint" data-i18n="hint.uiScale">
+              文字やボタンなど、UI全体の大きさを変更します。ビジュアライザーの描画には影響しません。
+            </p>
+            <button
+              type="button"
+              class="mini-btn"
+              id="resetUiScaleBtn"
+              data-i18n="btn.resetUiScale"
+            >
+              100% に戻す
+            </button>
           </div>
 
           <div class="settings-section-title" data-i18n="section.displayTuning">
@@ -474,16 +549,13 @@
             </label>
           </div>
           <div class="setting-item">
-            <label>
-              <input type="checkbox" id="showVideoCheckbox" />
-              <span data-i18n="label.showVideo"
-                >動画を表示 (動画ファイル時)</span
-              >
-            </label>
-          </div>
-          <div class="setting-item">
-            <label data-i18n="label.videoMode">動画表示モード</label>
-            <select id="videoModeSelect">
+            <label for="videoDisplayModeSelect" data-i18n="label.videoDisplayMode"
+              >動画の表示</label
+            >
+            <select id="videoDisplayModeSelect">
+              <option value="audio" data-i18n="opt.videoAudioOnly">
+                音声のみ（映像を表示しない）
+              </option>
               <option value="window" data-i18n="opt.videoWindow">
                 ウィンドウ (移動可能)
               </option>
@@ -491,6 +563,9 @@
                 背景 (全画面)
               </option>
             </select>
+            <p class="hint" data-i18n="hint.videoDisplayMode">
+              音声のみを選ぶと、動画ファイルでも映像を読み込まず、音声とビジュアライザーだけを再生します。
+            </p>
           </div>
           <div class="setting-item">
             <label data-i18n="label.videoFitMode"
@@ -525,7 +600,7 @@
             <label data-i18n="label.glow">発光 (Glow) を有効</label>
             <div class="range-wrapper">
               <input type="range" id="glowSlider" min="0" max="50" step="1" />
-              <span id="glowValue" data-i18n="val.medium">Medium</span>
+              <span id="glowValue">Medium</span>
             </div>
           </div>
           <div class="setting-item">
@@ -1128,6 +1203,28 @@
           </div>
           <div class="setting-item">
             <label>
+              <input type="checkbox" id="resumePlaybackCheckbox" checked />
+              <span data-i18n="label.resumePlayback"
+                >前回の続きから再開する</span
+              >
+            </label>
+            <p class="hint" data-i18n="hint.resumePlayback">
+              アプリを閉じたときの曲と再生位置を記憶します。
+            </p>
+          </div>
+          <div class="setting-item">
+            <label>
+              <input type="checkbox" id="keepScreenOnCheckbox" checked />
+              <span data-i18n="label.keepScreenOn"
+                >画面をスリープさせない</span
+              >
+            </label>
+            <p class="hint" data-i18n="hint.keepScreenOn">
+              再生中やマイク入力中に画面が暗くならないようにします。
+            </p>
+          </div>
+          <div class="setting-item">
+            <label>
               <input type="checkbox" id="stopOnVideoEndCheckbox" />
               <span data-i18n="label.stopOnVideoEnd"
                 >動画終了時に停止 (動画優先)</span
@@ -1290,7 +1387,7 @@
           </div>
         </div>
 
-        <div class="tab-content" id="tab-storage" style="display: none">
+        <div class="tab-content" id="tab-storage">
           <div class="setting-item">
             <label>
               <input type="checkbox" id="storeLocalFilesCheckbox" />
@@ -1348,6 +1445,10 @@
               <li>
                 <span data-i18n="shortcut.toggleUI">UI表示切替</span>
                 <span>H</span>
+              </li>
+              <li>
+                <span data-i18n="shortcut.fullscreen">全画面切替</span>
+                <span>F</span>
               </li>
               <li>
                 <span data-i18n="shortcut.toggleVideo">動画表示切替</span>

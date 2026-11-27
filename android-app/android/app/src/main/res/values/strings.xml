@@ -1,7 +1,14 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Audio Visualizer</string>
-    <string name="title_activity_main">Audio Visualizer</string>
-    <string name="package_name">io.github.rinoprogram.audiovisualizer</string>
-    <string name="custom_url_scheme">io.github.rinoprogram.audiovisualizer</string>
+    <string name="app_name" translatable="false">Audio Visualizer</string>
+    <string name="title_activity_main" translatable="false">Audio Visualizer</string>
+    <string name="package_name" translatable="false">io.github.rinoprogram.audiovisualizer</string>
+    <string name="custom_url_scheme" translatable="false">io.github.rinoprogram.audiovisualizer</string>
+    <string name="notification_channel_name">Playback</string>
+    <string name="notification_channel_description">Playback controls</string>
+    <string name="notification_previous">Previous</string>
+    <string name="notification_play">Play</string>
+    <string name="notification_pause">Pause</string>
+    <string name="notification_next">Next</string>
+    <string name="notification_stop">Stop</string>
 </resources>
